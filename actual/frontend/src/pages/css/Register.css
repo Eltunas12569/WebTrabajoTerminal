@@ -1,0 +1,98 @@
+/* Reutilizamos la estructura base del contenedor */
+.register-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100vw;
+    min-height: 100vh; /* Permite scroll si la pantalla es pequeña */
+    background-color: #b6ddff;
+    padding: 20px 0;
+}
+
+.register-card {
+    width: 100%;
+    max-width: 450px; /* Un poco más ancho para los campos de ESCOM */
+    padding: 30px 40px;
+    background-color: #FFFFFF;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.register-title {
+    font-size: 24px;
+    color: #444;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.register-subtitle {
+    font-size: 14px;
+    color: #003366;
+    margin-bottom: 25px;
+}
+
+.register-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Espaciado uniforme entre inputs */
+    text-align: left;
+}
+
+.register-input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #000000;
+    font-size: 14px;
+    transition: border-color 0.3s;
+    box-sizing: border-box;
+}
+
+.register-input:focus {
+    outline: none;
+    border-color: #003366;
+    box-shadow: 0 0 5px rgba(0, 51, 102, 0.2);
+}
+
+/* Botón Principal (Guinda ESCOM) */
+.btn-register {
+    width: 100%;
+    padding: 14px;
+    background-color: #800020;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s;
+    margin-top: 10px;
+}
+
+.btn-register:hover {
+    background-color: #600018;
+}
+
+/* Botón para volver (Azul IPN) */
+.btn-back {
+    background: none;
+    border: none;
+    color: #003366;
+    font-size: 14px;
+    font-weight: bold;
+    text-decoration: underline;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.register-error-banner {
+    margin-top: 20px;
+    padding: 12px;
+    background-color: #F8E8EB;
+    color: #A00020;
+    border-left: 5px solid #A00020;
+    border-radius: 4px;
+    font-size: 13px;
+    text-align: left;
+}

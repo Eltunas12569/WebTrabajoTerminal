@@ -1,0 +1,136 @@
+/* Contenedor principal de la página Crear Club */
+.crear-club-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f2f5; /* Un fondo claro y suave */
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* Tarjeta del formulario */
+.crear-club-card {
+    background-color: #ffffff;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    width: 100%;
+    max-width: 600px;
+    text-align: center;
+}
+
+.crear-club-title {
+    font-size: 2.2rem;
+    color: #003366; /* Azul IPN */
+    margin-bottom: 10px;
+    font-weight: 700;
+}
+
+.crear-club-subtitle {
+    font-size: 1rem;
+    color: #666;
+    margin-bottom: 30px;
+}
+
+/* Formulario */
+.crear-club-form {
+    text-align: left;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.9rem;
+    color: #333;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group textarea {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #dcdcdc;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #333;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    box-sizing: border-box; /* Asegura que padding no aumente el ancho */
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    border-color: #003366;
+    box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.2);
+    outline: none;
+}
+
+.form-group textarea {
+    resize: vertical; /* Permite redimensionar verticalmente */
+}
+
+/* Botón de envío */
+.btn-crear-club {
+    width: 100%;
+    padding: 14px 20px;
+    background-color: #800020; /* Guinda IPN */
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    margin-top: 20px;
+}
+
+.btn-crear-club:hover:not(:disabled) {
+    background-color: #600018;
+    transform: translateY(-2px);
+}
+
+.btn-crear-club:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+/* Mensajes de error/éxito */
+.message-banner {
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 20px;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.message-banner.error {
+    background-color: #ffebee;
+    color: #d32f2f;
+    border: 1px solid #ef9a9a;
+}
+
+.message-banner.success {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+}
+
+.btn-back-to-gestion {
+    background: none;
+    border: none;
+    color: #003366;
+    text-decoration: underline;
+    cursor: pointer;
+    margin-top: 25px;
+    font-size: 0.9rem;
+    transition: color 0.2s ease;
+}
+
+.btn-back-to-gestion:hover {
+    color: #00509e;
+}

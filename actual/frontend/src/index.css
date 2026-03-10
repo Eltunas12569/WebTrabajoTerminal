@@ -1,0 +1,67 @@
+/* 1. Bloqueo de esquema de color a nivel raíz */
+:root {
+  color-scheme: light !important;
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 2. Configuración del Body (Fondo Azul Claro de tu Club) */
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  justify-content: center; /* Asegura el centrado de la tarjeta */
+  min-width: 320px;
+  min-height: 100vh;
+  /* Forzamos colores institucionales */
+  background-color: #b6ddff !important; 
+  color: #212529 !important; 
+}
+
+/* 3. Blindaje total contra Modo Oscuro del dispositivo */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: light !important;
+  }
+  body {
+    background-color: #b6ddff !important;
+    color: #212529 !important;
+  }
+}
+
+/* 4. Estilos base para elementos comunes */
+h1 {
+  font-size: 2.5em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+a {
+  font-weight: 500;
+  color: #003366; /* Azul IPN */
+  text-decoration: none;
+  transition: color 0.25s;
+}
+
+a:hover {
+  color: #800020; /* Guinda IPN */
+}
+
+/* 5. Reset de botones para que no se pongan negros en modo oscuro */
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.25s;
+  background-color: #ffffff; /* Fondo claro por defecto */
+  color: #212529;
+}

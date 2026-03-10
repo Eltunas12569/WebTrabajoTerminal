@@ -1,0 +1,281 @@
+/* Contenedor principal */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100vw;
+    height: 100vh;
+    background-color: #b6ddff;
+    margin: 0;
+    padding: 0;
+}
+
+/* Tarjeta blanca */
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    padding: 40px;
+    background-color: #FFFFFF;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.login-header {
+    margin-bottom: 30px;
+}
+
+.logo-placeholder {
+    font-size: 50px;
+    margin-bottom: 10px;
+}
+
+.login-title {
+    font-size: 24px;
+    color: #444;
+    font-weight: bold;
+    margin: 0;
+}
+
+.login-subtitle {
+    font-size: 14px;
+    color: #003366;
+    margin-top: 5px;
+}
+
+/* Formulario */
+.login-form {
+    text-align: left;
+}
+
+.input-group {
+    margin-bottom: 20px;
+}
+
+.input-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6e6e6e;
+    margin-bottom: 8px;
+}
+
+.login-input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #919191;
+    font-size: 15px;
+    transition: all 0.3s;
+    box-sizing: border-box;
+}
+
+/* Botones */
+.btn-submit {
+    width: 100%;
+    padding: 14px;
+    background-color: #800020; /* Guinda IPN */
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.btn-submit:hover:not(:disabled) {
+    background-color: #600018;
+}
+
+.btn-loading {
+    background-color: #A00020;
+    opacity: 0.8;
+    cursor: wait;
+}
+
+.btn-disabled {
+    background-color: #e9ecef;
+    cursor: not-allowed;
+    color: #6c757d;
+}
+
+/* Sección de Registro */
+.register-prompt {
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.prompt-text {
+    font-size: 13px;
+    color: #666;
+    margin: 0 0 5px 0;
+}
+
+.link-button {
+    background: none;
+    border: none;
+    color: #003366;
+    font-size: 14px;
+    font-weight: bold;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 5px;
+    transition: color 0.2s;
+}
+
+.link-button:hover {
+    color: #00509e;
+}
+
+/* Banners de Error/Éxito */
+.error-banner {
+    margin-top: 20px;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    text-align: left;
+    line-height: 1.4;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.footer-text {
+    margin-top: 30px;
+    font-size: 11px;
+    color: #999;
+}
+/* Layout de pantalla dividida */
+.login-page-wrapper {
+    display: flex;
+    min-height: 100vh;
+    width: 100vw;
+    background-color: #b6ddff; /* Tu fondo azul blindado */
+}
+
+/* Sección de Avisos (Izquierda) */
+.login-side-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.avisos-container {
+    max-width: 450px;
+    width: 100%;
+}
+
+.avisos-title {
+    color: #003366;
+    margin-bottom: 25px;
+    font-size: 1.8rem;
+    font-weight: 800;
+}
+
+.aviso-card-login {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border-left: 6px solid #1976d2;
+}
+
+.aviso-card-login.prio-alta {
+    border-left-color: #800020; /* Guinda ESCOM */
+}
+
+.aviso-tag {
+    font-size: 10px;
+    font-weight: bold;
+    padding: 3px 8px;
+    background: #eee;
+    border-radius: 4px;
+    color: #666;
+}
+
+/* Sección de Formulario (Derecha) */
+.login-side-form {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border-radius: 40px 0 0 40px; /* Curva estética */
+    box-shadow: -10px 0 30px rgba(0,0,0,0.1);
+}
+
+.escom-branding {
+    margin-top: 40px;
+    color: #003366;
+    font-weight: 600;
+    opacity: 0.8;
+}
+
+/* Responsivo para celulares */
+@media (max-width: 850px) {
+    .login-page-wrapper { flex-direction: column; }
+    .login-side-form { border-radius: 40px 40px 0 0; }
+    .login-side-info { padding: 20px; }
+}
+/* Pantalla Dividida */
+.login-split-screen {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    background-color: #b6ddff; /* Fondo general azul */
+}
+
+/* Columna de Avisos */
+.login-avisos-section {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+}
+
+.avisos-wrapper {
+    width: 100%;
+    max-width: 400px;
+}
+
+.section-title {
+    color: #003366;
+    font-size: 2rem;
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+.aviso-card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+/* Colores por prioridad basados en tu DB */
+.color-alta { border-left: 8px solid #800020; }   /* Guinda IPN */
+.color-normal { border-left: 8px solid #003366; } /* Azul IPN */
+.color-baja { border-left: 8px solid #999; }      /* Gris */
+
+/* Columna de Login */
+.login-form-section {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: white;
+    border-radius: 50px 0 0 50px; /* Desplaza el login a la derecha con estilo */
+    box-shadow: -10px 0 20px rgba(0,0,0,0.05);
+}
+
+.login-card {
+    width: 100%;
+    max-width: 380px;
+    padding: 20px;
+}

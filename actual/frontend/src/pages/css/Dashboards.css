@@ -1,0 +1,406 @@
+/* ==========================================================================
+   1. LAYOUT PRINCIPAL Y ESTRUCTURA
+   ========================================================================== */
+.web-dashboard {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    background-color: #ffffff !important;
+}
+
+/* NAVBAR FIJA SUPERIOR */
+.admin-navbar-fixed {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 65px;
+    background-color: #003366 !important; /* Azul IPN */
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 25px;
+    z-index: 1001;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    box-sizing: border-box;
+}
+
+/* SIDEBAR FIJA LATERAL */
+.admin-sidebar-fixed {
+    position: fixed;
+    left: -280px;
+    top: 65px;
+    width: 280px;
+    height: calc(100vh - 65px);
+    background-color: #f8f9fa;
+    border-right: 1px solid #dee2e6;
+    transition: left 0.3s ease;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    padding: 20px 0;
+}
+
+.admin-sidebar-fixed.active {
+    left: 0;
+}
+
+/* ÁREA DE CONTENIDO PRINCIPAL */
+.admin-main-scroll {
+    margin-top: 65px;
+    padding: 40px;
+    width: 100%;
+    height: calc(100vh - 65px);
+    overflow-y: auto;
+    background-color: #ffffff !important;
+    box-sizing: border-box;
+}
+
+/* ==========================================================================
+   2. COMPONENTES DE LA NAVBAR (PERFIL)
+   ========================================================================== */
+.profile-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.profile-greeting {
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+.user-name-highlight {
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.profile-bubble {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Color de fondo dinámico vía inline style en React */
+    color: #ffffff !important; /* Blanco Total */
+    font-weight: 800;
+    font-size: 1.4rem;
+    text-transform: uppercase;
+    border: 2px solid #ffffff;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    user-select: none;
+    transition: transform 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.profile-bubble:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+/* ==========================================================================
+   3. MENÚ LATERAL (SIDEBAR)
+   ========================================================================== */
+.sidebar-links ul { list-style: none; padding: 0; margin: 0; }
+
+.sidebar-links li {
+    padding: 15px 30px;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: #333;
+}
+
+.sidebar-links li:hover { background-color: #e9ecef; }
+
+.logout-button {
+    margin: auto 20px 20px 20px;
+    padding: 12px;
+    background-color: #800020; /* Guinda ESCOM */
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.3s;
+}
+
+.logout-button:hover { background-color: #600018; }
+
+/* ==========================================================================
+   4. SECCIÓN DE CLUBES (GRID Y CARDS)
+   ========================================================================== */
+.clubs-grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 25px;
+    margin-top: 20px;
+}
+
+.club-card-admin {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.club-card-admin:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+    border-color: #b6ddff;
+}
+
+.club-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.club-card-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #003366;
+}
+
+/* TAGS DE ESTATUS */
+.club-tag {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: bold;
+    text-transform: capitalize;
+}
+.tag-activo { background: #d4edda; color: #155724; }
+.tag-inactivo { background: #f8d7da; color: #721c24; }
+.tag-en_revision { background: #fff3cd; color: #856404; }
+
+.club-card-body p {
+    margin: 5px 0;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.club-stats-mini {
+    margin-top: 10px;
+    font-weight: 600;
+    color: #333;
+}
+
+.club-card-footer {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+.btn-edit-club, .btn-view-list {
+    flex: 1;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border: 1px solid #ddd;
+    background: #f8f9fa;
+    transition: 0.2s;
+}
+
+.btn-edit-club:hover, .btn-view-list:hover {
+    background: #003366;
+    color: white;
+    border-color: #003366;
+}
+
+/* ==========================================================================
+   5. SISTEMA DE FOLDERS (CENTRO DE ACTIVIDADES)
+   ========================================================================== */
+.hub-container-centered {
+    max-width: 800px;
+    margin: 20px auto;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.folder-tabs {
+    display: flex;
+    background: #f1f3f5;
+    padding: 10px 20px 0 20px;
+}
+
+.folder-btn {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 10px 10px 0 0;
+    cursor: pointer;
+    font-weight: 600;
+    background: #dee2e6;
+    margin-right: 5px;
+    transition: 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.folder-btn.active-avisos {
+    background: white !important;
+    border: 2px solid #ff9800;
+    border-bottom: none;
+    color: #ff9800;
+}
+
+.folder-btn.active-clubs {
+    background: white !important;
+    border: 2px solid #003366;
+    border-bottom: none;
+    color: #003366;
+}
+
+.folder-body {
+    padding: 25px;
+    margin: 0 15px 15px 15px;
+    border-radius: 0 0 10px 10px;
+    /* El color del borde se puede manejar dinámicamente */
+}
+
+/* ==========================================================================
+   6. OTROS ESTADOS
+   ========================================================================== */
+.loading-state {
+    text-align: center;
+    padding: 40px;
+    font-size: 1.2rem;
+    color: #003366;
+}
+.club-row-info h4 {
+    margin-bottom: 5px;
+}
+
+/* Estilos para el botón de Revisar Club */
+.btn-review-club {
+    background-color: #003366; /* Azul IPN */
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.3s ease;
+}
+
+.btn-review-club:hover {
+    background-color: #002244;
+}
+
+/* Estilos para la modal de detalles del club */
+.club-details-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* Asegura que esté por encima de otros elementos */
+}
+
+.club-details-modal {
+    background-color: #ffffff;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 600px;
+    position: relative;
+    animation: fadeInScale 0.3s ease-out;
+}
+
+.club-details-modal .close-modal-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+    transition: color 0.2s ease;
+}
+
+.club-details-modal .close-modal-btn:hover {
+    color: #333;
+}
+
+.club-details-modal .modal-title {
+    color: #003366;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.club-details-modal .modal-content p {
+    margin-bottom: 10px;
+    font-size: 1rem;
+    color: #333;
+}
+
+.club-details-modal .modal-content strong {
+    color: #003366;
+}
+
+.club-details-modal .modal-actions {
+    margin-top: 30px;
+    display: flex;
+    justify-content: space-around;
+    gap: 15px;
+}
+
+.club-details-modal .btn-approve,
+.club-details-modal .btn-reject {
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+    flex-grow: 1;
+}
+
+.club-details-modal .btn-approve {
+    background-color: #28a745; /* Verde para aprobar */
+    color: white;
+    border: 1px solid #28a745;
+}
+
+.club-details-modal .btn-approve:hover {
+    background-color: #218838;
+}
+
+.club-details-modal .btn-reject {
+    background-color: #dc3545; /* Rojo para rechazar */
+    color: white;
+    border: 1px solid #dc3545;
+}
+
+.club-details-modal .btn-reject:hover {
+    background-color: #c82333;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
