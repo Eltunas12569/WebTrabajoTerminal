@@ -35,55 +35,54 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Ruta para crear un nuevo club
-// Protegida por el middleware de autenticación
+
 router.post('/', verifyToken, async (req, res) => {
     const { nombre, descripcion, profesor_encargado_id, alumno_encargado_id } = req.body;
-    const estatus = 'en_revision'; // El estatus por defecto al crear un club
-    const fecha_creacion = new Date(); // Fecha y hora actual
+    const estatus = 'en_revision'; 
+    const fecha_creacion = new Date();
 
-    // Validaciones básicas
     if (!nombre || !descripcion || !profesor_encargado_id || !alumno_encargado_id) {
-        return res.status(400).json({ message: 'Todos los campos son obligatorios: nombre, descripción, profesor_encargado_id, alumno_encargado_id.' });
+        return res.status(400).json({ message: 'Campos obligatorios faltantes.' });
     }
     
     try {
+        // 1. Crear el club
         const [result] = await db.query(
             `INSERT INTO clubes (nombre, descripcion, profesor_encargado_id, alumno_encargado_id, estatus, fecha_creacion)
              VALUES (?, ?, ?, ?, ?, ?)`,
             [nombre, descripcion, profesor_encargado_id, alumno_encargado_id, estatus, fecha_creacion]
         );
 
+        const newClubId = result.insertId;
+
+        // 2. Inscribir al Profesor
+        await db.query(
+            `INSERT INTO inscripciones (usuario_id, club_id, estatus) VALUES (?, ?, ?)`,
+            [profesor_encargado_id, newClubId, 'activo']
+        );
+
+        // 3. Inscribir al Alumno (SOLO si es una persona distinta al profesor)
+        if (profesor_encargado_id !== alumno_encargado_id) {
+            await db.query(
+                `INSERT INTO inscripciones (usuario_id, club_id, estatus) VALUES (?, ?, ?)`,
+                [alumno_encargado_id, newClubId, 'activo']
+            );
+        }
+
+        // 4. Enviar respuesta final solo después de completar todo
         res.status(201).json({
-            message: 'Club creado exitosamente y en estado pendiente de aprobación.',
-            clubId: result.insertId,
-            estatus: estatus
+            message: 'Club creado exitosamente.',
+            clubId: newClubId
         });
-
-        // Registrar al profesor encargado en la tabla de inscripciones
-        await db.query(
-            `INSERT INTO inscripciones (usuario_id, club_id, estatus)
-             VALUES (?, ?, ?)`,
-            [profesor_encargado_id, result.insertId, 'activo'] // Estatus 'activo' por defecto para encargados
-        );
-        console.log(`Profesor ${profesor_encargado_id} inscrito en el club ${result.insertId}.`);
-
-        // Registrar al alumno encargado en la tabla de inscripciones
-        await db.query(
-            `INSERT INTO inscripciones (usuario_id, club_id, estatus)
-             VALUES (?, ?, ?)`,
-            [alumno_encargado_id, result.insertId, 'activo'] // Estatus 'activo' por defecto para encargados
-        );
-        console.log(`Alumno ${alumno_encargado_id} inscrito en el club ${result.insertId}.`);
 
     } catch (error) {
         console.error("Error al crear el club:", error);
-        res.status(500).json({
-            message: "Error interno del servidor al crear el club."
-        });
+        // Evitamos enviar doble respuesta si ya se envió arriba
+        if (!res.headersSent) {
+            res.status(500).json({ message: "Error interno", error: error.message });
+        }
     }
 });
-
 
 // Obtener clubes a los que un usuario está inscrito
 router.get('/user/:userId', verifyToken, async (req, res) => {
