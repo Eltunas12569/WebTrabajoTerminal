@@ -35,4 +35,18 @@ router.get('/students-in-charge', verifyToken, async (req, res) => {
     }
 });
 
+// NUEVA RUTA: Obtener todos los usuarios para el buscador universal
+router.get('/', verifyToken, async (req, res) => {
+    try {
+        const [usuarios] = await db.query(`
+            SELECT id, nombres, apellidos, boleta, role_id AS rol 
+            FROM usuarios
+        `); // Usamos AS rol para que coincida con el modelo de Android
+        res.status(200).json(usuarios);
+    } catch (error) {
+        console.error("Error en búsqueda universal:", error);
+        res.status(500).json({ message: "Error al consultar usuarios" });
+    }
+});
+
 module.exports = router;
