@@ -155,6 +155,13 @@ const Login = () => {
                             {error}
                         </div>
                     )}
+
+                    <div className="register-prompt">
+                        <p className="prompt-text">¿No tienes una cuenta?</p>
+                        <button type="button" onClick={() => navigate('/register')} className="link-button">
+                            Regístrate aquí
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

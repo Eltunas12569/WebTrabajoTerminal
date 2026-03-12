@@ -193,6 +193,12 @@ router.delete('/:id', verifyToken, async (req, res) => {
 // NUEVA RUTA: Editar un club completo (Textos y Encargados)
 router.put('/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
+    
+    // VERIFICACIÓN DE SEGURIDAD: Solo el Administrador (role_id = 1) puede reasignar encargados
+    if (req.user.role_id !== 1 && req.user.rol !== 1) {
+        return res.status(403).json({ message: "Acceso denegado. Solo los administradores pueden editar encargados." });
+    }
+
     const { nombre, descripcion, nuevo_profesor_id, nuevo_alumno_id } = req.body;
 
     if (!nombre || !descripcion || !nuevo_profesor_id || !nuevo_alumno_id) {
