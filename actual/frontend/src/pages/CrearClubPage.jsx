@@ -3,6 +3,64 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './css/CrearClubPage.css'; // Importa el CSS para esta página
 
+// Componente interno para selector con búsqueda (Autocomplete)
+const SearchableSelect = ({ options, value, onChange, placeholder }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        // Sincronizar el texto del input con el valor seleccionado (ID)
+        const selected = options.find(o => o.id == value);
+        if (selected) {
+            setSearchTerm(`${selected.nombres} ${selected.apellidos} (Boleta: ${selected.boleta})`);
+        } else if (!isOpen) {
+            // Solo limpiar si no está abierto (el usuario no está escribiendo activamente)
+            setSearchTerm('');
+        }
+    }, [value, options, isOpen]);
+
+    return (
+        <div style={{ position: 'relative' }}>
+            <input
+                type="text"
+                placeholder={placeholder}
+                value={searchTerm}
+                onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setIsOpen(true);
+                }}
+                onFocus={() => setIsOpen(true)}
+                onBlur={() => setTimeout(() => setIsOpen(false), 200)} // Pequeño retraso para permitir capturar el click en la lista
+                autoComplete="off"
+            />
+            {isOpen && (
+                <ul style={{
+                    position: 'absolute', top: '100%', left: 0, width: '100%',
+                    maxHeight: '200px', overflowY: 'auto', backgroundColor: 'white',
+                    border: '1px solid #ccc', borderRadius: '0 0 8px 8px', zIndex: 1000,
+                    listStyle: 'none', padding: 0, margin: 0, boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                }}>
+                    {options.filter(op => 
+                        `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).map(op => (
+                        <li key={op.id}
+                            style={{ padding: '10px', cursor: 'pointer', borderBottom: '1px solid #eee', color: '#333' }}
+                            onMouseDown={() => { onChange(op.id); setIsOpen(false); }}
+                            onMouseEnter={(e) => e.target.style.backgroundColor = '#f0f2f5'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                        >
+                            {op.nombres} {op.apellidos} (Boleta: {op.boleta})
+                        </li>
+                    ))}
+                    {options.filter(op => `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                        <li style={{ padding: '10px', color: '#999' }}>No se encontraron resultados</li>
+                    )}
+                </ul>
+            )}
+        </div>
+    );
+};
+
 const CrearClubPage = () => {
     const [nombre, setNombre] = useState('');
     const [descripcion, setDescripcion] = useState('');
@@ -126,40 +184,22 @@ const CrearClubPage = () => {
                         ></textarea>
                     </div>
                     <div className="form-group">
-                        <label htmlFor="profesorEncargadoId">ID Profesor Encargado</label>
-                        <select
-                            id="profesorEncargadoId"
+                        <label htmlFor="profesorEncargadoId">Profesor Encargado</label>
+                        <SearchableSelect 
+                            options={profesoresDisponibles}
                             value={profesorEncargadoId}
-                            onChange={(e) => setProfesorEncargadoId(e.target.value)}
-                            required
-                            disabled={loadingProfesores || loading}
-                        >
-                            <option value="">{loadingProfesores ? 'Cargando profesores...' : 'Selecciona un profesor'}</option>
-                            {profesoresDisponibles.map((profesor) => (
-                                <option key={profesor.id} value={profesor.id}>
-                                    {profesor.nombres} {profesor.apellidos} (Boleta: {profesor.boleta})
-                                </option>
-                            ))}
-                        </select>
-                        {/* Se ha cambiado a un selector desplegable */}
+                            onChange={(id) => setProfesorEncargadoId(id)}
+                            placeholder={loadingProfesores ? "Cargando..." : "Buscar profesor por nombre o boleta..."}
+                        />
                     </div>
                     <div className="form-group">
                         <label htmlFor="alumnoEncargadoId">Alumno Encargado</label>
-                        <select
-                            id="alumnoEncargadoId"
+                        <SearchableSelect 
+                            options={alumnosDisponibles}
                             value={alumnoEncargadoId}
-                            onChange={(e) => setAlumnoEncargadoId(e.target.value)}
-                            required
-                            disabled={loadingAlumnos || loading}
-                        >
-                            <option value="">{loadingAlumnos ? 'Cargando alumnos...' : 'Selecciona un alumno'}</option>
-                            {alumnosDisponibles.map((alumno) => (
-                                <option key={alumno.id} value={alumno.id}>
-                                    {alumno.nombres} {alumno.apellidos} (Boleta: {alumno.boleta})
-                                </option>
-                            ))}
-                        </select>
-                        {/* Se ha cambiado a un selector desplegable para alumnos */}
+                            onChange={(id) => setAlumnoEncargadoId(id)}
+                            placeholder={loadingAlumnos ? "Cargando..." : "Buscar alumno por nombre o boleta..."}
+                        />
                     </div>
                     <button type="submit" className="btn-crear-club" disabled={loading}>
                         {loading ? 'Creando...' : 'Registrar Club'}
