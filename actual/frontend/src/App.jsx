@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AdminDashboard from './pages/AdminDashboard';
 import GestionDashboard from './pages/GestionDashboard';
 import CrearClubPage from './pages/CrearClubPage'; // Asume que este archivo existe
+import ClubDetailsAdminPage from './pages/ClubDetailsAdminPage';
 
 /**
  * Configuración de Rutas del Sistema de Gestión Deportiva - ESCOM
@@ -38,13 +39,19 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* Crear Club (Profesores, Alumnos Encargados y Alumnos) */}
+          {/* Crear Club (Administrador) */}
           <Route path="/crear-club" element={
-            <ProtectedRoute rolesPermitidos={[2, 3, 4]}>
+            <ProtectedRoute rolesPermitidos={[1]}>
               <CrearClubPage />
             </ProtectedRoute>
           } />
-          
+
+          {/* Detalles del Club (Administrador) */}
+          <Route path="/admin/club/:id" element={
+            <ProtectedRoute rolesPermitidos={[1]}>
+              <ClubDetailsAdminPage />
+            </ProtectedRoute>
+          } />
 
           {/* Manejo de errores 404 */}
           <Route path="*" element={<div style={{ padding: '20px' }}><h1>404 - Página no encontrada</h1></div>} />

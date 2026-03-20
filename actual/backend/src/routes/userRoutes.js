@@ -8,9 +8,10 @@ const verifyToken = require('../middlewares/authMiddleware'); // Asegúrate de q
 router.get('/professors', verifyToken, async (req, res) => {
     try {
         const [profesores] = await db.query(`
-            SELECT id, nombres, apellidos, boleta
-            FROM usuarios
-            WHERE role_id = 2;
+            SELECT u.id, u.nombres, u.apellidos, u.correo, pd.num_empleado AS boleta
+            FROM usuarios u
+            JOIN profesores_detalles pd ON u.id = pd.usuario_id
+            WHERE u.role_id = 2;
         `);
         res.status(200).json(profesores);
     } catch (error) {
@@ -24,9 +25,10 @@ router.get('/professors', verifyToken, async (req, res) => {
 router.get('/students-in-charge', verifyToken, async (req, res) => {
     try {
         const [alumnos] = await db.query(`
-            SELECT id, nombres, apellidos, boleta
-            FROM usuarios
-            WHERE role_id IN (3, 4);
+            SELECT u.id, u.nombres, u.apellidos, u.correo, ad.boleta
+            FROM usuarios u
+            JOIN alumnos_detalles ad ON u.id = ad.usuario_id
+            WHERE u.role_id IN (3, 4);
         `);
         res.status(200).json(alumnos);
     } catch (error) {
@@ -39,8 +41,12 @@ router.get('/students-in-charge', verifyToken, async (req, res) => {
 router.get('/', verifyToken, async (req, res) => {
     try {
         const [usuarios] = await db.query(`
-            SELECT id, nombres, apellidos, boleta, role_id AS rol 
-            FROM usuarios
+            SELECT u.id, u.nombres, u.apellidos, u.correo,
+                   COALESCE(ad.boleta, pd.num_empleado) AS boleta, 
+                   u.role_id AS rol 
+            FROM usuarios u
+            LEFT JOIN alumnos_detalles ad ON u.id = ad.usuario_id
+            LEFT JOIN profesores_detalles pd ON u.id = pd.usuario_id
         `); // Usamos AS rol para que coincida con el modelo de Android
         res.status(200).json(usuarios);
     } catch (error) {
