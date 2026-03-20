@@ -145,7 +145,7 @@ const CrearClubPage = () => {
             setDescripcion('');
             setProfesorEncargadoId('');
             setAlumnoEncargadoId('');
-            // navigate('/gestion'); // Por ejemplo, redirigir al dashboard de gestión
+            // navigate('/admin'); // Por ejemplo, redirigir al dashboard de admin
         } catch (err) {
             console.error("Error al crear el club:", err);
             setError(err.response?.data?.message || 'Error al crear el club. Inténtalo de nuevo.');
@@ -208,7 +208,7 @@ const CrearClubPage = () => {
 
                 {error && <div className="message-banner error">{error}</div>}
                 {success && <div className="message-banner success">{success}</div>}
-                <button onClick={() => navigate('/gestion')} className="btn-back-to-gestion">Volver al Dashboard</button>
+                <button onClick={() => navigate('/admin')} className="btn-back-to-gestion">Volver al Dashboard</button>
             </div>
         </div>
     );

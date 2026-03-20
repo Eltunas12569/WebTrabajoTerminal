@@ -10,19 +10,21 @@ router.get('/', async (req, res) => {
         const [rows] = await db.query(`
             SELECT 
                 c.id, 
-                nombre, 
-                descripcion, 
-                estatus,
-                fecha_creacion,
-                profesor_encargado_id,
-                alumno_encargado_id,
+                c.nombre, 
+                c.descripcion, 
+                c.estatus,
+                c.fecha_creacion,
+                p_insc.usuario_id AS profesor_encargado_id,
+                a_insc.usuario_id AS alumno_encargado_id,
                 p.nombres AS profesor_nombres,
                 p.apellidos AS profesor_apellidos,
                 a.nombres AS alumno_nombres,
                 a.apellidos AS alumno_apellidos
             FROM clubes c
-            LEFT JOIN usuarios p ON c.profesor_encargado_id = p.id
-            LEFT JOIN usuarios a ON c.alumno_encargado_id = a.id
+            LEFT JOIN inscripciones p_insc ON c.id = p_insc.club_id AND p_insc.rol_en_club = 'encargado_profesor'
+            LEFT JOIN usuarios p ON p_insc.usuario_id = p.id
+            LEFT JOIN inscripciones a_insc ON c.id = a_insc.club_id AND a_insc.rol_en_club = 'encargado_alumno'
+            LEFT JOIN usuarios a ON a_insc.usuario_id = a.id
         `);
         
         // Enviamos la respuesta al frontend en formato JSON
@@ -49,17 +51,17 @@ router.post('/', verifyToken, async (req, res) => {
     try {
         // 1. Insertar el club
         const [result] = await db.query(
-            `INSERT INTO clubes (nombre, descripcion, profesor_encargado_id, alumno_encargado_id, estatus, fecha_creacion)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [nombre, descripcion, profesor_encargado_id, alumno_encargado_id, estatus, fecha_creacion]
+            `INSERT INTO clubes (nombre, descripcion, estatus, fecha_creacion)
+             VALUES (?, ?, ?, ?)`,
+            [nombre, descripcion, estatus, fecha_creacion]
         );
 
         const newClubId = result.insertId;
 
         // 2. Inscribir al Profesor y actualizar su rol a 2 (profesor_encargado)
         await db.query(
-            `INSERT INTO inscripciones (usuario_id, club_id, estatus) VALUES (?, ?, ?)`,
-            [profesor_encargado_id, newClubId, 'activo']
+            `INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo')`,
+            [profesor_encargado_id, newClubId]
         );
         // Actualizamos el rol, protegiendo al Admin (role_id = 1) para que no pierda sus permisos
         await db.query(
@@ -70,8 +72,8 @@ router.post('/', verifyToken, async (req, res) => {
         // 3. Inscribir al Alumno y actualizar su rol a 3 (alumno_encargado)
         if (profesor_encargado_id !== alumno_encargado_id) {
             await db.query(
-                `INSERT INTO inscripciones (usuario_id, club_id, estatus) VALUES (?, ?, ?)`,
-                [alumno_encargado_id, newClubId, 'activo']
+                `INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo')`,
+                [alumno_encargado_id, newClubId]
             );
             // Actualizamos el rol, protegiendo al Admin (role_id = 1)
             await db.query(
@@ -101,8 +103,8 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
                 c.descripcion,
                 c.estatus,
                 c.fecha_creacion,
-                c.profesor_encargado_id,
-                c.alumno_encargado_id,
+                p_insc.usuario_id AS profesor_encargado_id,
+                a_insc.usuario_id AS alumno_encargado_id,
                 p.nombres AS profesor_nombres,
                 p.apellidos AS profesor_apellidos,
                 a.nombres AS alumno_nombres,
@@ -111,8 +113,10 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
                 i.fecha_inscripcion
             FROM clubes c
             JOIN inscripciones i ON c.id = i.club_id
-            LEFT JOIN usuarios p ON c.profesor_encargado_id = p.id
-            LEFT JOIN usuarios a ON c.alumno_encargado_id = a.id
+            LEFT JOIN inscripciones p_insc ON c.id = p_insc.club_id AND p_insc.rol_en_club = 'encargado_profesor'
+            LEFT JOIN usuarios p ON p_insc.usuario_id = p.id
+            LEFT JOIN inscripciones a_insc ON c.id = a_insc.club_id AND a_insc.rol_en_club = 'encargado_alumno'
+            LEFT JOIN usuarios a ON a_insc.usuario_id = a.id
             WHERE i.usuario_id = ? AND i.estatus = 'activo';
         `, [userId]);
 
@@ -146,18 +150,59 @@ router.put('/:id/aprobar', verifyToken, async (req, res) => {
     }
 });
 
+// NUEVA RUTA: Obtener un club específico por ID
+router.get('/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [rows] = await db.query(`
+            SELECT 
+                c.id, 
+                c.nombre, 
+                c.descripcion, 
+                c.estatus,
+                c.fecha_creacion,
+                p_insc.usuario_id AS profesor_encargado_id,
+                a_insc.usuario_id AS alumno_encargado_id,
+                p.nombres AS profesor_nombres,
+                p.apellidos AS profesor_apellidos,
+                p.correo AS profesor_correo,
+                pd.num_empleado AS profesor_num_empleado,
+                a.nombres AS alumno_nombres,
+                a.apellidos AS alumno_apellidos,
+                a.correo AS alumno_correo,
+                ad.boleta AS alumno_boleta
+            FROM clubes c
+            LEFT JOIN inscripciones p_insc ON c.id = p_insc.club_id AND p_insc.rol_en_club = 'encargado_profesor'
+            LEFT JOIN usuarios p ON p_insc.usuario_id = p.id
+            LEFT JOIN profesores_detalles pd ON p.id = pd.usuario_id
+            LEFT JOIN inscripciones a_insc ON c.id = a_insc.club_id AND a_insc.rol_en_club = 'encargado_alumno'
+            LEFT JOIN usuarios a ON a_insc.usuario_id = a.id
+            LEFT JOIN alumnos_detalles ad ON a.id = ad.usuario_id
+            WHERE c.id = ?
+        `, [id]);
+        
+        if (rows.length === 0) return res.status(404).json({ message: "Club no encontrado" });
+        
+        res.status(200).json(rows[0]);
+    } catch (error) {
+        console.error("Error al obtener club:", error);
+        res.status(500).json({ message: "Error interno del servidor" });
+    }
+});
 
 router.delete('/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
     try {
         // 1. Obtener quiénes eran los encargados ANTES de borrar el club
-        const [clubes] = await db.query('SELECT profesor_encargado_id, alumno_encargado_id FROM clubes WHERE id = ?', [id]);
+        const [clubes] = await db.query('SELECT id FROM clubes WHERE id = ?', [id]);
         
         if (clubes.length === 0) {
             return res.status(404).json({ message: "Club no encontrado" });
         }
 
-        const { profesor_encargado_id, alumno_encargado_id } = clubes[0];
+        const [encargados] = await db.query('SELECT usuario_id, rol_en_club FROM inscripciones WHERE club_id = ? AND rol_en_club IN ("encargado_profesor", "encargado_alumno")', [id]);
+        const profesor_encargado_id = encargados.find(e => e.rol_en_club === 'encargado_profesor')?.usuario_id;
+        const alumno_encargado_id = encargados.find(e => e.rol_en_club === 'encargado_alumno')?.usuario_id;
 
         // 2. Eliminar el club de la base de datos
         await db.query('DELETE FROM clubes WHERE id = ?', [id]);
@@ -168,8 +213,8 @@ router.delete('/:id', verifyToken, async (req, res) => {
             
             // Buscamos si el usuario todavía está a cargo de algún OTRO club
             const [otrosClubes] = await db.query(
-                'SELECT id FROM clubes WHERE profesor_encargado_id = ? OR alumno_encargado_id = ?', 
-                [usuarioId, usuarioId]
+                'SELECT id FROM inscripciones WHERE usuario_id = ? AND rol_en_club IN ("encargado_profesor", "encargado_alumno")', 
+                [usuarioId]
             );
 
             // Si el arreglo está vacío, significa que ya NO es encargado de NADA
@@ -206,22 +251,29 @@ router.put('/:id', verifyToken, async (req, res) => {
     }
 
     try {
-        // 1. Obtener encargados actuales para ver si a alguien lo van a despedir
-        const [clubes] = await db.query('SELECT profesor_encargado_id, alumno_encargado_id FROM clubes WHERE id = ?', [id]);
+        const [clubes] = await db.query('SELECT id FROM clubes WHERE id = ?', [id]);
         if (clubes.length === 0) return res.status(404).json({ message: "Club no encontrado" });
 
-        const viejo_profesor_id = clubes[0].profesor_encargado_id;
-        const viejo_alumno_id = clubes[0].alumno_encargado_id;
+        // 1. Obtener encargados actuales para ver si a alguien lo van a despedir
+        const [encargados] = await db.query('SELECT usuario_id, rol_en_club FROM inscripciones WHERE club_id = ? AND rol_en_club IN ("encargado_profesor", "encargado_alumno")', [id]);
+        const viejo_profesor_id = encargados.find(e => e.rol_en_club === 'encargado_profesor')?.usuario_id;
+        const viejo_alumno_id = encargados.find(e => e.rol_en_club === 'encargado_alumno')?.usuario_id;
 
-        // 2. Actualizar TODOS los datos del club de un jalón
+        // 2. Actualizar textos del club
         await db.query(
-            'UPDATE clubes SET nombre = ?, descripcion = ?, profesor_encargado_id = ?, alumno_encargado_id = ? WHERE id = ?',
-            [nombre, descripcion, nuevo_profesor_id, nuevo_alumno_id, id]
+            'UPDATE clubes SET nombre = ?, descripcion = ? WHERE id = ?',
+            [nombre, descripcion, id]
         );
 
-        // 3. Inscribir a los nuevos si es que no estaban inscritos
-        await db.query(`INSERT IGNORE INTO inscripciones (usuario_id, club_id, estatus) VALUES (?, ?, 'activo')`, [nuevo_profesor_id, id]);
-        await db.query(`INSERT IGNORE INTO inscripciones (usuario_id, club_id, estatus) VALUES (?, ?, 'activo')`, [nuevo_alumno_id, id]);
+        // 3. Modificar inscripciones
+        if (viejo_profesor_id !== nuevo_profesor_id) {
+            if (viejo_profesor_id) await db.query(`DELETE FROM inscripciones WHERE usuario_id = ? AND club_id = ? AND rol_en_club = 'encargado_profesor'`, [viejo_profesor_id, id]);
+            await db.query(`INSERT INTO inscripciones (usuario_id, club_id, estatus, rol_en_club) VALUES (?, ?, 'activo', 'encargado_profesor') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_profesor'`, [nuevo_profesor_id, id]);
+        }
+        if (viejo_alumno_id !== nuevo_alumno_id) {
+            if (viejo_alumno_id) await db.query(`DELETE FROM inscripciones WHERE usuario_id = ? AND club_id = ? AND rol_en_club = 'encargado_alumno'`, [viejo_alumno_id, id]);
+            await db.query(`INSERT INTO inscripciones (usuario_id, club_id, estatus, rol_en_club) VALUES (?, ?, 'activo', 'encargado_alumno') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_alumno'`, [nuevo_alumno_id, id]);
+        }
 
         // 4. Subir de puesto a los NUEVOS (Roles 2 y 3), protegiendo al Admin
         await db.query(`UPDATE usuarios SET role_id = 2 WHERE id = ? AND role_id != 1`, [nuevo_profesor_id]);
@@ -230,7 +282,7 @@ router.put('/:id', verifyToken, async (req, res) => {
         // 5. Función para destituir a los viejos si se quedaron sin clubes
         const actualizarRolSiEsNecesario = async (usuarioId) => {
             if (!usuarioId) return;
-            const [otrosClubes] = await db.query('SELECT id FROM clubes WHERE profesor_encargado_id = ? OR alumno_encargado_id = ?', [usuarioId, usuarioId]);
+            const [otrosClubes] = await db.query('SELECT id FROM inscripciones WHERE usuario_id = ? AND rol_en_club IN ("encargado_profesor", "encargado_alumno")', [usuarioId]);
             if (otrosClubes.length === 0) {
                 await db.query('UPDATE usuarios SET role_id = 4 WHERE id = ? AND role_id != 1', [usuarioId]);
             }

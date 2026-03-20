@@ -1,30 +1,21 @@
 import React, { useState, useEffect } from 'react'; // Import useEffect
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom'; // 1. Importamos el hook
 import axios from 'axios'; // Import axios
 import './css/Dashboards.css';
 
 const GestionDashboard = () => {
     const { user, logout } = useAuth();
-    const navigate = useNavigate(); // 2. Inicializamos el navegador
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('clubs'); // Default to clubs tab
     const [userClubs, setUserClubs] = useState([]); // State for user's clubs
     const [loadingClubs, setLoadingClubs] = useState(true); // Loading state for clubs
+    
+    const [avisos, setAvisos] = useState([]); // Estado para los avisos combinados
+    const [loadingAvisos, setLoadingAvisos] = useState(true);
+
     const API_URL = import.meta.env.VITE_API_URL; // Get API_URL
 
-    // Datos de ejemplo
-    const avisos = [
-        { id: 1, titulo: 'Nueva actualización', desc: 'La aplicación ha sido actualizada.', tiempo: 'Hace 5 min' },
-    ];
-
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
-
-    // 3. Función para redirigir
-    const goToCreateClub = () => {
-        setIsSidebarOpen(false); // Cerramos el sidebar antes de irnos
-        navigate('/crear-club'); // <--- Ruta a la que quieres ir
-    };
 
     // Fetch user's clubs when component mounts or user changes
     useEffect(() => {
@@ -49,6 +40,28 @@ const GestionDashboard = () => {
         fetchUserClubs();
     }, [user, API_URL]); // Re-run when user or API_URL changes
 
+    // Obtener los avisos (Globales + Clubs) del usuario
+    useEffect(() => {
+        const fetchAvisos = async () => {
+            if (user && user.id) {
+                setLoadingAvisos(true);
+                try {
+                    const response = await axios.get(`${API_URL}/avisos/user/${user.id}`, {
+                        headers: {
+                            Authorization: `Bearer ${localStorage.getItem('token')}`
+                        }
+                    });
+                    setAvisos(response.data);
+                } catch (error) {
+                    console.error("Error al obtener los avisos:", error);
+                } finally {
+                    setLoadingAvisos(false);
+                }
+            }
+        };
+        fetchAvisos();
+    }, [user, API_URL]);
+
     return (
         <div className="web-dashboard">
             <header className="admin-navbar-fixed">
@@ -71,12 +84,8 @@ const GestionDashboard = () => {
                             <li onClick={() => { setActiveTab('avisos'); setIsSidebarOpen(false); }}>🏠 Inicio</li>
                             <li onClick={() => { setActiveTab('clubs'); setIsSidebarOpen(false); }}>📅 Mis Actividades</li>
                             
-                            {/* 4. Opción con redirección real */}
-                            <li onClick={goToCreateClub} className="special-link">
-                                ➕ Crear Club
-                            </li>
-
-                            {user?.rol !== 4 && <li onClick={toggleSidebar}>📋 Pasar Lista</li>}
+                            {/* Mostrar Pasar Lista solo a Administradores (1) y Profesores (2) */}
+                            {(user?.role_id === 1 || user?.role_id === 2 || user?.rol === 1 || user?.rol === 2) && <li onClick={toggleSidebar}>📋 Pasar Lista</li>}
                         </ul>
                     </nav>
                     <button onClick={logout} className="logout-button">Cerrar Sesión</button>
@@ -102,15 +111,26 @@ const GestionDashboard = () => {
                         <div className="folder-body" style={{ borderColor: activeTab === 'avisos' ? '#ff9800' : '#003366' }}>
                             {activeTab === 'avisos' ? (
                                 <div className="avisos-list">
-                                    {avisos.map(aviso => (
-                                        <div key={aviso.id} className="aviso-item">
-                                            <div className="aviso-header">
-                                                <h4>{aviso.titulo}</h4>
-                                                <button className="close-x">×</button>
+                                    {loadingAvisos ? (
+                                        <p style={{ padding: '20px' }}>Cargando avisos...</p>
+                                    ) : avisos.length > 0 ? (
+                                        avisos.map(aviso => (
+                                            <div key={`${aviso.tipo}-${aviso.id}`} className="aviso-item" style={{ borderLeft: aviso.prioridad === 'alta' ? '4px solid #dc3545' : '4px solid #003366' }}>
+                                                <div className="aviso-header">
+                                                    <h4>
+                                                        {aviso.tipo === 'global' ? '🌍 ' : '🛡️ '} 
+                                                        {aviso.titulo}
+                                                    </h4>
+                                                    <span style={{ fontSize: '0.85rem', color: '#666' }}>
+                                                        {new Date(aviso.tiempo).toLocaleDateString('es-MX')}
+                                                    </span>
+                                                </div>
+                                                <p>{aviso.descripcion}</p>
                                             </div>
-                                            <p>{aviso.desc}</p>
-                                        </div>
-                                    ))}
+                                        ))
+                                    ) : (
+                                        <p style={{ padding: '20px' }}>No hay avisos nuevos por el momento.</p>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="clubs-list-simple"> {/* This is the clubs tab content */}
