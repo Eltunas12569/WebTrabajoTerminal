@@ -1,83 +1,76 @@
-const User = require('../models/userModel');
+const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-/**
- * Servicio de Autenticación con Seguridad Reforzada (RBAC + Anti-Fuerza Bruta)
- */
-
-// --- FUNCIÓN DE LOGIN ---
 const login = async (correo, password) => {
-    // 1. Buscamos al usuario en la base de datos
-    const user = await User.findByEmail(correo);
+    const [users] = await db.query(`SELECT * FROM usuarios WHERE correo = ?`, [correo]);
+    const user = users[0];
     
-    if (!user) {
-        throw new Error('El correo electrónico no está registrado');
-    }
+    if (!user) throw new Error('El correo electrónico no está registrado');
 
-    // 2. Verificación de Bloqueo por seguridad
     if (user.bloqueado_hasta && new Date(user.bloqueado_hasta) > new Date()) {
         const tiempoRestante = Math.ceil((new Date(user.bloqueado_hasta) - new Date()) / 60000);
         throw new Error(`Cuenta bloqueada temporalmente. Intenta de nuevo en ${tiempoRestante} minutos.`);
     }
 
-    // 3. Comparación de contraseña (Bcrypt)
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-        await User.registrarIntentoFallido(user.id);
-        const intentosRestantes = 5 - (user.intentos_fallidos + 1);
-        
-        if (intentosRestantes <= 0) {
-            throw new Error('Has superado el límite de intentos. Cuenta bloqueada por seguridad.');
+        await db.query(`UPDATE usuarios SET intentos_fallidos = intentos_fallidos + 1 WHERE id = ?`, [user.id]);
+        const [checkUser] = await db.query(`SELECT intentos_fallidos FROM usuarios WHERE id = ?`, [user.id]);
+        const intentos = checkUser[0].intentos_fallidos;
+        if (intentos >= 5) {
+            await db.query(`UPDATE usuarios SET bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?`, [user.id]);
+            throw new Error('Límite de intentos superado. Cuenta bloqueada por 15 minutos.');
         }
-        throw new Error(`Contraseña incorrecta. Intentos restantes: ${intentosRestantes}`);
+        throw new Error(`Contraseña incorrecta. Intentos restantes: ${5 - intentos}`);
     }
 
-    // 4. Login Exitoso: Reset de seguridad
-    await User.resetearIntentos(user.id);
+    await db.query(`UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = ?`, [user.id]);
 
-    // 5. Generación del JWT
-    const token = jwt.sign(
-        { id: user.id, rol: user.role_id }, 
-        process.env.JWT_SECRET, 
-        { expiresIn: '8h' } 
-    );
+    let boleta = null, num_empleado = null;
+    if (user.role_id === 2) {
+        const [det] = await db.query(`SELECT boleta FROM alumnos_detalles WHERE usuario_id = ?`, [user.id]);
+        if (det.length > 0) boleta = det[0].boleta;
+    } else if (user.role_id === 3) {
+        const [det] = await db.query(`SELECT num_empleado FROM profesores_detalles WHERE usuario_id = ?`, [user.id]);
+        if (det.length > 0) num_empleado = det[0].num_empleado;
+    }
+
+    const token = jwt.sign({ id: user.id, rol: user.role_id }, process.env.JWT_SECRET, { expiresIn: '8h' });
 
     return {
         token,
         user: {
             id: user.id,
             nombres: user.nombres,
-            apellidos: user.apellidos,
-            rol: user.role_id,
-            boleta: user.boleta
+            apellidos: `${user.apellido_paterno} ${user.apellido_materno || ''}`.trim(),
+            role_id: user.role_id, // ⬅️ CORRECCIÓN CRÍTICA: Ahora sí dice role_id
+            boleta,
+            num_empleado
         }
     };
 };
 
-// --- NUEVA FUNCIÓN DE REGISTRO ---
 const register = async (userData) => {
-    const { nombres, apellidos, nss, boleta, correo, password } = userData;
-
-    // 1. Encriptación de la contraseña antes de guardarla
+    const { nombres, apellido_paterno, apellido_materno, correo, password, rol_id, nss, boleta, carrera, num_empleado } = userData;
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // 2. Llamada al modelo para insertar en la DB
-    // El role_id 4 corresponde al rol de 'alumno' según tu tabla de roles
-    await User.create(
-        nombres, 
-        apellidos, 
-        nss, 
-        boleta, 
-        correo, 
-        passwordHash, 
-        4 
+    const [result] = await db.query(
+        `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) VALUES (?, ?, ?, ?, ?, ?)`,
+        [nombres, apellido_paterno, apellido_materno, correo, passwordHash, rol_id]
     );
+
+    const userId = result.insertId;
+
+    if (rol_id === 2) {
+        await db.query(`INSERT INTO alumnos_detalles (usuario_id, nss, boleta, carrera) VALUES (?, ?, ?, ?)`, [userId, nss, boleta, carrera]);
+    } else if (rol_id === 3) {
+        await db.query(`INSERT INTO profesores_detalles (usuario_id, num_empleado) VALUES (?, ?)`, [userId, num_empleado]);
+    }
 
     return { message: "Usuario creado exitosamente" };
 };
 
-// EXPORTACIÓN UNIFICADA: Vital para evitar ReferenceErrors en el controlador
 module.exports = { login, register };
