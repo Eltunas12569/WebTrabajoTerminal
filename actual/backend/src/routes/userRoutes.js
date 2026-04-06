@@ -1,57 +1,53 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const verifyToken = require('../middlewares/authMiddleware'); // Asegúrate de que la ruta sea correcta
+const verifyToken = require('../middlewares/authMiddleware');
 
-// Endpoint para obtener profesores (usuarios con role_id = 2)
-// Protegido por el middleware de autenticación
+// Obtener profesores
 router.get('/professors', verifyToken, async (req, res) => {
     try {
         const [profesores] = await db.query(`
-            SELECT u.id, u.nombres, u.apellidos, u.correo, pd.num_empleado AS boleta
-            FROM usuarios u
-            JOIN profesores_detalles pd ON u.id = pd.usuario_id
-            WHERE u.role_id = 2;
+            SELECT id, nombres, CONCAT(apellido_paterno, ' ', IFNULL(apellido_materno, '')) AS apellidos 
+            FROM usuarios WHERE role_id = 3
         `);
         res.status(200).json(profesores);
     } catch (error) {
-        console.error("Error al obtener profesores:", error);
-        res.status(500).json({ message: "Error interno del servidor al obtener profesores." });
+        res.status(500).json({ message: "Error al obtener profesores" });
     }
 });
 
-// Endpoint para obtener alumnos encargados y alumnos (usuarios con role_id = 3 o 4)
-// Protegido por el middleware de autenticación
+// Obtener alumnos para encargados
 router.get('/students-in-charge', verifyToken, async (req, res) => {
     try {
         const [alumnos] = await db.query(`
-            SELECT u.id, u.nombres, u.apellidos, u.correo, ad.boleta
-            FROM usuarios u
-            JOIN alumnos_detalles ad ON u.id = ad.usuario_id
-            WHERE u.role_id IN (3, 4);
+            SELECT id, nombres, CONCAT(apellido_paterno, ' ', IFNULL(apellido_materno, '')) AS apellidos, 
+            (SELECT boleta FROM alumnos_detalles WHERE usuario_id = usuarios.id) as boleta
+            FROM usuarios WHERE role_id IN (2, 4)
         `);
         res.status(200).json(alumnos);
     } catch (error) {
-        console.error("Error al obtener alumnos encargados:", error);
-        res.status(500).json({ message: "Error interno del servidor al obtener alumnos encargados." });
+        res.status(500).json({ message: "Error al obtener alumnos" });
     }
 });
 
-// NUEVA RUTA: Obtener todos los usuarios para el buscador universal
+// Buscador universal (CORREGIDO)
 router.get('/', verifyToken, async (req, res) => {
     try {
         const [usuarios] = await db.query(`
-            SELECT u.id, u.nombres, u.apellidos, u.correo,
-                   COALESCE(ad.boleta, pd.num_empleado) AS boleta, 
-                   u.role_id AS rol 
+            SELECT 
+                u.id, 
+                u.nombres, 
+                CONCAT(u.apellido_paterno, ' ', IFNULL(u.apellido_materno, '')) AS apellidos, 
+                a.boleta, 
+                p.num_empleado, 
+                u.role_id   /* ⬅️ CORRECCIÓN: Quitamos el "AS rol". Ahora se llama role_id */
             FROM usuarios u
-            LEFT JOIN alumnos_detalles ad ON u.id = ad.usuario_id
-            LEFT JOIN profesores_detalles pd ON u.id = pd.usuario_id
-        `); // Usamos AS rol para que coincida con el modelo de Android
+            LEFT JOIN alumnos_detalles a ON u.id = a.usuario_id
+            LEFT JOIN profesores_detalles p ON u.id = p.usuario_id
+        `);
         res.status(200).json(usuarios);
     } catch (error) {
-        console.error("Error en búsqueda universal:", error);
-        res.status(500).json({ message: "Error al consultar usuarios" });
+        res.status(500).json({ message: "Error en búsqueda" });
     }
 });
 
