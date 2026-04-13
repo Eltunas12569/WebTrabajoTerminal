@@ -6,14 +6,12 @@ const verifyToken = require('../middlewares/authMiddleware');
 // ==========================================
 // --- SISTEMA DE INVITACIONES Y NOTIFICACIONES ---
 // ==========================================
-
 router.get('/invitaciones/pendientes', verifyToken, async (req, res) => {
     const userId = req.user.id;
     try {
         const [rows] = await db.query(`
             SELECT c.id AS club_id, c.nombre, i.rol_en_club AS rol_invitado
-            FROM clubes c
-            JOIN inscripciones i ON c.id = i.club_id
+            FROM clubes c JOIN inscripciones i ON c.id = i.club_id
             WHERE i.usuario_id = ? AND i.estatus = 'pendiente'
         `, [userId]);
         res.status(200).json(rows);
@@ -24,7 +22,6 @@ router.put('/invitaciones/:clubId/responder', verifyToken, async (req, res) => {
     const { clubId } = req.params;
     const { accion } = req.body; 
     const userId = req.user.id;
-
     try {
         if (accion === 'aceptar') {
             await db.query(`UPDATE inscripciones SET estatus = 'activo' WHERE club_id = ? AND usuario_id = ?`, [clubId, userId]);
@@ -39,25 +36,107 @@ router.put('/invitaciones/:clubId/responder', verifyToken, async (req, res) => {
 router.put('/:id/enviar-revision', verifyToken, async (req, res) => {
     const { id } = req.params;
     try {
-        // 👇 CORRECCIÓN: Contamos solo a los alumnos activos (Excluimos al profe) 👇
-        const [countRes] = await db.query(`
-            SELECT COUNT(*) as total 
-            FROM inscripciones 
-            WHERE club_id = ? AND estatus = 'activo' AND rol_en_club != 'encargado_profesor'
-        `, [id]);
+        const [countRes] = await db.query(`SELECT COUNT(*) as total FROM inscripciones WHERE club_id = ? AND estatus = 'activo' AND rol_en_club != 'encargado_profesor'`, [id]);
+        if (countRes[0].total < 20) return res.status(400).json({ message: `Aún faltan confirmaciones. Han aceptado ${countRes[0].total} de 20.` });
         
-        if (countRes[0].total < 20) {
-            return res.status(400).json({ message: `Aún faltan confirmaciones. Solo han aceptado ${countRes[0].total} de 20 alumnos.` });
-        }
         await db.query(`UPDATE clubes SET estatus = 'en_revision' WHERE id = ?`, [id]);
         res.status(200).json({ message: "Club enviado a revisión exitosamente" });
     } catch (error) { res.status(500).json({ message: "Error interno" }); }
 });
 
 // ==========================================
-// --- OBTENER CLUBES ---
+// --- DASHBOARD DEL CLUB (CHAT, AVISOS, EVENTOS, RECURSOS) ---
 // ==========================================
+router.get('/:id/chat', verifyToken, async (req, res) => {
+    try {
+        const [mensajes] = await db.query(`
+            SELECT c.id, c.club_id, c.usuario_id, c.mensaje, c.fecha_envio, CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre
+            FROM chat_club c JOIN usuarios u ON c.usuario_id = u.id
+            WHERE c.club_id = ? ORDER BY c.fecha_envio ASC
+        `, [req.params.id]);
+        res.status(200).json(mensajes);
+    } catch (error) { res.status(500).json({ message: "Error al cargar chat" }); }
+});
 
+router.get('/:id/avisos', verifyToken, async (req, res) => {
+    try {
+        const [avisos] = await db.query(`
+            SELECT a.*, CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre
+            FROM avisos_club a JOIN usuarios u ON a.usuario_id = u.id
+            WHERE a.club_id = ? AND a.activo = 1 ORDER BY a.fecha_envio DESC
+        `, [req.params.id]);
+        res.status(200).json(avisos);
+    } catch (error) { res.status(500).json({ message: "Error al cargar avisos" }); }
+});
+
+router.post('/:id/avisos', verifyToken, async (req, res) => {
+    const { contenido } = req.body;
+    try {
+        await db.query(`INSERT INTO avisos_club (club_id, usuario_id, contenido) VALUES (?, ?, ?)`, [req.params.id, req.user.id, contenido]);
+        
+        // Emitir alerta a todos los del club
+        const io = req.app.get('socketio');
+        io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso' });
+
+        res.status(201).json({ message: "Aviso publicado" });
+    } catch (error) { res.status(500).json({ message: "Error al crear aviso" }); }
+});
+
+router.get('/:id/eventos', verifyToken, async (req, res) => {
+    try {
+        const [eventos] = await db.query(`
+            SELECT e.*, 
+                   (SELECT COUNT(*) FROM asistencias_eventos WHERE evento_id = e.id AND asistira = 1) AS total_asistentes,
+                   (SELECT asistira FROM asistencias_eventos WHERE evento_id = e.id AND usuario_id = ?) AS mi_respuesta
+            FROM eventos_club e
+            WHERE e.club_id = ?
+            ORDER BY e.id DESC
+        `, [req.user.id, req.params.id]);
+        res.status(200).json(eventos);
+    } catch (error) { res.status(500).json({ message: "Error al cargar eventos" }); }
+});
+
+router.post('/:id/eventos', verifyToken, async (req, res) => {
+    const { titulo, descripcion, fecha_evento, lugar } = req.body;
+    try {
+        await db.query(
+            `INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar) VALUES (?, ?, ?, ?, ?, ?)`,
+            [req.params.id, req.user.id, titulo, descripcion, fecha_evento, lugar]
+        );
+
+        // Emitir alerta a todos los del club
+        const io = req.app.get('socketio');
+        io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'evento' });
+
+        res.status(201).json({ message: "Evento creado" });
+    } catch (error) { res.status(500).json({ message: "Error al crear evento" }); }
+});
+
+router.post('/:id/eventos/:eventoId/asistencia', verifyToken, async (req, res) => {
+    const { asistira } = req.body;
+    try {
+        await db.query(
+            `INSERT INTO asistencias_eventos (evento_id, usuario_id, asistira) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE asistira = ?`,
+            [req.params.eventoId, req.user.id, asistira, asistira]
+        );
+        res.status(200).json({ message: "Asistencia actualizada" });
+    } catch (error) { res.status(500).json({ message: "Error al registrar asistencia" }); }
+});
+
+router.post('/:id/recursos', verifyToken, async (req, res) => {
+    const { tipo_club, tipo_recurso, nombre_recurso, cantidad, unidad, especificaciones, opciones_marcas, motivo } = req.body;
+    try {
+        await db.query(
+            `INSERT INTO solicitudes_recursos (club_id, usuario_id, tipo_club, tipo_recurso, nombre_recurso, cantidad, unidad, especificaciones, opciones_marcas, motivo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+            [req.params.id, req.user.id, tipo_club, tipo_recurso, nombre_recurso, cantidad, unidad, especificaciones, opciones_marcas, motivo]
+        );
+        res.status(201).json({ message: "Solicitud enviada a revisión." });
+    } catch (error) { res.status(500).json({ message: "Error al solicitar recurso" }); }
+});
+
+// ==========================================
+// --- OBTENER CLUBES GLOBALES ---
+// ==========================================
 router.get('/', async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -98,15 +177,13 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
 });
 
 // ==========================================
-// --- CREACIÓN (NUEVO SISTEMA DE INVITACIONES) ---
+// --- CREACIÓN, EDICIÓN Y ACCIONES DE ADMIN ---
 // ==========================================
-
 router.post('/', verifyToken, async (req, res) => {
     const { nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, profesor_encargado_id, alumno_encargado_id, miembros_ids } = req.body;
     const estatus = 'esperando_firmas'; 
     const fecha_creacion = new Date();
 
-    // 👇 CORRECCIÓN: Ahora solo pedimos 19 alumnos en la lista (19 + 1 representante = 20) 👇
     if (!nombre || !profesor_encargado_id || !alumno_encargado_id || !miembros_ids || miembros_ids.length < 19) return res.status(400).json({ message: 'Faltan campos o alumnos.' });
     
     try {
@@ -128,68 +205,14 @@ router.post('/', verifyToken, async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error interno." }); }
 });
 
-// ==========================================
-// --- ACCIONES DE ADMINISTRADOR Y EDICIÓN ---
-// ==========================================
-
-router.put('/:id/aprobar', verifyToken, async (req, res) => {
-    const { id } = req.params;
-    const codigoGenerado = Math.random().toString(36).substring(2, 8).toUpperCase();
-    try {
-        await db.query(`UPDATE clubes SET estatus = 'activo', codigo_union = ?, motivo_rechazo = NULL WHERE id = ?`, [codigoGenerado, id]);
-        res.status(200).json({ message: "Aprobado", codigo: codigoGenerado });
-    } catch (error) { res.status(500).json({ message: "Error" }); }
-});
-
-router.put('/:id/rechazar', verifyToken, async (req, res) => {
-    const { id } = req.params;
-    const { motivo } = req.body;
-    try {
-        await db.query(`UPDATE clubes SET estatus = 'rechazado', motivo_rechazo = ? WHERE id = ?`, [motivo, id]);
-        res.status(200).json({ message: "Rechazado" });
-    } catch (error) { res.status(500).json({ message: "Error" }); }
-});
-
-router.put('/:id/pausar', verifyToken, async (req, res) => {
-    try {
-        await db.query(`UPDATE clubes SET estatus = 'inactivo' WHERE id = ?`, [req.params.id]);
-        res.status(200).json({ message: "Pausado" });
-    } catch (error) { res.status(500).json({ message: "Error" }); }
-});
-
-router.put('/:id/reactivar', verifyToken, async (req, res) => {
-    try {
-        await db.query(`UPDATE clubes SET estatus = 'activo' WHERE id = ?`, [req.params.id]);
-        res.status(200).json({ message: "Reactivado" });
-    } catch (error) { res.status(500).json({ message: "Error" }); }
-});
-
-router.delete('/:id', verifyToken, async (req, res) => {
-    const { id } = req.params;
-    try {
-        const [encargados] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno')`, [id]);
-        await db.query('DELETE FROM clubes WHERE id = ?', [id]);
-        
-        const actualizarRolSiEsNecesario = async (usuarioId) => {
-            if (!usuarioId) return;
-            const [otrosClubes] = await db.query(`SELECT id FROM inscripciones WHERE usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo'`, [usuarioId]);
-            if (otrosClubes.length === 0) await db.query('UPDATE usuarios SET role_id = 4 WHERE id = ? AND role_id != 1', [usuarioId]);
-        };
-        for (let encargado of encargados) await actualizarRolSiEsNecesario(encargado.usuario_id);
-        res.status(200).json({ message: "Eliminado exitosamente" });
-    } catch (error) { res.status(500).json({ message: "Error" }); }
-});
-
 router.put('/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
-    // 👇 AHORA RECIBIMOS TODOS LOS CAMPOS 👇
     const { nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, nuevo_profesor_id, nuevo_alumno_id } = req.body;
     try {
         await db.query(
             `UPDATE clubes SET nombre = ?, descripcion = ?, objetivo = ?, cronograma = ?, detalle_actividades = ?, espacios_tiempos = ?, impacto = ?, estatus = 'en_revision', motivo_rechazo = NULL WHERE id = ?`, 
             [nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, id]
         );
-        
         const [profesoresActuales] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_profesor'`, [id]);
         const [alumnosActuales] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_alumno'`, [id]);
         
@@ -209,14 +232,55 @@ router.put('/:id', verifyToken, async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error interno al editar" }); }
 });
 
-router.post('/unirse', verifyToken, async (req, res) => {
-    const { codigo } = req.body;
-    const usuarioId = req.user.id;
-    if (!codigo) return res.status(400).json({ message: "Código obligatorio" });
+router.put('/:id/aprobar', verifyToken, async (req, res) => {
+    const { id } = req.params;
+    const codigoGenerado = Math.random().toString(36).substring(2, 8).toUpperCase();
     try {
-        const [clubes] = await db.query('SELECT id FROM clubes WHERE codigo_union = ? AND estatus = "activo"', [codigo]);
-        if (clubes.length === 0) return res.status(404).json({ message: "Código inválido o club inactivo" });
-        await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'miembro', 'activo') ON DUPLICATE KEY UPDATE estatus = 'activo'`, [usuarioId, clubes[0].id]);
+        await db.query(`UPDATE clubes SET estatus = 'activo', codigo_union = ?, motivo_rechazo = NULL WHERE id = ?`, [codigoGenerado, id]);
+        res.status(200).json({ message: "Aprobado", codigo: codigoGenerado });
+    } catch (error) { res.status(500).json({ message: "Error" }); }
+});
+
+router.put('/:id/rechazar', verifyToken, async (req, res) => {
+    try {
+        await db.query(`UPDATE clubes SET estatus = 'rechazado', motivo_rechazo = ? WHERE id = ?`, [req.body.motivo, req.params.id]);
+        res.status(200).json({ message: "Rechazado" });
+    } catch (error) { res.status(500).json({ message: "Error" }); }
+});
+
+router.put('/:id/pausar', verifyToken, async (req, res) => {
+    try {
+        await db.query(`UPDATE clubes SET estatus = 'inactivo' WHERE id = ?`, [req.params.id]);
+        res.status(200).json({ message: "Pausado" });
+    } catch (error) { res.status(500).json({ message: "Error" }); }
+});
+
+router.put('/:id/reactivar', verifyToken, async (req, res) => {
+    try {
+        await db.query(`UPDATE clubes SET estatus = 'activo' WHERE id = ?`, [req.params.id]);
+        res.status(200).json({ message: "Reactivado" });
+    } catch (error) { res.status(500).json({ message: "Error" }); }
+});
+
+router.delete('/:id', verifyToken, async (req, res) => {
+    try {
+        const [encargados] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno')`, [req.params.id]);
+        await db.query('DELETE FROM clubes WHERE id = ?', [req.params.id]);
+        
+        for (let encargado of encargados) {
+            const [otros] = await db.query(`SELECT id FROM inscripciones WHERE usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo'`, [encargado.usuario_id]);
+            if (otros.length === 0) await db.query('UPDATE usuarios SET role_id = 4 WHERE id = ? AND role_id != 1', [encargado.usuario_id]);
+        }
+        res.status(200).json({ message: "Eliminado" });
+    } catch (error) { res.status(500).json({ message: "Error" }); }
+});
+
+router.post('/unirse', verifyToken, async (req, res) => {
+    if (!req.body.codigo) return res.status(400).json({ message: "Código obligatorio" });
+    try {
+        const [clubes] = await db.query('SELECT id FROM clubes WHERE codigo_union = ? AND estatus = "activo"', [req.body.codigo]);
+        if (clubes.length === 0) return res.status(404).json({ message: "Código inválido" });
+        await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'miembro', 'activo') ON DUPLICATE KEY UPDATE estatus = 'activo'`, [req.user.id, clubes[0].id]);
         res.status(200).json({ message: "¡Te has unido!" });
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
