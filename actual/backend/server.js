@@ -1,40 +1,80 @@
 const express = require('express');
 const cors = require('cors');
-// Carga las variables del archivo .env (PORT, DB_HOST, etc.)
+const http = require('http'); 
+const { Server } = require('socket.io'); 
+const db = require('./src/config/db'); 
 require('dotenv').config();
-
-// 1. Importación de rutas
-// Asegúrate de que los archivos existan en la carpeta 'src/routes/'
-const authRoutes = require('./src/routes/authRoutes');
-const userRoutes = require('./src/routes/userRoutes');
-const clubRoutes = require('./src/routes/clubes'); 
-const avisoRoutes = require('./src/routes/avisos'); 
 
 const app = express();
 
-// 2. Configuración de CORS
-// Permite que tu Frontend en el puerto 5173 acceda a la API
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173', 
+    origin: '*', 
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
 }));
 
-// Middleware para entender formatos JSON en las peticiones
 app.use(express.json());
 
-// 3. Registro de Endpoints (Rutas de la API)
-// Estas rutas conectan tu lógica con la base de datos sistema_tt
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes); // Asegúrate de que esta línea esté presente
-app.use('/api/clubes', clubRoutes);
-app.use('/api/avisos', avisoRoutes);
+// ==========================================
+// --- CONFIGURACIÓN DE SOCKET.IO (CHAT Y NOTIFICACIONES) ---
+// ==========================================
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: { origin: '*', methods: ['GET', 'POST'] }
+});
 
-// 4. Configuración del Puerto
-// Usa el puerto definido en el .env, si no existe usa el 3000 por defecto
+// Guardamos 'io' globalmente para usarlo en el archivo de rutas (clubes.js)
+app.set('socketio', io);
+
+io.on('connection', (socket) => {
+    console.log('✅ Usuario conectado al socket:', socket.id);
+
+    // Unirse a la sala (room) específica del club
+    socket.on('unirse_club', (clubId) => {
+        socket.join(`club_${clubId}`);
+        console.log(`Usuario se unió al chat del club ${clubId}`);
+    });
+
+    // Recibir mensaje y reenviarlo a todos en el club
+    socket.on('enviar_mensaje', async (data) => {
+        const { club_id, usuario_id, mensaje, autor_nombre } = data;
+        try {
+            const [result] = await db.query(
+                `INSERT INTO chat_club (club_id, usuario_id, mensaje) VALUES (?, ?, ?)`,
+                [club_id, usuario_id, mensaje]
+            );
+            
+            const nuevoMensaje = {
+                id: result.insertId,
+                club_id,
+                usuario_id,
+                autor_nombre,
+                mensaje,
+                fecha_envio: new Date().toISOString()
+            };
+
+            // Emitir el mensaje a todos los de la sala
+            io.to(`club_${club_id}`).emit('nuevo_mensaje', nuevoMensaje);
+        } catch (error) {
+            console.error("Error guardando mensaje en socket:", error);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('❌ Usuario desconectado:', socket.id);
+    });
+});
+
+// ==========================================
+// --- REGISTRO DE RUTAS API REST ---
+// ==========================================
+app.use('/api/auth', require('./src/routes/authRoutes'));
+app.use('/api/users', require('./src/routes/userRoutes'));
+app.use('/api/clubes', require('./src/routes/clubes'));
+app.use('/api/avisos', require('./src/routes/avisos'));
+
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-    console.log(`🚀 Servidor listo en http://localhost:${PORT}`);
-    console.log(`📡 Conectado a la base de datos: ${process.env.DB_NAME}`);
+server.listen(PORT, () => {
+    console.log(`🚀 Servidor y WebSockets corriendo en puerto ${PORT}`);
 });
