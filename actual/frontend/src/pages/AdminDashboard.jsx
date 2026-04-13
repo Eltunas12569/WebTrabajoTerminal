@@ -11,6 +11,9 @@ const AdminDashboard = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [clubes, setClubes] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [showFilters, setShowFilters] = useState(false);
 
     const API_URL = import.meta.env.VITE_API_URL;
 
@@ -55,9 +58,21 @@ const AdminDashboard = () => {
         navigate('/crear-club');
     };
     
+    const filteredClubs = clubes.filter((club) => {
+        const matchesName = club.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = statusFilter === 'all' || club.estatus === statusFilter;
+        return matchesName && matchesStatus;
+    });
+
+    const noClubsMessage = loading
+        ? 'Buscando clubes en la base de datos...'
+        : clubes.length === 0
+            ? 'No hay clubes registrados.'
+            : 'No se encontraron clubes con esos filtros.';
+
     return (
         <div className="web-dashboard">
-            <header className="admin-navbar-fixed">
+            <header className="admin-navbar-fixed" style={{backgroundColor: '#003366', color: '#fff'}}>
                 <div className="nav-left">
                     <button className="menu-toggle" onClick={toggleSidebar}>☰</button>
                     <span className="nav-title">🏆 Sistema de Clubs - ESCOM</span>
@@ -97,14 +112,77 @@ const AdminDashboard = () => {
                 </aside>
 
                 <main className="admin-main-scroll">
-                    <div className="page-header">
-                        <h2>Gestión de Clubes Deportivos</h2>
-                        <hr />
+                    <div className="page-header" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                        <div>
+                            <h2 style={{ margin: 0 }}>Gestión de Clubes</h2>
+                            <hr style={{ marginTop: '12px', borderColor: '#d1d5db' }} />
+                        </div>
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                onClick={() => setShowFilters(!showFilters)}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '10px 14px',
+                                    borderRadius: '999px',
+                                    border: '1px solid #d1d5db',
+                                    backgroundColor: '#fff',
+                                    cursor: 'pointer',
+                                    fontWeight: '600',
+                                    color: '#1c1e21'
+                                }}
+                            >
+                                <span>🔍</span>
+                                <span>Filtros</span>
+                            </button>
+                            {showFilters && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 12px)',
+                                    right: 0,
+                                    width: '320px',
+                                    background: '#fff',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '16px',
+                                    boxShadow: '0 18px 50px rgba(15, 23, 42, 0.12)',
+                                    padding: '16px',
+                                    zIndex: 20
+                                }}>
+                                    <div style={{ marginBottom: '14px', fontWeight: '700', color: '#111' }}>Opciones de filtro</div>
+                                    <div style={{ marginBottom: '14px' }}>
+                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>Nombre</label>
+                                        <input
+                                            type="text"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            placeholder="Busca un club..."
+                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #d1d5db', background: '#fff', outline: 'none' }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>Estado</label>
+                                        <select
+                                            value={statusFilter}
+                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+                                        >
+                                            <option value="all">Todos los estados</option>
+                                            <option value="esperando_firmas">Esperando firmas</option>
+                                            <option value="en_revision">En revisión</option>
+                                            <option value="activo">Activo</option>
+                                            <option value="rechazado">Rechazado</option>
+                                            <option value="inactivo">Inactivo</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div className="clubs-grid-container">
-                        {!loading && clubes.length > 0 ? (
-                            clubes.map((club) => (
+                        {!loading && filteredClubs.length > 0 ? (
+                            filteredClubs.map((club) => (
                                 <div key={club.id} className="club-card-admin">
                                     <div className="club-card-header">
                                         <h3>{club.nombre}</h3>
@@ -127,7 +205,7 @@ const AdminDashboard = () => {
                             ))
                         ) : (
                             <div className="loading-state">
-                                {loading ? "Buscando clubes en la base de datos..." : "No hay clubes registrados."}
+                                {noClubsMessage}
                             </div>
                         )}
                     </div>

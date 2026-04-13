@@ -7,12 +7,9 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
     try {
-        const userData = localStorage.getItem('user');
-        if (userData) {
-            const user = JSON.parse(userData);
-            if (user && user.token) {
-                config.headers.Authorization = `Bearer ${user.token}`;
-            }
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
         }
     } catch (error) {
         console.error("Error al leer el token del localStorage", error);

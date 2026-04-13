@@ -9,11 +9,9 @@ const ProtectedRoute = ({ children, rolesPermitidos }) => {
 
     /**
      * 2. CORRECCIÓN DE ACCESO AL ROL:
-     * Dependiendo de cómo guardes el usuario en AuthContext, 
-     * el rol suele estar en user.rol o user.user.rol.
-     * Aquí normalizamos ambos casos y convertimos a Número.
+     * Después de los cambios del backend, el rol está en user.role_id
      */
-    const rolActual = user.rol || (user.user && user.user.rol);
+    const rolActual = user.role_id;
     
     // 3. Verificación robusta (Número vs Número)
     if (rolesPermitidos) {
