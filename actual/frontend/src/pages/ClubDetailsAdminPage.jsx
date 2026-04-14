@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import './css/Dashboards.css';
 
 // Reutilizamos tu componente de búsqueda
@@ -46,7 +46,6 @@ const SearchableSelect = ({ options, value, onChange, placeholder }) => {
 const ClubDetailsAdminPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const API_URL = import.meta.env.VITE_API_URL;
 
     const [club, setClub] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -63,48 +62,52 @@ const ClubDetailsAdminPage = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
-                
-                // Cargar datos del club, profesores y alumnos al mismo tiempo
-                const [clubRes, profRes, alumRes] = await Promise.all([
-                    axios.get(`${API_URL}/clubes/${id}`, { headers }),
-                    axios.get(`${API_URL}/users/professors`, { headers }),
-                    axios.get(`${API_URL}/users/students-in-charge`, { headers })
+                // Cargar datos de clubes, profesores y alumnos al mismo tiempo
+                const [clubesRes, profRes, alumRes] = await Promise.all([
+                    api.get('/clubes'),
+                    api.get('/users/professors'),
+                    api.get('/users/students-in-charge')
                 ]);
-                
-                setClub(clubRes.data);
+
+                const clubEncontrado = clubesRes.data.find((clubItem) => String(clubItem.id) === String(id));
+                if (!clubEncontrado) {
+                    throw new Error('Club no encontrado');
+                }
+
+                setClub(clubEncontrado);
                 setEditData({
-                    nombre: clubRes.data.nombre || '',
-                    descripcion: clubRes.data.descripcion || '',
-                    profesor_encargado_id: clubRes.data.profesor_encargado_id || '',
-                    alumno_encargado_id: clubRes.data.alumno_encargado_id || ''
+                    nombre: clubEncontrado.nombre || '',
+                    descripcion: clubEncontrado.descripcion || '',
+                    profesor_encargado_id: clubEncontrado.profesor_encargado_id || '',
+                    alumno_encargado_id: clubEncontrado.alumno_encargado_id || ''
                 });
                 setProfesores(profRes.data);
                 setAlumnos(alumRes.data);
             } catch (error) {
-                console.error("Error al cargar datos:", error);
-                setActionError("No se pudo cargar la información del club.");
-                // Ahora mostramos el mensaje de error directo del servidor, o un aviso de conexión
-                setActionError(error.response?.data?.message || "No se pudo conectar con el servidor. ¿Reiniciaste el backend?");
+                console.error('Error al cargar datos:', error);
+                setActionError(error.response?.data?.message || error.message || 'No se pudo conectar con el servidor. ¿Reiniciaste el backend?');
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
-    }, [id, API_URL]);
+    }, [id]);
 
     const handleSaveChanges = async () => {
         setSaving(true);
         setActionError('');
         try {
-            await axios.put(`${API_URL}/clubes/${id}`, {
-                nombre: editData.nombre, descripcion: editData.descripcion, nuevo_profesor_id: editData.profesor_encargado_id, nuevo_alumno_id: editData.alumno_encargado_id
-            }, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+            await api.put(`/clubes/${id}`, {
+                nombre: editData.nombre,
+                descripcion: editData.descripcion,
+                nuevo_profesor_id: editData.profesor_encargado_id,
+                nuevo_alumno_id: editData.alumno_encargado_id
+            });
             
-            alert("Club y encargados actualizados correctamente.");
-            window.location.reload(); // Recarga simple para reflejar cambios
+            alert('Club y encargados actualizados correctamente.');
+            window.location.reload();
         } catch (error) {
-            setActionError(error.response?.data?.message || "Error al actualizar.");
+            setActionError(error.response?.data?.message || 'Error al actualizar.');
         } finally {
             setSaving(false);
         }
@@ -113,7 +116,7 @@ const ClubDetailsAdminPage = () => {
     const handleApproveClub = async () => {
         setApproving(true);
         try {
-            await axios.put(`${API_URL}/clubes/${id}/aprobar`, {}, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+            await api.put(`/clubes/${id}/aprobar`, {});
             navigate('/admin');
         } catch (error) {
             setActionError('Error al aprobar el club.');
@@ -123,12 +126,12 @@ const ClubDetailsAdminPage = () => {
     };
 
     const handleDeleteClub = async () => {
-        if (!window.confirm("¿Estás seguro de que deseas eliminar este club? Esta acción no se puede deshacer.")) return;
+        if (!window.confirm('¿Estás seguro de que deseas eliminar este club? Esta acción no se puede deshacer.')) return;
         try {
-            await axios.delete(`${API_URL}/clubes/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+            await api.delete(`/clubes/${id}`);
             navigate('/admin');
         } catch (error) {
-            alert("No se pudo eliminar el club.");
+            alert('No se pudo eliminar el club.');
         }
     };
 
@@ -142,8 +145,8 @@ const ClubDetailsAdminPage = () => {
             <div style={{ width: '100%', minHeight: '100vh', backgroundColor: 'white', display: 'flex', flexDirection: 'column' }}>
                 
                 {/* Barra de Navegación Interna Fija */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 5%', borderBottom: '1px solid #e4e6eb', backgroundColor: '#fff', position: 'sticky', top: 0, zIndex: 10 }}>
-                    <h1 style={{ margin: 0, color: '#1c1e21', fontSize: '1.4rem', fontWeight: '600' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', boxSizing: 'border-box', borderBottom: '1px solid #e4e6eb', backgroundColor: '#003366', color: '#fff', position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 1000 }}>
+                    <h1 style={{ margin: 0, color: '#fff', fontSize: '1.4rem', fontWeight: '600' }}>
                         {isEditing ? '✏️ Editar Configuración del Club' : '🛡️ Perfil del Club'}
                     </h1>
                     <button onClick={() => navigate('/admin')} style={{ background: '#e4e6eb', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#1c1e21', transition: 'background 0.2s' }}>

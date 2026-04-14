@@ -31,30 +31,71 @@ const login = async (req, res) => {
 const register = async (req, res) => {
     try {
         console.log("Datos de registro recibidos:", req.body);
-        const { nombres, apellidos, nss, boleta, correo, password } = req.body;
-
-        // 1. Validaciones de longitud institucional para ESCOM
-        if (!nss || nss.length !== 11) {
-            return res.status(400).json({ message: "El NSS debe tener exactamente 11 dígitos" });
-        }
-        if (!boleta || boleta.length !== 10) {
-            return res.status(400).json({ message: "La boleta debe tener exactamente 10 dígitos" });
-        }
-
-        // 2. Llamada al servicio para procesar el registro
-        // El servicio se encargará de verificar duplicados y encriptar la contraseña
-        const result = await authService.register({ 
+        const { 
             nombres, 
-            apellidos, 
+            apellido_paterno, 
+            apellido_materno, 
             nss, 
             boleta, 
             correo, 
-            password 
+            password, 
+            rol_id, 
+            carrera, 
+            num_empleado 
+        } = req.body;
+
+        // Validaciones básicas
+        if (!nombres || !nombres.trim()) {
+            return res.status(400).json({ message: "Los nombres son requeridos" });
+        }
+        if (!apellido_paterno || !apellido_paterno.trim()) {
+            return res.status(400).json({ message: "El apellido paterno es requerido" });
+        }
+        if (!nss || nss.length !== 11) {
+            return res.status(400).json({ message: "El NSS debe tener exactamente 11 dígitos" });
+        }
+        if (!correo || !correo.trim()) {
+            return res.status(400).json({ message: "El correo es requerido" });
+        }
+        if (!password || password.length < 6) {
+            return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
+        }
+        if (!rol_id || ![2, 3].includes(rol_id)) {
+            return res.status(400).json({ message: "Rol inválido" });
+        }
+
+        // Validaciones específicas por rol
+        if (rol_id === 2) { // Alumno
+            if (!boleta || boleta.length !== 10) {
+                return res.status(400).json({ message: "La boleta debe tener exactamente 10 dígitos para alumnos" });
+            }
+            if (!carrera || !carrera.trim()) {
+                return res.status(400).json({ message: "La carrera es requerida para alumnos" });
+            }
+        } else if (rol_id === 3) { // Profesor
+            if (!num_empleado || !num_empleado.trim()) {
+                return res.status(400).json({ message: "El número de empleado es requerido para profesores" });
+            }
+        }
+
+        // 2. Llamada al servicio para procesar el registro
+        const result = await authService.register({ 
+            nombres: nombres.trim(),
+            apellido_paterno: apellido_paterno.trim(),
+            apellido_materno: apellido_materno ? apellido_materno.trim() : null,
+            correo: correo.trim().toLowerCase(),
+            password,
+            rol_id,
+            nss: nss.trim(),
+            boleta: rol_id === 2 ? boleta.trim() : null,
+            carrera: rol_id === 2 ? carrera.trim() : null,
+            num_empleado: rol_id === 3 ? num_empleado.trim() : null
         });
 
         res.status(201).json(result);
     } catch (error) {
         // Captura errores como "Correo ya registrado"
+        console.error("Error en registro:", error);
         res.status(400).json({ message: error.message });
     }
 };

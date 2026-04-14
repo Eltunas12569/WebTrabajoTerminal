@@ -85,7 +85,7 @@ const GestionDashboard = () => {
                             <li onClick={() => { setActiveTab('clubs'); setIsSidebarOpen(false); }}>📅 Mis Actividades</li>
                             
                             {/* Mostrar Pasar Lista solo a Administradores (1) y Profesores (2) */}
-                            {(user?.role_id === 1 || user?.role_id === 2 || user?.rol === 1 || user?.rol === 2) && <li onClick={toggleSidebar}>📋 Pasar Lista</li>}
+                            {(user?.role_id === 1 || user?.role_id === 2) && <li onClick={toggleSidebar}>📋 Pasar Lista</li>}
                         </ul>
                     </nav>
                     <button onClick={logout} className="logout-button">Cerrar Sesión</button>

@@ -12,7 +12,8 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
     const [isBlocked, setIsBlocked] = useState(false);
     const [avisos, setAvisos] = useState([]);
-    const [isAvisosOpen, setIsAvisosOpen] = useState(true); // Controla la visibilidad del panel de avisos
+    const [isAvisosOpen, setIsAvisosOpen] = useState(false); // Controla la visibilidad del panel de avisos
+    const [isTabVisible, setIsTabVisible] = useState(false); // Controla la visibilidad de la pestaña
 
     const { loginUser } = useAuth();
     const navigate = useNavigate();
@@ -45,6 +46,17 @@ const Login = () => {
         fetchAvisos();
     }, [API_URL]);
 
+    useEffect(() => {
+        if (isAvisosOpen) {
+            const timer = setTimeout(() => {
+                setIsTabVisible(true);
+            }, 400); // Espera a que termine la animación de 0.4s
+            return () => clearTimeout(timer);
+        } else {
+            setIsTabVisible(false);
+        }
+    }, [isAvisosOpen]);
+
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
         setLoading(true);
@@ -56,7 +68,7 @@ const Login = () => {
             setError('¡Acceso concedido! Redirigiendo...');
 
             setTimeout(() => {
-                const userRole = Number(data.user.rol || data.user.role_id);
+                const userRole = Number(data.user.role_id);
                 if (userRole === 1) navigate('/admin');
                 else navigate('/gestion');
             }, 1200);
@@ -96,22 +108,58 @@ const Login = () => {
                 boxShadow: isAvisosOpen ? '4px 0 25px rgba(0,0,0,0.15)' : 'none',
                 display: 'flex',
                 flexDirection: 'column',
-                zIndex: 20
+                zIndex: 20,
+                position: 'relative'
             }}>
+                {/* Botón Pestaña para cerrar */}
+                {isTabVisible && (
+                    <button 
+                        onClick={() => setIsAvisosOpen(false)} 
+                        style={{
+                            position: 'fixed',
+                            right: 'calc(50% - 45px)',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: '40px',
+                            height: '60px',
+                            backgroundColor: '#003366',
+                            border: '2px solid rgba(255,255,255,0.3)',
+                            borderLeft: 'none',
+                            borderRadius: '0 8px 8px 0',
+                            color: 'rgba(255,255,255,0.8)',
+                            cursor: 'pointer',
+                            fontSize: '1.2rem',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '2px 4px 12px rgba(0,0,0,0.2)',
+                            zIndex: 25,
+                            pointerEvents: 'auto'
+                        }}
+                        onMouseOver={(e) => { 
+                            e.target.style.backgroundColor = '#002244';
+                            e.target.style.right = 'calc(50% - 42px)';
+                            e.target.style.color = 'white';
+                            e.target.style.boxShadow = '3px 6px 16px rgba(0,0,0,0.3)';
+                        }}
+                        onMouseOut={(e) => { 
+                            e.target.style.backgroundColor = '#003366';
+                            e.target.style.right = 'calc(50% - 45px)';
+                            e.target.style.color = 'rgba(255,255,255,0.8)';
+                            e.target.style.boxShadow = '2px 4px 12px rgba(0,0,0,0.2)';
+                        }}
+                        title="Ocultar panel"
+                    >
+                        ←
+                    </button>
+                )}
+
                 <div style={{ padding: '30px 25px', width: '50vw', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', height: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '15px' }}>
                         <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <span>📢</span> Tablero de Avisos
                         </h2>
-                        <button 
-                            onClick={() => setIsAvisosOpen(false)} 
-                            style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '1.5rem', transition: 'color 0.2s' }}
-                            onMouseOver={(e) => e.target.style.color = 'white'}
-                            onMouseOut={(e) => e.target.style.color = 'rgba(255,255,255,0.7)'}
-                            title="Ocultar panel"
-                        >
-                            ✕
-                        </button>
                     </div>
 
                     <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px' }}>
