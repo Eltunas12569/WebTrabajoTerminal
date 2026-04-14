@@ -14,6 +14,7 @@ const Login = () => {
     const [avisos, setAvisos] = useState([]);
     const [isAvisosOpen, setIsAvisosOpen] = useState(false); // Controla la visibilidad del panel de avisos
     const [isTabVisible, setIsTabVisible] = useState(false); // Controla la visibilidad de la pestaña
+    const [showPassword, setShowPassword] = useState(false); // Controla si se muestra la contraseña
 
     const { loginUser } = useAuth();
     const navigate = useNavigate();
@@ -57,8 +58,23 @@ const Login = () => {
         }
     }, [isAvisosOpen]);
 
+    // Efecto para recuperar el error y el correo si la página se recarga inesperadamente
+    useEffect(() => {
+        const savedError = sessionStorage.getItem('login_error');
+        const savedCorreo = sessionStorage.getItem('login_correo');
+        
+        if (savedError) {
+            setError(savedError);
+            sessionStorage.removeItem('login_error'); // Lo eliminamos para que no vuelva a salir si navega normal
+            if (savedCorreo) setCorreo(savedCorreo);
+        }
+    }, []);
+
     const handleSubmit = async (e) => {
-        if (e) e.preventDefault();
+        if (e) {
+            if (typeof e.preventDefault === 'function') e.preventDefault();
+            if (typeof e.stopPropagation === 'function') e.stopPropagation();
+        }
         setLoading(true);
         setError('');
 
@@ -67,15 +83,49 @@ const Login = () => {
             loginUser(data);
             setError('¡Acceso concedido! Redirigiendo...');
 
+            // Si se loguea exitosamente, limpiamos el storage
+            sessionStorage.removeItem('login_error');
+            sessionStorage.removeItem('login_correo');
+
             setTimeout(() => {
-                const userRole = Number(data.user.role_id);
+                const userRole = Number(data?.user?.role_id || 2);
                 if (userRole === 1) navigate('/admin');
                 else navigate('/gestion');
-            }, 1200);
+            }, 1000);
 
         } catch (err) {
-            setError(err);
-            if (err.toLowerCase().includes('bloqueada') || err.toLowerCase().includes('intentos')) {
+            console.error("Error capturado en el login:", err);
+            
+            // Extracción ultra-segura para evitar cualquier crasheo de renderizado
+            let textoError = 'contraseña o/y correo incorrectos';
+            try {
+                if (typeof err === 'string') {
+                    textoError = err;
+                } else if (err && typeof err === 'object') {
+                    textoError = err.message || err.msg || 'contraseña o/y correo incorrectos';
+                }
+
+                // Unificamos el mensaje para no revelar si el correo existe o no (Mejor práctica de seguridad)
+                if (textoError.includes('correo electrónico no está registrado') || textoError.includes('Contraseña incorrecta')) {
+                    textoError = 'contraseña o/y correo incorrectos';
+                }
+            } catch (fallbackErr) {
+                console.error("Error al extraer el mensaje:", fallbackErr);
+            }
+
+            
+            
+            setError(String(textoError));
+            
+            // Guardamos el error y el correo en sessionStorage por si Vite recarga la página
+            sessionStorage.setItem('login_error', String(textoError));
+            sessionStorage.setItem('login_correo', correo);
+            
+            // Limpiamos la contraseña para que el usuario la vuelva a intentar, manteniendo el correo
+            setPassword(''); 
+            
+            const errorLower = String(textoError).toLowerCase();
+            if (errorLower.includes('bloqueada') || errorLower.includes('intentos')) {
                 setIsBlocked(true);
             }
         } finally {
@@ -236,7 +286,16 @@ const Login = () => {
                         <p style={{ margin: 0, color: '#666', fontSize: '1.1rem' }}>Gestión Deportiva - ESCOM IPN</p>
                     </div>
 
-                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                    <div 
+                        onKeyDown={(e) => { 
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleSubmit(e); 
+                            }
+                        }}
+                        style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}
+                    >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <label style={{ fontSize: '0.95rem', fontWeight: '600', color: '#444' }}>Correo Institucional</label>
                             <input
@@ -258,25 +317,42 @@ const Login = () => {
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <label style={{ fontSize: '0.95rem', fontWeight: '600', color: '#444' }}>Contraseña</label>
-                            <input
-                                type="password"
-                                placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                style={{ 
-                                    padding: '14px 16px', borderRadius: '8px', border: `2px solid ${isBlocked ? '#ffc107' : '#e1e5eb'}`, 
-                                    fontSize: '1rem', transition: 'border-color 0.2s', outline: 'none',
-                                    backgroundColor: (isBlocked || loading) ? '#f8f9fa' : '#fff'
-                                }}
-                                onFocus={(e) => !isBlocked && (e.target.style.borderColor = '#003366')}
-                                onBlur={(e) => !isBlocked && (e.target.style.borderColor = '#e1e5eb')}
-                                required
-                                disabled={isBlocked || loading}
-                            />
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="••••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    style={{ 
+                                        width: '100%', boxSizing: 'border-box',
+                                        padding: '14px 45px 14px 16px', borderRadius: '8px', border: `2px solid ${isBlocked ? '#ffc107' : '#e1e5eb'}`, 
+                                        fontSize: '1rem', transition: 'border-color 0.2s', outline: 'none',
+                                        backgroundColor: (isBlocked || loading) ? '#f8f9fa' : '#fff'
+                                    }}
+                                    onFocus={(e) => !isBlocked && (e.target.style.borderColor = '#003366')}
+                                    onBlur={(e) => !isBlocked && (e.target.style.borderColor = '#e1e5eb')}
+                                    required
+                                    disabled={isBlocked || loading}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    disabled={isBlocked || loading}
+                                    style={{
+                                        position: 'absolute', right: '10px', background: 'none', border: 'none',
+                                        cursor: (isBlocked || loading) ? 'not-allowed' : 'pointer', 
+                                        fontSize: '1.2rem', color: '#666', padding: '5px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    }}
+                                >
+                                    {showPassword ? '👁️‍🗨️' : '◡'}
+                                </button>
+                            </div>
                         </div>
 
                         <button
-                            type="submit"
+                            type="button"
+                            onClick={handleSubmit}
                             style={{
                                 marginTop: '10px', padding: '16px', borderRadius: '8px', border: 'none',
                                 background: isBlocked ? '#ffc107' : (loading ? '#6c757d' : '#003366'),
@@ -293,16 +369,16 @@ const Login = () => {
                         >
                             {loading ? 'Verificando credenciales...' : isBlocked ? 'Acceso Suspendido' : 'Iniciar Sesión'}
                         </button>
-                    </form>
+                    </div>
 
                     {error && (
                         <div style={{
                             marginTop: '25px', padding: '15px', borderRadius: '8px', textAlign: 'center', fontSize: '0.95rem', fontWeight: '500',
-                            backgroundColor: error.includes('concedido') ? '#d4edda' : (isBlocked ? '#fff3cd' : '#f8d7da'),
-                            color: error.includes('concedido') ? '#155724' : (isBlocked ? '#856404' : '#721c24'),
-                            border: `1px solid ${error.includes('concedido') ? '#c3e6cb' : (isBlocked ? '#ffeeba' : '#f5c6cb')}`
+                            backgroundColor: String(error).includes('concedido') ? '#d4edda' : (isBlocked ? '#fff3cd' : '#f8d7da'),
+                            color: String(error).includes('concedido') ? '#155724' : (isBlocked ? '#856404' : '#721c24'),
+                            border: `1px solid ${String(error).includes('concedido') ? '#c3e6cb' : (isBlocked ? '#ffeeba' : '#f5c6cb')}`
                         }}>
-                            {error}
+                            {String(error)}
                         </div>
                     )}
 

@@ -55,6 +55,18 @@
     box-shadow: 0 0 5px rgba(0, 51, 102, 0.2);
 }
 
+/* Ocultar flechas en inputs numéricos (Chrome, Safari, Edge, Opera) */
+.register-input::-webkit-outer-spin-button,
+.register-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Ocultar flechas en inputs numéricos (Firefox) */
+.register-input[type="number"] {
+    -moz-appearance: textfield;
+}
+
 /* Botón Principal (Guinda ESCOM) */
 .btn-register {
     width: 100%;
