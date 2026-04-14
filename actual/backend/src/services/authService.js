@@ -54,6 +54,32 @@ const login = async (correo, password) => {
 
 const register = async (userData) => {
     const { nombres, apellido_paterno, apellido_materno, correo, password, rol_id, nss, boleta, carrera, num_empleado } = userData;
+
+    // Verificar duplicados
+    const [existingUser] = await db.query(`SELECT id FROM usuarios WHERE correo = ?`, [correo]);
+    if (existingUser.length > 0) {
+        throw new Error('El correo electrónico ya está registrado');
+    }
+
+    const [existingNSS] = await db.query(`SELECT usuario_id FROM alumnos_detalles WHERE nss = ?`, [nss]);
+    if (existingNSS.length > 0) {
+        throw new Error('El NSS ya está registrado');
+    }
+
+    if (rol_id === 2 && boleta) { // Alumno
+        const [existingBoleta] = await db.query(`SELECT usuario_id FROM alumnos_detalles WHERE boleta = ?`, [boleta]);
+        if (existingBoleta.length > 0) {
+            throw new Error('La boleta ya está registrada');
+        }
+    }
+
+    if (rol_id === 3 && num_empleado) { // Profesor
+        const [existingEmpleado] = await db.query(`SELECT usuario_id FROM profesores_detalles WHERE num_empleado = ?`, [num_empleado]);
+        if (existingEmpleado.length > 0) {
+            throw new Error('El número de empleado ya está registrado');
+        }
+    }
+
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
