@@ -7,6 +7,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import GestionDashboard from './pages/GestionDashboard';
 import CrearClubPage from './pages/CrearClubPage'; // Asume que este archivo existe
 import ClubDetailsAdminPage from './pages/ClubDetailsAdminPage';
+import AvisosAdminPage from './pages/AvisosAdminPage';
+import PerfilPage from './pages/PerfilPage';
 
 /**
  * Configuración de Rutas del Sistema de Gestión Deportiva - ESCOM
@@ -50,6 +52,20 @@ function App() {
           <Route path="/admin/club/:id" element={
             <ProtectedRoute rolesPermitidos={[1]}>
               <ClubDetailsAdminPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Página de Avisos (Administrador) */}
+          <Route path="/admin/avisos" element={
+            <ProtectedRoute rolesPermitidos={[1]}>
+              <AvisosAdminPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Configuración de Perfil (Cualquier usuario logueado) */}
+          <Route path="/perfil" element={
+            <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
+              <PerfilPage />
             </ProtectedRoute>
           } />
 

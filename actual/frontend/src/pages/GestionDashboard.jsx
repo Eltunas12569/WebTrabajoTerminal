@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'; // Import useEffect
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios'; // Import axios
 import './css/Dashboards.css';
 
 const GestionDashboard = () => {
     const { user, logout } = useAuth();
+    const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('clubs'); // Default to clubs tab
     const [userClubs, setUserClubs] = useState([]); // State for user's clubs
@@ -16,6 +18,11 @@ const GestionDashboard = () => {
     const API_URL = import.meta.env.VITE_API_URL; // Get API_URL
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+    const goToProfile = () => {
+        setIsSidebarOpen(false);
+        navigate('/perfil');
+    };
 
     // Fetch user's clubs when component mounts or user changes
     useEffect(() => {
@@ -86,6 +93,9 @@ const GestionDashboard = () => {
                             
                             {/* Mostrar Pasar Lista solo a Administradores (1) y Profesores (2) */}
                             {(user?.role_id === 1 || user?.role_id === 2) && <li onClick={toggleSidebar}>📋 Pasar Lista</li>}
+                            <li onClick={goToProfile}>
+                                ⚙️ Configurar Perfil
+                            </li>
                         </ul>
                     </nav>
                     <button onClick={logout} className="logout-button">Cerrar Sesión</button>

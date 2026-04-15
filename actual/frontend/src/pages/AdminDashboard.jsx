@@ -57,6 +57,16 @@ const AdminDashboard = () => {
         setIsSidebarOpen(false);
         navigate('/crear-club');
     };
+
+    const goToAvisos = () => {
+        setIsSidebarOpen(false);
+        navigate('/admin/avisos');
+    };
+
+    const goToProfile = () => {
+        setIsSidebarOpen(false);
+        navigate('/perfil');
+    };
     
     const filteredClubs = clubes.filter((club) => {
         const matchesName = club.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -105,6 +115,12 @@ const AdminDashboard = () => {
                             <li onClick={toggleSidebar}>📋 Lista de Clubs</li>
                             <li onClick={goToCreateClub} className="special-link">
                                 ➕ Crear Club
+                            </li>
+                            <li onClick={goToAvisos}>
+                                📢 Gestión de Avisos
+                            </li>
+                            <li onClick={goToProfile}>
+                                ⚙️ Configurar Perfil
                             </li>
                         </ul>
                     </nav>

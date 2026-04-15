@@ -52,6 +52,8 @@
 
 .form-group input[type="text"],
 .form-group input[type="number"],
+.form-group input[type="email"],
+.form-group input[type="password"],
 .form-group textarea {
     width: 100%;
     padding: 12px 15px;
@@ -72,6 +74,12 @@
 
 .form-group textarea {
     resize: vertical; /* Permite redimensionar verticalmente */
+}
+
+.form-group input:disabled {
+    background-color: #e9ecef;
+    cursor: not-allowed;
+    color: #6c757d;
 }
 
 /* Botón de envío */
