@@ -108,7 +108,11 @@ const getPerfil = async (req, res) => {
     try {
         const [users] = await db.query('SELECT nombres, apellido_paterno, apellido_materno, correo FROM usuarios WHERE id = ?', [req.user.id]);
         if (users.length === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
-        res.status(200).json(users[0]);
+        
+        // Obtener ficha médica si existe
+        const [fichas] = await db.query('SELECT * FROM fichas_medicas WHERE usuario_id = ?', [req.user.id]);
+        
+        res.status(200).json({ ...users[0], ficha_medica: fichas.length > 0 ? fichas[0] : null });
     } catch (error) {
         console.error("Error en getPerfil:", error);
         res.status(500).json({ message: 'Error al obtener perfil' });
@@ -117,7 +121,13 @@ const getPerfil = async (req, res) => {
 
 const updatePerfil = async (req, res) => {
     try {
-        const { nombres, apellido_paterno, apellido_materno, currentPassword, newPassword } = req.body;
+        const { 
+            nombres, apellido_paterno, apellido_materno, currentPassword, newPassword,
+            tipo_sangre, alergias, 
+            contacto_emergencia_1_nombre, contacto_emergencia_1_telefono,
+            contacto_emergencia_2_nombre, contacto_emergencia_2_telefono,
+            contacto_emergencia_3_nombre, contacto_emergencia_3_telefono
+        } = req.body;
         
         // 1. Actualizar datos básicos
         await db.query(
@@ -137,6 +147,30 @@ const updatePerfil = async (req, res) => {
                 const hashedPassword = await bcrypt.hash(newPassword, salt);
                 await db.query('UPDATE usuarios SET password = ? WHERE id = ?', [hashedPassword, req.user.id]);
             }
+        }
+
+        // 3. Actualizar o insertar ficha médica
+        const [fichas] = await db.query('SELECT id FROM fichas_medicas WHERE usuario_id = ?', [req.user.id]);
+        if (fichas.length > 0) {
+            await db.query(
+                `UPDATE fichas_medicas SET 
+                 tipo_sangre = ?, alergias = ?, 
+                 contacto_emergencia_1_nombre = ?, contacto_emergencia_1_telefono = ?,
+                 contacto_emergencia_2_nombre = ?, contacto_emergencia_2_telefono = ?,
+                 contacto_emergencia_3_nombre = ?, contacto_emergencia_3_telefono = ?
+                 WHERE usuario_id = ?`,
+                [tipo_sangre, alergias, contacto_emergencia_1_nombre, contacto_emergencia_1_telefono, contacto_emergencia_2_nombre, contacto_emergencia_2_telefono, contacto_emergencia_3_nombre, contacto_emergencia_3_telefono, req.user.id]
+            );
+        } else {
+            await db.query(
+                `INSERT INTO fichas_medicas (
+                    usuario_id, tipo_sangre, alergias, 
+                    contacto_emergencia_1_nombre, contacto_emergencia_1_telefono, 
+                    contacto_emergencia_2_nombre, contacto_emergencia_2_telefono,
+                    contacto_emergencia_3_nombre, contacto_emergencia_3_telefono
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [req.user.id, tipo_sangre, alergias, contacto_emergencia_1_nombre, contacto_emergencia_1_telefono, contacto_emergencia_2_nombre, contacto_emergencia_2_telefono, contacto_emergencia_3_nombre, contacto_emergencia_3_telefono]
+            );
         }
 
         res.status(200).json({ message: 'Perfil actualizado exitosamente' });

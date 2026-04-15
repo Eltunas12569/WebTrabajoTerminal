@@ -18,7 +18,15 @@ const PerfilPage = () => {
         correo: user?.correo || '',
         currentPassword: '',
         newPassword: '',
-        confirmNewPassword: ''
+        confirmNewPassword: '',
+        tipo_sangre: '',
+        alergias: '',
+        contacto_emergencia_1_nombre: '',
+        contacto_emergencia_1_telefono: '',
+        contacto_emergencia_2_nombre: '',
+        contacto_emergencia_2_telefono: '',
+        contacto_emergencia_3_nombre: '',
+        contacto_emergencia_3_telefono: ''
     });
 
     const [loading, setLoading] = useState(true);
@@ -26,6 +34,7 @@ const PerfilPage = () => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [tieneFicha, setTieneFicha] = useState(false);
 
     useEffect(() => {
         const fetchPerfil = async () => {
@@ -34,12 +43,26 @@ const PerfilPage = () => {
                     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                 });
                 const data = response.data;
+                
+                // Verificamos si el backend envió datos médicos
+                if (data.ficha_medica) {
+                    setTieneFicha(true);
+                }
+                
                 setFormData(prev => ({
                     ...prev,
                     nombres: data.nombres || '',
                     apellido_paterno: data.apellido_paterno || '',
                     apellido_materno: data.apellido_materno || '',
-                    correo: data.correo || ''
+                    correo: data.correo || '',
+                    tipo_sangre: data.ficha_medica?.tipo_sangre || '',
+                    alergias: data.ficha_medica?.alergias || '',
+                    contacto_emergencia_1_nombre: data.ficha_medica?.contacto_emergencia_1_nombre || '',
+                    contacto_emergencia_1_telefono: data.ficha_medica?.contacto_emergencia_1_telefono || '',
+                    contacto_emergencia_2_nombre: data.ficha_medica?.contacto_emergencia_2_nombre || '',
+                    contacto_emergencia_2_telefono: data.ficha_medica?.contacto_emergencia_2_telefono || '',
+                    contacto_emergencia_3_nombre: data.ficha_medica?.contacto_emergencia_3_nombre || '',
+                    contacto_emergencia_3_telefono: data.ficha_medica?.contacto_emergencia_3_telefono || ''
                 }));
             } catch (err) {
                 console.error("Error al cargar perfil:", err);
@@ -83,6 +106,7 @@ const PerfilPage = () => {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
             setSuccess(response.data.message);
+            setTieneFicha(true); // Al guardar exitosamente, ya cuenta con ficha
             // Limpiar los campos de contraseña después del éxito
             setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmNewPassword: '' }));
         } catch (err) {
@@ -190,14 +214,34 @@ const PerfilPage = () => {
                                     </div>
                                 </div>
                                 
-                                {(formData.currentPassword || formData.newPassword || formData.confirmNewPassword) && (
-                                    <>
-                                        <hr style={{ margin: '25px 0', borderColor: '#e1e5eb' }} />
-                                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                            <button type="submit" className="btn-crear-club" disabled={saving} style={{ marginTop: '0', maxWidth: '300px' }}>{saving ? 'Guardando...' : '💾 Guardar Cambios'}</button>
-                                        </div>
-                                    </>
-                                )}
+                                <hr style={{ margin: '30px 0', borderColor: '#e1e5eb' }} />
+                                
+                                <h3 style={{ marginBottom: '20px', color: '#003366', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    🏥 Datos Médicos y de Emergencia
+                                    {tieneFicha ? (
+                                        <span style={{ fontSize: '0.8rem', background: '#d4edda', color: '#155724', padding: '4px 10px', borderRadius: '20px', fontWeight: 'bold' }}>✓ Información Cargada</span>
+                                    ) : (
+                                        <span style={{ fontSize: '0.8rem', background: '#fff3cd', color: '#856404', padding: '4px 10px', borderRadius: '20px', fontWeight: 'bold' }}>⚠️ Sin Registro Previo</span>
+                                    )}
+                                </h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
+                                    <div className="form-group"><label>Tipo de Sangre</label><input type="text" name="tipo_sangre" value={formData.tipo_sangre} onChange={handleChange} placeholder="Ej. O+" /></div>
+                                    <div className="form-group"><label>Alergias</label><input type="text" name="alergias" value={formData.alergias} onChange={handleChange} placeholder="Ninguna / Penicilina, etc." /></div>
+                                    
+                                    <div className="form-group"><label>Contacto Emergencia 1 (Nombre)</label><input type="text" name="contacto_emergencia_1_nombre" value={formData.contacto_emergencia_1_nombre} onChange={handleChange} required /></div>
+                                    <div className="form-group"><label>Contacto Emergencia 1 (Teléfono)</label><input type="text" name="contacto_emergencia_1_telefono" value={formData.contacto_emergencia_1_telefono} onChange={handleChange} required /></div>
+                                    
+                                    <div className="form-group"><label>Contacto Emergencia 2 (Nombre)</label><input type="text" name="contacto_emergencia_2_nombre" value={formData.contacto_emergencia_2_nombre} onChange={handleChange} required /></div>
+                                    <div className="form-group"><label>Contacto Emergencia 2 (Teléfono)</label><input type="text" name="contacto_emergencia_2_telefono" value={formData.contacto_emergencia_2_telefono} onChange={handleChange} required /></div>
+                                    
+                                    <div className="form-group"><label>Contacto Emergencia 3 (Nombre)</label><input type="text" name="contacto_emergencia_3_nombre" value={formData.contacto_emergencia_3_nombre} onChange={handleChange} required /></div>
+                                    <div className="form-group"><label>Contacto Emergencia 3 (Teléfono)</label><input type="text" name="contacto_emergencia_3_telefono" value={formData.contacto_emergencia_3_telefono} onChange={handleChange} required /></div>
+                                </div>
+
+                                <hr style={{ margin: '25px 0', borderColor: '#e1e5eb' }} />
+                                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                    <button type="submit" className="btn-crear-club" disabled={saving} style={{ marginTop: '0', maxWidth: '300px' }}>{saving ? 'Guardando...' : '💾 Guardar Cambios'}</button>
+                                </div>
                             </form>
                             {error && <div className="message-banner error">{error}</div>}{success && <div className="message-banner success">{success}</div>}
                             </div>
