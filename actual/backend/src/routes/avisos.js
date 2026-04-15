@@ -62,4 +62,42 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
     }
 });
 
+// NUEVA RUTA: Para que el admin vea TODOS los avisos (globales y de club)
+router.get('/all-for-admin', verifyToken, async (req, res) => {
+    try {
+        // Verificación infalible: Consultamos el rol directamente en la BD
+        // usando el ID del usuario validado por el token.
+        const [users] = await db.query('SELECT role_id FROM usuarios WHERE id = ?', [req.user.id]);
+        
+        if (!users.length || Number(users[0].role_id) !== 1) {
+            return res.status(403).json({ message: 'Acceso denegado. Solo para administradores.' });
+        }
+
+        // 1. Todos los avisos globales (activos e inactivos)
+        const [globales] = await db.query(`
+            SELECT 
+                id, titulo, mensaje, prioridad, activo, 
+                fecha_creacion, fecha_vencimiento, 'global' as tipo
+            FROM avisos_globales
+        `);
+
+        // 2. Todos los avisos de club
+        const [clubes] = await db.query(`
+            SELECT 
+                ac.id, c.nombre as nombre_club, ac.contenido as mensaje, 
+                ac.activo, ac.fecha_envio, 'club' as tipo
+            FROM avisos_club ac
+            JOIN clubes c ON ac.club_id = c.id
+        `);
+
+        // 3. Unir y ordenar por fecha (más recientes primero)
+        const todos = [...globales, ...clubes].sort((a, b) => new Date(b.fecha_creacion || b.fecha_envio) - new Date(a.fecha_creacion || a.fecha_envio));
+
+        res.status(200).json(todos);
+    } catch (error) {
+        console.error("Error al obtener todos los avisos para admin:", error.message);
+        res.status(500).json({ message: "Error al cargar todos los avisos" });
+    }
+});
+
 module.exports = router;

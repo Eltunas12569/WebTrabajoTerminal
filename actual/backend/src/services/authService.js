@@ -45,6 +45,9 @@ const login = async (correo, password) => {
             id: user.id,
             nombres: user.nombres,
             apellidos: `${user.apellido_paterno} ${user.apellido_materno || ''}`.trim(),
+            apellido_paterno: user.apellido_paterno,
+            apellido_materno: user.apellido_materno,
+            correo: user.correo,
             role_id: user.role_id, // ⬅️ CORRECCIÓN CRÍTICA: Ahora sí dice role_id
             boleta,
             num_empleado
