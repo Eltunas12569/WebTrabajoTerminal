@@ -24,6 +24,11 @@ const GestionDashboard = () => {
         navigate('/perfil');
     };
 
+    const goToCreateClub = () => {
+        setIsSidebarOpen(false);
+        navigate('/crear-club');
+    };
+
     // Fetch user's clubs when component mounts or user changes
     useEffect(() => {
         const fetchUserClubs = async () => {
@@ -93,6 +98,11 @@ const GestionDashboard = () => {
                             
                             {/* Mostrar Pasar Lista solo a Administradores (1) y Profesores (2) */}
                             {(user?.role_id === 1 || user?.role_id === 2) && <li onClick={toggleSidebar}>📋 Pasar Lista</li>}
+
+                            {/* Opción para crear club, solo para profesores (rol 3) */}
+                            {user?.role_id === 3 && (
+                                <li onClick={goToCreateClub} className="special-link">➕ Crear Club</li>
+                            )}
                             <li onClick={goToProfile}>
                                 ⚙️ Configurar Perfil
                             </li>

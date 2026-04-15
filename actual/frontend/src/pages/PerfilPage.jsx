@@ -10,6 +10,7 @@ const PerfilPage = () => {
     const navigate = useNavigate();
     const API_URL = import.meta.env.VITE_API_URL;
 
+    const [originalData, setOriginalData] = useState(null);
     const [formData, setFormData] = useState({
         // Pre-llenamos con la información de la sesión actual por si el backend tarda
         nombres: user?.nombres || '',
@@ -49,12 +50,14 @@ const PerfilPage = () => {
                     setTieneFicha(true);
                 }
                 
-                setFormData(prev => ({
-                    ...prev,
+                const loadedData = {
                     nombres: data.nombres || '',
                     apellido_paterno: data.apellido_paterno || '',
                     apellido_materno: data.apellido_materno || '',
                     correo: data.correo || '',
+                    currentPassword: '',
+                    newPassword: '',
+                    confirmNewPassword: '',
                     tipo_sangre: data.ficha_medica?.tipo_sangre || '',
                     alergias: data.ficha_medica?.alergias || '',
                     contacto_emergencia_1_nombre: data.ficha_medica?.contacto_emergencia_1_nombre || '',
@@ -63,17 +66,31 @@ const PerfilPage = () => {
                     contacto_emergencia_2_telefono: data.ficha_medica?.contacto_emergencia_2_telefono || '',
                     contacto_emergencia_3_nombre: data.ficha_medica?.contacto_emergencia_3_nombre || '',
                     contacto_emergencia_3_telefono: data.ficha_medica?.contacto_emergencia_3_telefono || ''
-                }));
+                };
+                setFormData(loadedData);
+                setOriginalData(loadedData); // Guardamos la "foto" original
             } catch (err) {
                 console.error("Error al cargar perfil:", err);
                 // Si falla, aseguramos que al menos se vean los datos de la sesión
-                setFormData(prev => ({
-                    ...prev,
+                const fallbackData = {
                     nombres: user?.nombres || '',
                     apellido_paterno: user?.apellido_paterno || (user?.apellidos ? user.apellidos.split(' ')[0] : ''),
                     apellido_materno: user?.apellido_materno || (user?.apellidos ? user.apellidos.split(' ').slice(1).join(' ') : ''),
-                    correo: user?.correo || ''
-                }));
+                    correo: user?.correo || '',
+                    currentPassword: '',
+                    newPassword: '',
+                    confirmNewPassword: '',
+                    tipo_sangre: '',
+                    alergias: '',
+                    contacto_emergencia_1_nombre: '',
+                    contacto_emergencia_1_telefono: '',
+                    contacto_emergencia_2_nombre: '',
+                    contacto_emergencia_2_telefono: '',
+                    contacto_emergencia_3_nombre: '',
+                    contacto_emergencia_3_telefono: ''
+                };
+                setFormData(fallbackData);
+                setOriginalData(fallbackData); // Guardamos la "foto" original
             } finally {
                 setLoading(false);
             }
@@ -107,8 +124,10 @@ const PerfilPage = () => {
             });
             setSuccess(response.data.message);
             setTieneFicha(true); // Al guardar exitosamente, ya cuenta con ficha
-            // Limpiar los campos de contraseña después del éxito
-            setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmNewPassword: '' }));
+            // Limpiar los campos de contraseña y actualizar la "foto" original para que se oculte el botón
+            const updatedData = { ...formData, currentPassword: '', newPassword: '', confirmNewPassword: '' };
+            setFormData(updatedData);
+            setOriginalData(updatedData);
         } catch (err) {
             console.error("Error al actualizar perfil:", err);
             setError(err.response?.data?.message || 'Error al actualizar el perfil.');
@@ -133,6 +152,9 @@ const PerfilPage = () => {
         const index = text.charCodeAt(0) % colors.length;
         return colors[index];
     };
+
+    // Comprueba si los datos del formulario son diferentes a la copia original que llegó del servidor
+    const hasChanges = originalData && JSON.stringify(formData) !== JSON.stringify(originalData);
 
     return (
         <div className="web-dashboard">
@@ -165,7 +187,6 @@ const PerfilPage = () => {
                                 <>
                                     <li onClick={() => navigate('/admin')}>🏠 Inicio</li>
                                     <li onClick={() => navigate('/admin')}>📋 Lista de Clubs</li>
-                                    <li onClick={() => navigate('/crear-club')} className="special-link">➕ Crear Club</li>
                                     <li onClick={() => navigate('/admin/avisos')}>📢 Gestión de Avisos</li>
                                 </>
                             ) : (
@@ -173,6 +194,7 @@ const PerfilPage = () => {
                                     <li onClick={() => navigate('/gestion')}>🏠 Inicio</li>
                                     <li onClick={() => navigate('/gestion')}>📅 Mis Actividades</li>
                                     {user?.role_id === 2 && <li onClick={() => navigate('/gestion')}>📋 Pasar Lista</li>}
+                                    {user?.role_id === 3 && <li onClick={() => navigate('/crear-club')} className="special-link">➕ Crear Club</li>}
                                 </>
                             )}
                             <li onClick={() => navigate('/perfil')}>⚙️ Configurar Perfil</li>
@@ -238,10 +260,15 @@ const PerfilPage = () => {
                                     <div className="form-group"><label>Contacto Emergencia 3 (Teléfono)</label><input type="text" name="contacto_emergencia_3_telefono" value={formData.contacto_emergencia_3_telefono} onChange={handleChange} required /></div>
                                 </div>
 
-                                <hr style={{ margin: '25px 0', borderColor: '#e1e5eb' }} />
-                                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                    <button type="submit" className="btn-crear-club" disabled={saving} style={{ marginTop: '0', maxWidth: '300px' }}>{saving ? 'Guardando...' : '💾 Guardar Cambios'}</button>
-                                </div>
+                                {/* El botón y la línea solo aparecen si hasChanges es true */}
+                                {hasChanges && (
+                                    <>
+                                        <hr style={{ margin: '25px 0', borderColor: '#e1e5eb' }} />
+                                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                            <button type="submit" className="btn-crear-club" disabled={saving} style={{ marginTop: '0', maxWidth: '300px' }}>{saving ? 'Guardando...' : '💾 Guardar Cambios'}</button>
+                                        </div>
+                                    </>
+                                )}
                             </form>
                             {error && <div className="message-banner error">{error}</div>}{success && <div className="message-banner success">{success}</div>}
                             </div>
