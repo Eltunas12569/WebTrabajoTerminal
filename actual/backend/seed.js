@@ -10,149 +10,128 @@ const getRandomMultiple = (arr, num) => {
 
 const seedMasivo = async () => {
     try {
-        console.log("🚀 INICIANDO MEGA SEEDER MASIVO (Llenado Total Absoluto)...");
+        console.log("🚀 INICIANDO MEGA SEEDER MASIVO (ALINEADO AL DIAGRAMA ER)...");
 
         console.log("⏳ 1. Configurando roles...");
-        const rolesBase = [ { id: 1, nombre: 'administrador' }, { id: 2, nombre: 'alumno' }, { id: 3, nombre: 'profesor' } ];
+        const rolesBase = [ 
+            { id: 1, nombre: 'administrador' }, 
+            { id: 2, nombre: 'alumno' }, 
+            { id: 3, nombre: 'profesor' },
+            { id: 4, nombre: 'usuario_basico' }
+        ];
         for (const rol of rolesBase) {
             await db.query(`INSERT IGNORE INTO roles (id, nombre) VALUES (?, ?)`, [rol.id, rol.nombre]);
         }
 
-        console.log("⏳ 2. Generando 181 usuarios completos...");
+        console.log("⏳ 2. Generando usuarios y fichas médicas...");
         const hash = await bcrypt.hash("qwerty", 10);
-        const carreras = ['Ing. en Sistemas', 'Ing. Mecatrónica', 'Lic. en Administración', 'Ing. Civil', 'Ing. Electrónica'];
+        const carreras = ['Ing. en Sistemas', 'Ing. Mecatrónica', 'Lic. en Computación', 'Ing. en Datos'];
         
         let profeIds = [];
         let alumnoIds = [];
 
-        // Admin
+        // ADMIN
         await db.query(
-            `INSERT INTO usuarios (id, nombres, apellido_paterno, apellido_materno, correo, password, role_id) VALUES (1, 'Carlos', 'Mendoza', 'Ruiz', 'admin@ipn.mx', ?, 1) ON DUPLICATE KEY UPDATE id=1`,
-            [hash]
+            `INSERT IGNORE INTO usuarios (id, nombres, apellido_paterno, apellido_materno, correo, password, role_id) 
+             VALUES (1, 'Admin', 'General', 'Sistema', 'admin@ipn.mx', ?, 1)`, [hash]
         );
 
-        // Profesores
+        // PROFESORES
         for (let i = 1; i <= 30; i++) {
             const [res] = await db.query(
-                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) VALUES (?, ?, ?, ?, ?, 3)`,
-                [`Profesor ${i}`, `García`, `López`, `profe${i}@ipn.mx`, hash]
+                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) 
+                 VALUES (?, ?, ?, ?, ?, 3)`, 
+                [`Profesor ${i}`, 'García', 'López', `profe${i}@ipn.mx`, hash]
             );
             const profeId = res.insertId;
             profeIds.push(profeId);
-            await db.query(`INSERT INTO profesores_detalles (usuario_id, num_empleado) VALUES (?, ?)`, [profeId, `EMP-${i.toString().padStart(4, '0')}`]);
+
+            await db.query(`INSERT INTO profesores_detalles (usuario_id, num_empleado) VALUES (?, ?)`, [profeId, `EMP${2000 + i}`]);
+
+            await db.query(
+                `INSERT INTO fichas_medicas (
+                    usuario_id, tipo_sangre, condiciones_preexistentes, 
+                    contacto_emergencia_1_nombre, contacto_emergencia_1_telefono,
+                    contacto_emergencia_2_nombre, contacto_emergencia_2_telefono,
+                    contacto_emergencia_3_nombre, contacto_emergencia_3_telefono
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+                [profeId, 'A+', 'Ninguna', 'Contacto 1', '5500000000', 'N/A', '000', 'N/A', '000']
+            );
         }
 
-        // Alumnos
+        // ALUMNOS
         for (let i = 1; i <= 150; i++) {
             const [res] = await db.query(
-                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) VALUES (?, ?, ?, ?, ?, 2)`,
-                [`Alumno ${i}`, `Pérez`, `Sánchez`, `alumno${i}@ipn.mx`, hash]
+                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) 
+                 VALUES (?, ?, ?, ?, ?, 2)`, 
+                [`Alumno ${i}`, 'Martínez', 'Sánchez', `alumno${i}@ipn.mx`, hash]
             );
             const alumnoId = res.insertId;
             alumnoIds.push(alumnoId);
-            
-            const nssGenerado = `1111111${i.toString().padStart(4, '0')}`;
-            const boletaGenerada = `2026630${i.toString().padStart(3, '0')}`;
-            const carreraGenerada = getRandom(carreras);
-            
-            await db.query(`INSERT INTO alumnos_detalles (usuario_id, nss, boleta, carrera) VALUES (?, ?, ?, ?)`, [alumnoId, nssGenerado, boletaGenerada, carreraGenerada]);
-            
+
+            await db.query(`INSERT INTO alumnos_detalles (usuario_id, nss, boleta, carrera) VALUES (?, ?, ?, ?)`, 
+                [alumnoId, `NSS-${100000 + i}`, `2026${5000 + i}`, getRandom(carreras)]);
+
             await db.query(
                 `INSERT INTO fichas_medicas (
-                    usuario_id, tipo_sangre, alergias, 
-                    contacto_emergencia_1_nombre, contacto_emergencia_1_telefono, 
+                    usuario_id, tipo_sangre, condiciones_preexistentes, 
+                    contacto_emergencia_1_nombre, contacto_emergencia_1_telefono,
                     contacto_emergencia_2_nombre, contacto_emergencia_2_telefono,
                     contacto_emergencia_3_nombre, contacto_emergencia_3_telefono
-                ) 
-                VALUES (?, 'O+', 'Ninguna', 'Mamá', '5551234567', 'Papá', '5557654321', 'Tío', '5559998888')`,
-                [alumnoId]
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+                [alumnoId, getRandom(['O+', 'A+']), 'Estudiante sano', 'Padre/Madre', '5512345678', 'N/A', '000', 'N/A', '000']
             );
         }
 
-        console.log("⏳ 3. Creando 20 clubes con TODOS LOS CAMPOS LLENOS...");
-        const nombresClubes = ['Robótica', 'Ajedrez', 'Desarrollo Web', 'Basquetbol', 'Fútbol', 'Voleibol', 'Danza', 'Teatro', 'Música', 'Fotografía', 'Literatura', 'Ciencias', 'Matemáticas', 'Idiomas', 'Debate', 'Ecología', 'Cine', 'Cocina', 'Emprendimiento', 'Diseño Gráfico'];
-        let clubIds = [];
+        console.log("⏳ 3. Creando Clubes e Interacción...");
+        const nombresClub = ['Club de Robótica', 'Cine Debate', 'Ajedrez ESCOM', 'Selección de Básquetbol'];
+        
+        for (const nombre of nombresClub) {
+            const pEncargado = getRandom(profeIds);
+            const aEncargado = getRandom(alumnoIds);
+            const codigo = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-        for (let i = 0; i < nombresClubes.length; i++) {
-            // Lógica de Estatus: Los primeros 10 activos, siguientes 5 en revisión, 3 rechazados, 2 inactivos.
-            let estatus = 'activo';
-            let codigo = Math.random().toString(36).substring(2, 8).toUpperCase();
-            let motivo_rechazo = null;
-
-            if (i >= 10 && i < 15) { estatus = 'en_revision'; codigo = null; }
-            if (i >= 15 && i < 18) { estatus = 'rechazado'; codigo = null; motivo_rechazo = "Faltan firmas en el PDF de integrantes. Por favor corregir."; }
-            if (i >= 18) { estatus = 'inactivo'; codigo = null; }
-
-            const cronogramaFalso = JSON.stringify([
-                { mes: "Enero", actividad: "Convocatoria y reclutamiento" },
-                { mes: "Marzo", actividad: "Primer proyecto interno" },
-                { mes: "Junio", actividad: "Presentación final" }
-            ]);
-
-            // DATOS FICTICIOS COMPLETOS PARA QUE NINGÚN CAMPO SEA NULL
-            const descripcionFalsa = `Este es el club oficial de ${nombresClubes[i]} de la institución. Un espacio para aprender y compartir conocimientos.`;
-            const objetivoFalso = `Desarrollar habilidades prácticas y teóricas en ${nombresClubes[i]} para todos los estudiantes interesados.`;
-            const detalleActividadesFalso = "Sesiones teóricas de 1 hora seguidas de 2 horas de práctica. Realización de torneos y exposiciones bimestrales.";
-            const espaciosFalsos = "Aula Magna los Lunes de 14:00 a 16:00 y Patio Central los Jueves de 15:00 a 17:00.";
-            const impactoFalso = "Mejora del trabajo en equipo, pensamiento crítico, disciplina y salud integral de los participantes.";
-            const archivoEstudiantes = `https://drive.google.com/file/d/documento_firmado_club_${i}/view`;
-            
-            const [resClub] = await db.query(
-                `INSERT INTO clubes (
-                    nombre, descripcion, objetivo, cronograma, detalle_actividades, 
-                    espacios_tiempos, impacto, archivo_lista_estudiantes, 
-                    estatus, codigo_union, motivo_rechazo
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            // 👇 SE AGREGARON LOS CAMPOS FALTANTES: cronograma, detalle_actividades, espacios_tiempos, impacto 👇
+            const [clubRes] = await db.query(
+                `INSERT INTO clubes (nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, estatus, codigo_union) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'activo', ?)`,
                 [
-                    `Club de ${nombresClubes[i]}`, descripcionFalsa, objetivoFalso, cronogramaFalso, 
-                    detalleActividadesFalso, espaciosFalsos, impactoFalso, archivoEstudiantes, 
-                    estatus, codigo, motivo_rechazo
+                    nombre, 
+                    `Descripción completa del ${nombre}`, 
+                    `Objetivo principal del ${nombre}`, 
+                    JSON.stringify([{ mes: "Agosto", actividad: "Reunión inicial y planeación" }, { mes: "Septiembre", actividad: "Inicio de actividades" }]), 
+                    `Detalles de las actividades que se desarrollarán en el ${nombre} durante el semestre.`, 
+                    `Lunes y Miércoles de 14:00 a 16:00 en el Aula asignada.`, 
+                    `Impacto positivo en la comunidad escolar fomentando el desarrollo integral.`, 
+                    codigo
                 ]
             );
-            
-            const clubId = resClub.insertId;
-            clubIds.push({ id: clubId, nombre: nombresClubes[i] });
+            const clubId = clubRes.insertId;
 
-            const profeEncargado = getRandom(profeIds);
-            const alumnoEncargado = getRandom(alumnoIds);
+            // Los encargados se guardan en la tabla inscripciones con su rol
+            await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo')`, [clubId, pEncargado]);
+            await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo')`, [clubId, aEncargado]);
 
-            await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club) VALUES (?, ?, 'encargado_profesor')`, [profeEncargado, clubId]);
-            await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club) VALUES (?, ?, 'encargado_alumno')`, [alumnoEncargado, clubId]);
-
-            const miembrosNormales = getRandomMultiple(alumnoIds.filter(id => id !== alumnoEncargado), 15);
-            for (const miembroId of miembrosNormales) {
-                await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club) VALUES (?, ?, 'miembro')`, [miembroId, clubId]);
-            }
-
-            // Opcional: Agregar interacciones en clubes activos
-            if (estatus === 'activo') {
-                await db.query(`INSERT INTO avisos_club (club_id, usuario_id, contenido) VALUES (?, ?, ?)`, [clubId, profeEncargado, `¡Bienvenidos al club de ${nombresClubes[i]}!`]);
-                await db.query(`INSERT INTO chat_club (club_id, usuario_id, mensaje) VALUES (?, ?, ?)`, [clubId, profeEncargado, `Hola, no olviden traer su material.`]);
-                await db.query(`INSERT INTO solicitudes_recursos (club_id, usuario_id, tipo_recurso, nombre_recurso, cantidad, motivo) VALUES (?, ?, 'material', 'Kits básicos', 5, 'Práctica inicial')`, [clubId, profeEncargado]);
+            const integrantes = getRandomMultiple(alumnoIds.filter(id => id !== aEncargado), 10);
+            for (const mId of integrantes) {
+                await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'miembro', 'activo')`, [clubId, mId]);
             }
         }
 
-        console.log("⏳ 4. Generando Avisos Globales (5 Activos, 5 Caducados)...");
-        for (let i = 1; i <= 10; i++) {
-            const prioridades = ['alta', 'normal', 'baja'];
-            // Del 1 al 5 son futuros (activos), del 6 al 10 son pasados (caducados)
-            const diasVencimiento = i <= 5 ? 15 : -10;
-            const activo = i <= 5 ? 1 : 0;
-            const mensaje = i <= 5 ? "Este aviso tiene una fecha futura y deberías verlo en la app." : "Este aviso ya venció y NO debería aparecer.";
-
+        console.log("⏳ 4. Generando Avisos Globales...");
+        for (let i = 1; i <= 5; i++) {
             await db.query(
                 `INSERT INTO avisos_globales (titulo, mensaje, prioridad, autor_id, activo, fecha_vencimiento) 
-                 VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
-                [`Aviso Institucional #${i}`, mensaje, getRandom(prioridades), 1, activo, diasVencimiento]
+                 VALUES (?, ?, ?, 1, 1, DATE_ADD(NOW(), INTERVAL 15 DAY))`,
+                [`Aviso ${i}`, `Contenido de prueba institucional ${i}`, 'normal']
             );
         }
 
-        console.log(`\n🎉 ¡MEGA SEEDER ABSOLUTO FINALIZADO CON ÉXITO! 🎉`);
-        console.log(`   Puedes revisar tu base de datos, no hay ningún campo en NULL.`);
+        console.log(`\n🎉 SEED EXITOSO. La base de datos está lista.`);
         process.exit(0);
 
     } catch (error) {
-        console.error("\n❌ Error Crítico en el Mega Seeder:", error);
+        console.error("❌ ERROR CRÍTICO EN EL SEED:", error);
         process.exit(1);
     }
 };

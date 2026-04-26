@@ -2,11 +2,6 @@ const authService = require('../services/authService');
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 
-/**
- * Controlador de Autenticación
- * Maneja las peticiones HTTP para Login y Registro
- */
-
 const login = async (req, res) => {
     try {
         console.log("Intento de login recibido:", req.body); 
@@ -14,18 +9,13 @@ const login = async (req, res) => {
         const { correo, password } = req.body;
 
         if (!correo || !password) {
-            return res.status(400).json({ 
-                message: 'Correo y contraseña son requeridos'
-            });
+            return res.status(400).json({ message: 'Correo y contraseña son requeridos' });
         }
 
         const result = await authService.login(correo, password);
-
-        // Envía el token y datos del usuario (nombres, apellidos, role_id)
         res.status(200).json(result);
 
     } catch (error) {
-        // Retorna errores de credenciales o bloqueos de seguridad
         res.status(401).json({ message: error.message });
     }
 };
@@ -34,40 +24,28 @@ const register = async (req, res) => {
     try {
         console.log("Datos de registro recibidos:", req.body);
         const { 
-            nombres, 
-            apellido_paterno, 
-            apellido_materno, 
-            nss, 
-            boleta, 
-            correo, 
-            password, 
-            rol_id, 
-            carrera, 
-            num_empleado 
+            nombres, apellido_paterno, apellido_materno, 
+            nss, boleta, correo, password, rol_id, 
+            carrera, num_empleado 
         } = req.body;
 
-        // Validaciones básicas
-        if (!nombres || !nombres.trim()) {
-            return res.status(400).json({ message: "Los nombres son requeridos" });
-        }
-        if (!apellido_paterno || !apellido_paterno.trim()) {
-            return res.status(400).json({ message: "El apellido paterno es requerido" });
-        }
-        if (!nss || nss.length !== 11) {
-            return res.status(400).json({ message: "El NSS debe tener exactamente 11 dígitos" });
-        }
-        if (!correo || !correo.trim()) {
-            return res.status(400).json({ message: "El correo es requerido" });
-        }
-        if (!password || password.length < 6) {
-            return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
-        }
-        if (!rol_id || ![2, 3].includes(rol_id)) {
-            return res.status(400).json({ message: "Rol inválido" });
-        }
+        // Validaciones básicas generales
+        if (!nombres || !nombres.trim()) return res.status(400).json({ message: "Los nombres son requeridos" });
+        if (!apellido_paterno || !apellido_paterno.trim()) return res.status(400).json({ message: "El apellido paterno es requerido" });
+        if (!correo || !correo.trim()) return res.status(400).json({ message: "El correo es requerido" });
+        if (!password || password.length < 8) return res.status(400).json({ message: "La contraseña debe tener al menos 8 caracteres" });
+        if (!rol_id || ![2, 3].includes(rol_id)) return res.status(400).json({ message: "Rol inválido" });
+
+        const correoLimpio = correo.trim().toLowerCase();
 
         // Validaciones específicas por rol
         if (rol_id === 2) { // Alumno
+            if (!correoLimpio.endsWith('@alumno.ipn.mx')) {
+                return res.status(400).json({ message: "El correo del alumno debe terminar en @alumno.ipn.mx" });
+            }
+            if (!nss || nss.length !== 11) {
+                return res.status(400).json({ message: "El NSS debe tener exactamente 11 dígitos" });
+            }
             if (!boleta || boleta.length !== 10) {
                 return res.status(400).json({ message: "La boleta debe tener exactamente 10 dígitos para alumnos" });
             }
@@ -75,34 +53,34 @@ const register = async (req, res) => {
                 return res.status(400).json({ message: "La carrera es requerida para alumnos" });
             }
         } else if (rol_id === 3) { // Profesor
+            // Se valida que sea @ipn.mx pero que NO sea el de alumno
+            if (!correoLimpio.endsWith('@ipn.mx') || correoLimpio.endsWith('@alumno.ipn.mx')) {
+                return res.status(400).json({ message: "El correo del profesor debe terminar en @ipn.mx" });
+            }
             if (!num_empleado || !num_empleado.trim()) {
                 return res.status(400).json({ message: "El número de empleado es requerido para profesores" });
             }
         }
 
-        // 2. Llamada al servicio para procesar el registro
         const result = await authService.register({ 
             nombres: nombres.trim(),
             apellido_paterno: apellido_paterno.trim(),
             apellido_materno: apellido_materno ? apellido_materno.trim() : null,
-            correo: correo.trim().toLowerCase(),
+            correo: correoLimpio,
             password,
             rol_id,
-            nss: nss.trim(),
-            boleta: rol_id === 2 ? boleta.trim() : null,
-            carrera: rol_id === 2 ? carrera.trim() : null,
-            num_empleado: rol_id === 3 ? num_empleado.trim() : null
+            nss: rol_id === 2 && nss ? nss.trim() : null,
+            boleta: rol_id === 2 && boleta ? boleta.trim() : null,
+            carrera: rol_id === 2 && carrera ? carrera.trim() : null,
+            num_empleado: rol_id === 3 && num_empleado ? num_empleado.trim() : null
         });
 
         res.status(201).json(result);
     } catch (error) {
-        // Captura errores como "Correo ya registrado"
         console.error("Error en registro:", error);
         res.status(400).json({ message: error.message });
     }
 };
-
-// --- NUEVAS FUNCIONES PARA PERFIL ---
 
 const getPerfil = async (req, res) => {
     try {
@@ -119,20 +97,17 @@ const updatePerfil = async (req, res) => {
     try {
         const { nombres, apellido_paterno, apellido_materno, currentPassword, newPassword } = req.body;
         
-        // 1. Actualizar datos básicos
         await db.query(
             'UPDATE usuarios SET nombres = ?, apellido_paterno = ?, apellido_materno = ? WHERE id = ?',
             [nombres, apellido_paterno, apellido_materno, req.user.id]
         );
 
-        // 2. Si el usuario ingresó contraseñas para cambiarlas
         if (currentPassword && newPassword) {
             const [users] = await db.query('SELECT password FROM usuarios WHERE id = ?', [req.user.id]);
             if (users.length > 0) {
                 const isMatch = await bcrypt.compare(currentPassword, users[0].password);
-                if (!isMatch) {
-                    return res.status(400).json({ message: 'La contraseña actual es incorrecta' });
-                }
+                if (!isMatch) return res.status(400).json({ message: 'La contraseña actual es incorrecta' });
+                
                 const salt = await bcrypt.genSalt(10);
                 const hashedPassword = await bcrypt.hash(newPassword, salt);
                 await db.query('UPDATE usuarios SET password = ? WHERE id = ?', [hashedPassword, req.user.id]);
@@ -146,5 +121,4 @@ const updatePerfil = async (req, res) => {
     }
 };
 
-// EXPORTACIÓN UNIFICADA: Esto evita el ReferenceError al iniciar el servidor
 module.exports = { login, register, getPerfil, updatePerfil };
