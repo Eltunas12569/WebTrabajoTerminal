@@ -4,10 +4,8 @@ const limpiarBaseDeDatos = async () => {
     try {
         console.log("🧹 INICIANDO LIMPIEZA TOTAL DE LA BASE DE DATOS...");
         
-        // Apagamos las llaves foráneas para evitar errores de restricción al borrar
         await db.query('SET FOREIGN_KEY_CHECKS = 0;');
 
-        // Lista de todas las tablas que vamos a vaciar (TRUNCATE reinicia los IDs a 1)
         const tablas = [
             'roles', 
             'usuarios', 
@@ -20,7 +18,9 @@ const limpiarBaseDeDatos = async () => {
             'avisos_club', 
             'chat_club', 
             'solicitudes_recursos', 
-            'avisos_globales'
+            'avisos_globales',
+            'eventos_club',
+            'asistencias_eventos'
         ];
 
         for (const tabla of tablas) {
@@ -28,14 +28,13 @@ const limpiarBaseDeDatos = async () => {
             console.log(`✅ Tabla '${tabla}' vaciada y reiniciada.`);
         }
 
-        // Volvemos a prender las llaves foráneas por seguridad
         await db.query('SET FOREIGN_KEY_CHECKS = 1;');
         
         console.log("🚀 Limpieza terminada. Tu base de datos está en blanco y lista para el seed.");
         process.exit(0);
 
     } catch (error) {
-        console.error("❌ Error Crítico al limpiar la BD:", error);
+        console.error("❌ ERROR AL LIMPIAR:", error);
         process.exit(1);
     }
 };
