@@ -32,8 +32,10 @@ const PerfilPage = () => {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [passwordSuccess, setPasswordSuccess] = useState('');
+    const [medicalError, setMedicalError] = useState('');
+    const [medicalSuccess, setMedicalSuccess] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [tieneFicha, setTieneFicha] = useState(false);
 
@@ -102,19 +104,26 @@ const PerfilPage = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = async (e) => {
+    const submitData = async (e, type) => {
         e.preventDefault();
-        setError('');
-        setSuccess('');
-
-        if (formData.newPassword && formData.newPassword !== formData.confirmNewPassword) {
-            setError('Las contraseñas nuevas no coinciden.');
-            return;
+        
+        if (type === 'password') {
+            setPasswordError('');
+            setPasswordSuccess('');
+        } else {
+            setMedicalError('');
+            setMedicalSuccess('');
         }
 
-        if (formData.newPassword && !formData.currentPassword) {
-            setError('Debes ingresar tu contraseña actual para cambiarla.');
-            return;
+        if (type === 'password') {
+            if (formData.newPassword && formData.newPassword !== formData.confirmNewPassword) {
+                setPasswordError('Las contraseñas nuevas no coinciden.');
+                return;
+            }
+            if (formData.newPassword && !formData.currentPassword) {
+                setPasswordError('Debes ingresar tu contraseña actual para cambiarla.');
+                return;
+            }
         }
 
         setSaving(true);
@@ -122,7 +131,12 @@ const PerfilPage = () => {
             const response = await axios.put(`${API_URL}/auth/perfil`, formData, {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
-            setSuccess(response.data.message);
+            
+            if (type === 'password') {
+                setPasswordSuccess(response.data.message);
+            } else {
+                setMedicalSuccess(response.data.message);
+            }
             setTieneFicha(true); // Al guardar exitosamente, ya cuenta con ficha
             // Limpiar los campos de contraseña y actualizar la "foto" original para que se oculte el botón
             const updatedData = { ...formData, currentPassword: '', newPassword: '', confirmNewPassword: '' };
@@ -130,7 +144,12 @@ const PerfilPage = () => {
             setOriginalData(updatedData);
         } catch (err) {
             console.error("Error al actualizar perfil:", err);
-            setError(err.response?.data?.message || 'Error al actualizar el perfil.');
+            const errorMsg = err.response?.data?.message || 'Error al actualizar el perfil.';
+            if (type === 'password') {
+                setPasswordError(errorMsg);
+            } else {
+                setMedicalError(errorMsg);
+            }
         } finally {
             setSaving(false);
         }
@@ -153,8 +172,15 @@ const PerfilPage = () => {
         return colors[index];
     };
 
-    // Comprueba si los datos del formulario son diferentes a la copia original que llegó del servidor
-    const hasChanges = originalData && JSON.stringify(formData) !== JSON.stringify(originalData);
+    // Comprueba si hay cambios en la contraseña
+    const hasPasswordChanges = formData.currentPassword || formData.newPassword || formData.confirmNewPassword;
+
+    // Comprueba si hay cambios en los datos médicos
+    const medicalFields = [
+        'tipo_sangre', 'alergias', 'contacto_emergencia_1_nombre', 'contacto_emergencia_1_telefono',
+        'contacto_emergencia_2_nombre', 'contacto_emergencia_2_telefono', 'contacto_emergencia_3_nombre', 'contacto_emergencia_3_telefono'
+    ];
+    const hasMedicalChanges = originalData && medicalFields.some(field => formData[field] !== originalData[field]);
 
     return (
         <div className="web-dashboard">
@@ -212,9 +238,9 @@ const PerfilPage = () => {
                             </div>
                             <div className="crear-club-card" style={{ flex: 1, marginTop: '0', maxWidth: '100%' }}>
                             <h1 className="crear-club-title">⚙️ Configuración de Perfil</h1>
-                            <p className="crear-club-subtitle">Actualiza tu contraseña de acceso.</p>
+                            <p className="crear-club-subtitle">Actualiza tu contraseña de acceso y datos médicos.</p>
 
-                            <form onSubmit={handleSubmit} className="crear-club-form">
+                            <div className="crear-club-form">
                                 <div style={{ display: 'flex', gap: '30px' }}>
                                     {/* Columna Izquierda: Información Personal */}
                                     <div style={{ flex: 1 }}>
@@ -229,15 +255,23 @@ const PerfilPage = () => {
 
                                     {/* Columna Derecha: Seguridad */}
                                     <div style={{ flex: 1 }}>
+                                        <form onSubmit={(e) => submitData(e, 'password')}>
                                         <h3 style={{ marginBottom: '15px', color: '#003366', fontSize: '1.1rem' }}>Seguridad</h3>
                                         <div className="form-group"><label>Contraseña Actual</label><input type="password" name="currentPassword" value={formData.currentPassword} onChange={handleChange} placeholder="Requerida solo si cambiarás de contraseña" /></div>
                                         <div className="form-group"><label>Nueva Contraseña</label><input type="password" name="newPassword" value={formData.newPassword} onChange={handleChange} placeholder="Mínimo 6 caracteres" /></div>
                                         <div className="form-group"><label>Confirmar Nueva Contraseña</label><input type="password" name="confirmNewPassword" value={formData.confirmNewPassword} onChange={handleChange} placeholder="Repite la nueva contraseña" /></div>
+                                        {hasPasswordChanges ? (
+                                            <button type="submit" className="btn-crear-club" disabled={saving} style={{ marginTop: '10px', maxWidth: '300px' }}>{saving ? 'Guardando...' : '💾 Guardar Contraseña'}</button>
+                                        ) : null}
+                                        {passwordError && <div className="message-banner error" style={{ marginTop: '10px' }}>{passwordError}</div>}
+                                        {passwordSuccess && <div className="message-banner success" style={{ marginTop: '10px' }}>{passwordSuccess}</div>}
+                                        </form>
                                     </div>
                                 </div>
                                 
                                 <hr style={{ margin: '30px 0', borderColor: '#e1e5eb' }} />
                                 
+                                <form onSubmit={(e) => submitData(e, 'medical')}>
                                 <h3 style={{ marginBottom: '20px', color: '#003366', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     🏥 Datos Médicos y de Emergencia
                                     {tieneFicha ? (
@@ -247,7 +281,20 @@ const PerfilPage = () => {
                                     )}
                                 </h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
-                                    <div className="form-group"><label>Tipo de Sangre</label><input type="text" name="tipo_sangre" value={formData.tipo_sangre} onChange={handleChange} placeholder="Ej. O+" /></div>
+                                    <div className="form-group">
+                                        <label>Tipo de Sangre</label>
+                                        <select name="tipo_sangre" value={formData.tipo_sangre} onChange={handleChange}>
+                                            <option value="">Selecciona una opción</option>
+                                            <option value="O+">O+</option>
+                                            <option value="O-">O-</option>
+                                            <option value="A+">A+</option>
+                                            <option value="A-">A-</option>
+                                            <option value="B+">B+</option>
+                                            <option value="B-">B-</option>
+                                            <option value="AB+">AB+</option>
+                                            <option value="AB-">AB-</option>
+                                        </select>
+                                    </div>
                                     <div className="form-group"><label>Alergias</label><input type="text" name="alergias" value={formData.alergias} onChange={handleChange} placeholder="Ninguna / Penicilina, etc." /></div>
                                     
                                     <div className="form-group"><label>Contacto Emergencia 1 (Nombre)</label><input type="text" name="contacto_emergencia_1_nombre" value={formData.contacto_emergencia_1_nombre} onChange={handleChange} required /></div>
@@ -260,17 +307,19 @@ const PerfilPage = () => {
                                     <div className="form-group"><label>Contacto Emergencia 3 (Teléfono)</label><input type="text" name="contacto_emergencia_3_telefono" value={formData.contacto_emergencia_3_telefono} onChange={handleChange} required /></div>
                                 </div>
 
-                                {/* El botón y la línea solo aparecen si hasChanges es true */}
-                                {hasChanges && (
+                                {/* El botón y la línea solo aparecen si hasMedicalChanges es true */}
+                                {hasMedicalChanges && (
                                     <>
                                         <hr style={{ margin: '25px 0', borderColor: '#e1e5eb' }} />
                                         <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                            <button type="submit" className="btn-crear-club" disabled={saving} style={{ marginTop: '0', maxWidth: '300px' }}>{saving ? 'Guardando...' : '💾 Guardar Cambios'}</button>
+                                            <button type="submit" className="btn-crear-club" disabled={saving} style={{ marginTop: '0', maxWidth: '300px' }}>{saving ? 'Guardando...' : '💾 Guardar Datos Médicos'}</button>
                                         </div>
                                     </>
                                 )}
-                            </form>
-                            {error && <div className="message-banner error">{error}</div>}{success && <div className="message-banner success">{success}</div>}
+                                {medicalError && <div className="message-banner error" style={{ marginTop: '15px' }}>{medicalError}</div>}
+                                {medicalSuccess && <div className="message-banner success" style={{ marginTop: '15px' }}>{medicalSuccess}</div>}
+                                </form>
+                            </div>
                             </div>
                         </div>
                     )}
