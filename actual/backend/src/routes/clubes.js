@@ -180,29 +180,40 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
 // --- CREACIÓN, EDICIÓN Y ACCIONES DE ADMIN ---
 // ==========================================
 router.post('/', verifyToken, async (req, res) => {
-    const { nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, profesor_encargado_id, alumno_encargado_id, miembros_ids } = req.body;
+    // CORRECCIÓN 1: Recibimos "lista_estudiantes" tal y como lo manda Kotlin
+    const { nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, profesor_encargado_id, alumno_encargado_id, lista_estudiantes } = req.body;
     const estatus = 'esperando_firmas'; 
-    const fecha_creacion = new Date();
 
-    if (!nombre || !profesor_encargado_id || !alumno_encargado_id || !miembros_ids || miembros_ids.length < 19) return res.status(400).json({ message: 'Faltan campos o alumnos.' });
+    // CORRECCIÓN 2: Validamos contra la variable correcta
+    if (!nombre || !profesor_encargado_id || !alumno_encargado_id || !lista_estudiantes || lista_estudiantes.length < 19) {
+        return res.status(400).json({ message: 'Faltan campos o los 19 alumnos obligatorios.' });
+    }
     
     try {
         const [result] = await db.query(
-            `INSERT INTO clubes (nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, estatus, fecha_creacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, estatus, fecha_creacion]
+            `INSERT INTO clubes (nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, estatus, fecha_creacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+            [nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, estatus]
         );
         const newClubId = result.insertId;
 
+        // Inscribir Profesor Titular (Activo de inmediato)
         await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo')`, [profesor_encargado_id, newClubId]);
-        await db.query(`UPDATE usuarios SET role_id = 2 WHERE id = ? AND role_id != 1`, [profesor_encargado_id]);
+        // Se eliminó la degradación de rol global que tenía el código anterior
         
+        // Inscribir Alumno Representante (Pendiente a que acepte la invitación)
         await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'pendiente')`, [alumno_encargado_id, newClubId]);
         
-        for (const miembroId of miembros_ids) {
-            if (miembroId !== alumno_encargado_id) await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'miembro', 'pendiente')`, [miembroId, newClubId]);
+        // Inscribir a los 19 miembros (Pendientes a que acepten)
+        for (const miembroId of lista_estudiantes) {
+            if (miembroId !== alumno_encargado_id) {
+                await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'miembro', 'pendiente')`, [miembroId, newClubId]);
+            }
         }
-        res.status(201).json({ message: 'Club creado. Esperando confirmación.', clubId: newClubId });
-    } catch (error) { res.status(500).json({ message: "Error interno." }); }
+        res.status(201).json({ message: 'Club creado. Esperando confirmación de alumnos.', clubId: newClubId });
+    } catch (error) { 
+        console.error("Error al crear club:", error);
+        res.status(500).json({ message: "Error interno al crear el club." }); 
+    }
 });
 
 router.put('/:id', verifyToken, async (req, res) => {
@@ -213,23 +224,28 @@ router.put('/:id', verifyToken, async (req, res) => {
             `UPDATE clubes SET nombre = ?, descripcion = ?, objetivo = ?, cronograma = ?, detalle_actividades = ?, espacios_tiempos = ?, impacto = ?, estatus = 'en_revision', motivo_rechazo = NULL WHERE id = ?`, 
             [nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, id]
         );
+        
         const [profesoresActuales] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_profesor'`, [id]);
         const [alumnosActuales] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_alumno'`, [id]);
         
         const viejo_profesor_id = profesoresActuales.length > 0 ? profesoresActuales[0].usuario_id : null;
         const viejo_alumno_id = alumnosActuales.length > 0 ? alumnosActuales[0].usuario_id : null;
 
+        // Si cambian al líder, el viejo líder pasa a ser un miembro normal
         if (viejo_profesor_id && viejo_profesor_id !== nuevo_profesor_id) await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, viejo_profesor_id]);
         if (viejo_alumno_id && viejo_alumno_id !== nuevo_alumno_id) await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, viejo_alumno_id]);
 
+        // Asignar a los nuevos líderes
         await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_profesor', estatus = 'activo'`, [nuevo_profesor_id, id]);
         await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_alumno', estatus = 'activo'`, [nuevo_alumno_id, id]);
 
-        await db.query(`UPDATE usuarios SET role_id = 2 WHERE id = ? AND role_id != 1`, [nuevo_profesor_id]);
-        await db.query(`UPDATE usuarios SET role_id = 3 WHERE id = ? AND role_id != 1`, [nuevo_alumno_id]);
+        // Se eliminó la degradación de roles globales cruzados.
 
-        res.status(200).json({ message: "Editado correctamente" });
-    } catch (error) { res.status(500).json({ message: "Error interno al editar" }); }
+        res.status(200).json({ message: "Editado y reenviado a revisión correctamente" });
+    } catch (error) { 
+        console.error("Error al editar club:", error);
+        res.status(500).json({ message: "Error interno al editar" }); 
+    }
 });
 
 router.put('/:id/aprobar', verifyToken, async (req, res) => {
@@ -284,5 +300,29 @@ router.post('/unirse', verifyToken, async (req, res) => {
         res.status(200).json({ message: "¡Te has unido!" });
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
+
+// ==========================================
+// --- OBTENER ESTADO DE FIRMAS (PROFESOR) ---
+// ==========================================
+router.get('/:id/miembros', verifyToken, async (req, res) => {
+    try {
+        // Traemos a todos los inscritos al club excepto al profesor que consulta
+        const [miembros] = await db.query(`
+            SELECT u.id, u.nombres, CONCAT(u.apellido_paterno, ' ', IFNULL(u.apellido_materno, '')) AS apellidos, 
+                   ad.boleta, i.rol_en_club, i.estatus 
+            FROM inscripciones i
+            JOIN usuarios u ON i.usuario_id = u.id
+            LEFT JOIN alumnos_detalles ad ON u.id = ad.usuario_id
+            WHERE i.club_id = ? AND i.rol_en_club != 'encargado_profesor'
+            ORDER BY i.estatus DESC, u.nombres ASC
+        `, [req.params.id]);
+        
+        res.status(200).json(miembros);
+    } catch (error) {
+        console.error("Error al obtener firmas:", error);
+        res.status(500).json({ message: "Error al cargar la lista de firmas" });
+    }
+});
+
 
 module.exports = router;
