@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'; // Import useEffect
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios'; // Import axios
+import axios from 'axios';
 import './css/Dashboards.css';
 import AccionesAlumno from '../components/AccionesAlumno';
 
@@ -67,7 +67,23 @@ const GestionDashboard = () => {
                         Authorization: `Bearer ${localStorage.getItem('token')}`
                     }
                 });
-                setAvisos(response.data);
+                
+                const datos = response.data;
+                const pesos = { 'alta': 1, 'normal': 2, 'baja': 3 };
+                const ordenados = [...datos].sort((a, b) => {
+                    const pA = a.prioridad ? String(a.prioridad).toLowerCase().trim() : 'normal';
+                    const pB = b.prioridad ? String(b.prioridad).toLowerCase().trim() : 'normal';
+                    const pesoA = pesos[pA] || 4;
+                    const pesoB = pesos[pB] || 4;
+                    
+                    if (pesoA !== pesoB) return pesoA - pesoB;
+                    
+                    const tA = new Date(a.tiempo).getTime() || 0;
+                    const tB = new Date(b.tiempo).getTime() || 0;
+                    return tB - tA; // Si empatan, el más nuevo primero
+                });
+                
+                setAvisos(ordenados);
             } catch (error) {
                 console.error("Error al obtener los avisos:", error);
             } finally {
@@ -142,7 +158,7 @@ const GestionDashboard = () => {
                     <nav className="sidebar-links">
                         <ul>
                             <li onClick={() => { setActiveTab('avisos'); setIsSidebarOpen(false); }}>🏠 Inicio</li>
-                            <li onClick={() => { setActiveTab('clubs'); setIsSidebarOpen(false); }}>📅 Mis Actividades</li>
+                            <li onClick={() => { setActiveTab('clubs'); setIsSidebarOpen(false); }}>📅 Mis Clubs</li>
                             
                             {/* Mostrar Unirse a un Club solo a Alumnos (2) */}
                             {user?.role_id === 2 && <li onClick={() => { setActiveTab('unirse'); setIsSidebarOpen(false); }}>🔑 Unirse a un Club</li>}
@@ -185,20 +201,36 @@ const GestionDashboard = () => {
                                     {loadingAvisos ? (
                                         <p style={{ padding: '20px' }}>Cargando avisos...</p>
                                     ) : avisos.length > 0 ? (
-                                        avisos.map(aviso => (
-                                            <div key={`${aviso.tipo}-${aviso.id}`} className="aviso-item" style={{ borderLeft: aviso.prioridad === 'alta' ? '4px solid #dc3545' : '4px solid #003366' }}>
-                                                <div className="aviso-header">
-                                                    <h4>
+                                        avisos.map(aviso => {
+                                            const prioridadStr = aviso.prioridad ? String(aviso.prioridad).toLowerCase().trim() : 'normal';
+                                            let borderColor = '#003366';
+                                            let bgColor = '#f8f9fa';
+                                            
+                                            if (prioridadStr === 'alta') {
+                                                borderColor = '#dc3545';
+                                                bgColor = 'rgba(220, 53, 69, 0.05)';
+                                            } else if (prioridadStr === 'normal') {
+                                                borderColor = '#007bff';
+                                                bgColor = 'rgba(0, 123, 255, 0.05)';
+                                            } else if (prioridadStr === 'baja') {
+                                                borderColor = '#28a745';
+                                                bgColor = 'rgba(40, 167, 69, 0.05)';
+                                            }
+                                            return (
+                                            <div key={`${aviso.tipo}-${aviso.id}`} className="aviso-item" style={{ borderLeft: `5px solid ${borderColor}`, backgroundColor: bgColor, padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
+                                                <div className="aviso-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                    <h4 style={{ margin: 0, color: borderColor }}>
                                                         {aviso.tipo === 'global' ? '🌍 ' : '🛡️ '} 
                                                         {aviso.titulo}
                                                     </h4>
-                                                    <span style={{ fontSize: '0.85rem', color: '#666' }}>
+                                                    <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 'bold' }}>
                                                         {new Date(aviso.tiempo).toLocaleDateString('es-MX')}
                                                     </span>
                                                 </div>
-                                                <p>{aviso.descripcion}</p>
+                                                <p style={{ margin: 0, color: '#333', lineHeight: '1.5' }}>{aviso.descripcion}</p>
                                             </div>
-                                        ))
+                                            );
+                                        })
                                     ) : (
                                         <p style={{ padding: '20px' }}>No hay avisos nuevos por el momento.</p>
                                     )}
@@ -212,17 +244,37 @@ const GestionDashboard = () => {
                                         {loadingClubs ? (
                                             <p>Cargando tus clubes...</p>
                                         ) : userClubs.length > 0 ? (
-                                            userClubs.map(club => (
-                                                <div key={club.id} className="club-row">
+                                            userClubs.map(club => {
+                                                const canEnterChat = club.estatus !== 'en_revision' && club.estatus !== 'esperando_firmas';
+                                                return (
+                                                <div 
+                                                    key={club.id} 
+                                                    className="club-row"
+                                                    onClick={() => {
+                                                        if (canEnterChat) {
+                                                            navigate(`/chat/${club.id}`);
+                                                        }
+                                                    }}
+                                                    style={{ 
+                                                        cursor: canEnterChat ? 'pointer' : 'default',
+                                                        borderLeft: canEnterChat ? '4px solid #1877f2' : 'none',
+                                                        transition: 'background-color 0.2s ease, transform 0.2s ease'
+                                                    }}
+                                                    onMouseOver={(e) => canEnterChat && (e.currentTarget.style.backgroundColor = '#f0f8ff')}
+                                                    onMouseOut={(e) => canEnterChat && (e.currentTarget.style.backgroundColor = 'transparent')}
+                                                >
                                                     <div className="club-row-info">
-                                                        <h4>{club.nombre}</h4>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <h4 style={{ margin: '0 0 5px 0' }}>{club.nombre}</h4>
+                                                            {canEnterChat && <span style={{ color: '#1877f2', fontSize: '0.85rem', fontWeight: 'bold' }}>💬 Abrir chat ➔</span>}
+                                                        </div>
                                                         <p>Encargado: {club.profesor_nombres} {club.profesor_apellidos}</p>
                                                         <p>Estatus del club: {club.estatus}</p>
                                                         
                                                         {/* Botón exclusivo para los Profesores Titulares en etapa de recolección de firmas */}
                                                         {club.mi_rol_interno === 'encargado_profesor' && club.estatus === 'esperando_firmas' && (
                                                             <button 
-                                                                onClick={() => openMembersModal(club)}
+                                                                onClick={(e) => { e.stopPropagation(); openMembersModal(club); }}
                                                                 className="btn-review-club"
                                                                 style={{ marginTop: '12px' }}
                                                             >
@@ -231,7 +283,8 @@ const GestionDashboard = () => {
                                                         )}
                                                     </div>
                                                 </div>
-                                            ))
+                                                );
+                                            })
                                         ) : (
                                             <p>No estás inscrito en ningún club activo.</p>
                                         )}
