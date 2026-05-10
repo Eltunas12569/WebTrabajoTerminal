@@ -13,7 +13,6 @@ const Login = () => {
     const [isBlocked, setIsBlocked] = useState(false);
     const [avisos, setAvisos] = useState([]);
     const [isAvisosOpen, setIsAvisosOpen] = useState(false); // Controla la visibilidad del panel de avisos
-    const [isTabVisible, setIsTabVisible] = useState(false); // Controla la visibilidad de la pestaña
     const [showPassword, setShowPassword] = useState(false); // Controla si se muestra la contraseña
 
     const { loginUser } = useAuth();
@@ -46,17 +45,6 @@ const Login = () => {
         };
         fetchAvisos();
     }, [API_URL]);
-
-    useEffect(() => {
-        if (isAvisosOpen) {
-            const timer = setTimeout(() => {
-                setIsTabVisible(true);
-            }, 400); // Espera a que termine la animación de 0.4s
-            return () => clearTimeout(timer);
-        } else {
-            setIsTabVisible(false);
-        }
-    }, [isAvisosOpen]);
 
     // Efecto para recuperar el error y el correo si la página se recarga inesperadamente
     useEffect(() => {
@@ -139,17 +127,27 @@ const Login = () => {
             position: 'absolute',
             top: 0,
             left: 0,
-            width: '100vw', 
-            minHeight: '100vh', 
+            width: '100%', 
+            height: '100vh', 
             overflow: 'hidden', 
             backgroundColor: '#f0f2f5', 
             fontFamily: 'system-ui, -apple-system, sans-serif',
             margin: 0
         }}>
+            <style>{`
+                .hide-scrollbar::-webkit-scrollbar {
+                    display: none;
+                }
+                .hide-scrollbar {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+            `}</style>
             
             {/* Panel Lateral de Avisos (Diseño Web Drawer) */}
             <div style={{
-                width: isAvisosOpen ? '50%' : '0',
+                width: isAvisosOpen ? '40%' : '0',
+                flexShrink: 0,
                 opacity: isAvisosOpen ? 1 : 0,
                 backgroundColor: '#003366',
                 color: '#ffffff',
@@ -161,58 +159,53 @@ const Login = () => {
                 zIndex: 20,
                 position: 'relative'
             }}>
-                {/* Botón Pestaña para cerrar */}
-                {isTabVisible && (
-                    <button 
-                        onClick={() => setIsAvisosOpen(false)} 
-                        style={{
-                            position: 'fixed',
-                            right: 'calc(50% - 45px)',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            width: '40px',
-                            height: '60px',
-                            backgroundColor: '#003366',
-                            border: '2px solid rgba(255,255,255,0.3)',
-                            borderLeft: 'none',
-                            borderRadius: '0 8px 8px 0',
-                            color: 'rgba(255,255,255,0.8)',
-                            cursor: 'pointer',
-                            fontSize: '1.2rem',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '2px 4px 12px rgba(0,0,0,0.2)',
-                            zIndex: 25,
-                            pointerEvents: 'auto'
-                        }}
-                        onMouseOver={(e) => { 
-                            e.target.style.backgroundColor = '#002244';
-                            e.target.style.right = 'calc(50% - 42px)';
-                            e.target.style.color = 'white';
-                            e.target.style.boxShadow = '3px 6px 16px rgba(0,0,0,0.3)';
-                        }}
-                        onMouseOut={(e) => { 
-                            e.target.style.backgroundColor = '#003366';
-                            e.target.style.right = 'calc(50% - 45px)';
-                            e.target.style.color = 'rgba(255,255,255,0.8)';
-                            e.target.style.boxShadow = '2px 4px 12px rgba(0,0,0,0.2)';
-                        }}
-                        title="Ocultar panel"
-                    >
-                        ←
-                    </button>
-                )}
+                {/* Pestañita para contraer */}
+                <button 
+                    onClick={() => setIsAvisosOpen(false)} 
+                    style={{
+                        position: 'absolute',
+                        right: '0',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: '30px',
+                        height: '80px',
+                        backgroundColor: 'rgba(255,255,255,0.1)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRight: 'none',
+                        borderRadius: '8px 0 0 8px',
+                        color: 'rgba(255,255,255,0.8)',
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
+                        zIndex: 25
+                    }}
+                    onMouseOver={(e) => { 
+                        e.target.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                        e.target.style.color = 'white';
+                        e.target.style.width = '35px';
+                    }}
+                    onMouseOut={(e) => { 
+                        e.target.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                        e.target.style.color = 'rgba(255,255,255,0.8)';
+                        e.target.style.width = '30px';
+                    }}
+                    title="Contraer panel"
+                >
+                    ◀
+                </button>
 
-                <div style={{ padding: '30px 25px', width: '50vw', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div style={{ padding: '30px 25px', width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', height: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '15px' }}>
                         <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <span>📢</span> Tablero de Avisos
                         </h2>
                     </div>
 
-                    <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px' }}>
+                    <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', paddingRight: '10px' }}>
                         {avisos.length > 0 ? (
                             avisos.map(aviso => (
                                 <div key={aviso.id} style={{ 
@@ -249,14 +242,15 @@ const Login = () => {
                 alignItems: 'center',
                 position: 'relative',
                 transition: 'all 0.4s ease-in-out',
-                backgroundImage: 'radial-gradient(circle at 50% 0%, #ffffff 0%, #f0f2f5 100%)'
+                backgroundImage: 'radial-gradient(circle at 50% 0%, #ffffff 0%, #f0f2f5 100%)',
+                overflowY: 'auto'
             }}>
                 {/* Botón flotante para mostrar avisos cuando están ocultos */}
                 {!isAvisosOpen && (
                     <button 
                         onClick={() => setIsAvisosOpen(true)} 
                         style={{ 
-                            position: 'absolute', top: '30px', left: '30px', 
+                            position: 'absolute', top: '20px', left: '20px', 
                             background: '#003366', color: 'white', border: 'none', 
                             padding: '12px 20px', borderRadius: '50px', cursor: 'pointer', 
                             zIndex: 10, boxShadow: '0 4px 15px rgba(0,51,102,0.3)', 
@@ -278,7 +272,8 @@ const Login = () => {
                     borderRadius: '16px',
                     boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
                     padding: '50px 45px',
-                    margin: '20px'
+                    margin: 'auto 20px',
+                    boxSizing: 'border-box'
                 }}>
                     <div style={{ textAlign: 'center', marginBottom: '40px' }}>
                         <div style={{ fontSize: '3.5rem', marginBottom: '15px' }}>🏆</div>

@@ -41,9 +41,9 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* Crear Club (Administrador) */}
+          {/* Crear Club (solo para Profesores) */}
           <Route path="/crear-club" element={
-            <ProtectedRoute rolesPermitidos={[1]}>
+            <ProtectedRoute rolesPermitidos={[3]}>
               <CrearClubPage />
             </ProtectedRoute>
           } />

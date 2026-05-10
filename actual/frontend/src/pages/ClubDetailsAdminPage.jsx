@@ -213,12 +213,76 @@ const ClubDetailsAdminPage = () => {
                         {/* Contenido: Acerca de y Equipo */}
                         <div style={{ padding: '40px 5%', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
                             
-                            {/* Tarjeta Acerca de */}
+                            {/* Motivo de Rechazo (Si aplica) */}
+                            {club.estatus === 'rechazado' && club.motivo_rechazo && (
+                                <div style={{ background: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderLeft: '5px solid #dc3545' }}>
+                                    <h3 style={{ margin: '0 0 10px 0', fontSize: '1.3rem', color: '#dc3545', fontWeight: '700' }}>⚠️ Motivo de Rechazo</h3>
+                                    <p style={{ margin: 0, fontSize: '1.05rem', color: '#333', lineHeight: '1.6' }}>{club.motivo_rechazo}</p>
+                                </div>
+                            )}
+
+                            {/* Tarjeta de Información Detallada */}
                             <div style={{ background: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                                 <h3 style={{ margin: '0 0 15px 0', fontSize: '1.3rem', color: '#1c1e21', borderBottom: '1px solid #e4e6eb', paddingBottom: '10px', fontWeight: '700' }}>Detalles del Club</h3>
-                                <p style={{ margin: 0, fontSize: '1.05rem', color: '#050505', lineHeight: '1.6' }}>{club.descripcion}</p>
-                                <div style={{ marginTop: '20px', fontSize: '0.95rem', color: '#65676b' }}>
+                                
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+                                    <div>
+                                        <h4 style={{ margin: '0 0 5px 0', color: '#003366', fontSize: '1.05rem' }}>Descripción</h4>
+                                        <p style={{ margin: 0, fontSize: '1rem', color: '#333', lineHeight: '1.5' }}>{club.descripcion}</p>
+                                    </div>
+                                    <div>
+                                        <h4 style={{ margin: '0 0 5px 0', color: '#003366', fontSize: '1.05rem' }}>Objetivo</h4>
+                                        <p style={{ margin: 0, fontSize: '1rem', color: '#333', lineHeight: '1.5' }}>{club.objetivo || 'No especificado'}</p>
+                                    </div>
+                                    <div>
+                                        <h4 style={{ margin: '0 0 5px 0', color: '#003366', fontSize: '1.05rem' }}>Detalle de Actividades</h4>
+                                        <p style={{ margin: 0, fontSize: '1rem', color: '#333', lineHeight: '1.5' }}>{club.detalle_actividades || 'No especificado'}</p>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+                                        <div>
+                                            <h4 style={{ margin: '0 0 5px 0', color: '#003366', fontSize: '1.05rem' }}>Espacios y Horarios Solicitados</h4>
+                                            <p style={{ margin: 0, fontSize: '1rem', color: '#333', lineHeight: '1.5' }}>{club.espacios_tiempos || 'No especificados'}</p>
+                                        </div>
+                                        <div>
+                                            <h4 style={{ margin: '0 0 5px 0', color: '#003366', fontSize: '1.05rem' }}>Impacto Esperado</h4>
+                                            <p style={{ margin: 0, fontSize: '1rem', color: '#333', lineHeight: '1.5' }}>{club.impacto || 'No especificado'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ marginTop: '25px', fontSize: '0.95rem', color: '#65676b', borderTop: '1px solid #e4e6eb', paddingTop: '15px', display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
                                     <strong>📅 Fecha de creación:</strong> {new Date(club.fecha_creacion).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                    {club.estatus === 'activo' && club.codigo_union && (
+                                        <span><strong>🔑 Código de Unión:</strong> <span style={{ background: '#e1e5eb', padding: '3px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold', color: '#1c1e21' }}>{club.codigo_union}</span></span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Tarjeta Cronograma */}
+                            <div style={{ background: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                <h3 style={{ margin: '0 0 15px 0', fontSize: '1.3rem', color: '#1c1e21', borderBottom: '1px solid #e4e6eb', paddingBottom: '10px', fontWeight: '700' }}>Cronograma de Actividades</h3>
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e4e6eb' }}>
+                                        <thead>
+                                            <tr style={{ backgroundColor: '#003366', color: '#fff' }}>
+                                                <th style={{ padding: '12px', textAlign: 'left', width: '25%' }}>Mes</th>
+                                                <th style={{ padding: '12px', textAlign: 'left' }}>Actividad</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(() => {
+                                                let cronogramaItems = [];
+                                                try { cronogramaItems = typeof club.cronograma === 'string' ? JSON.parse(club.cronograma) : (club.cronograma || []); } catch (e) { cronogramaItems = []; }
+                                                if (!Array.isArray(cronogramaItems) || cronogramaItems.length === 0) return <tr><td colSpan="2" style={{ padding: '15px', textAlign: 'center', color: '#666' }}>No hay cronograma disponible.</td></tr>;
+                                                return cronogramaItems.map((item, idx) => (
+                                                    <tr key={idx} style={{ borderBottom: '1px solid #eee', backgroundColor: idx % 2 === 0 ? '#fff' : '#f9f9f9' }}>
+                                                        <td style={{ padding: '12px', fontWeight: '600', color: '#333' }}>{item.mes}</td>
+                                                        <td style={{ padding: '12px', color: '#555' }}>{item.actividad}</td>
+                                                    </tr>
+                                                ));
+                                            })()}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
 

@@ -55,11 +55,6 @@ const AvisosAdminPage = () => {
         navigate('/admin');
     };
 
-    const goToCreateClub = () => {
-        setIsSidebarOpen(false);
-        navigate('/crear-club');
-    };
-
     const goToAvisos = () => {
         setIsSidebarOpen(false);
         navigate('/admin/avisos');
@@ -100,9 +95,6 @@ const AvisosAdminPage = () => {
                         <ul>
                             <li onClick={goToDashboard}>🏠 Inicio</li>
                             <li onClick={goToDashboard}>📋 Lista de Clubs</li>
-                            <li onClick={goToCreateClub} className="special-link">
-                                ➕ Crear Club
-                            </li>
                             <li onClick={goToAvisos}>
                                 📢 Gestión de Avisos
                             </li>

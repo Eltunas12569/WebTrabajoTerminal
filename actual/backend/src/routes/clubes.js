@@ -142,12 +142,16 @@ router.get('/', async (req, res) => {
         const [rows] = await db.query(`
             SELECT c.*, 
                 p.id AS profesor_encargado_id, p.nombres AS profesor_nombres, CONCAT(p.apellido_paterno, ' ', IFNULL(p.apellido_materno, '')) AS profesor_apellidos,
-                a.id AS alumno_encargado_id, a.nombres AS alumno_nombres, CONCAT(a.apellido_paterno, ' ', IFNULL(a.apellido_materno, '')) AS alumno_apellidos
+                p.correo AS profesor_correo, pd.num_empleado AS profesor_num_empleado,
+                a.id AS alumno_encargado_id, a.nombres AS alumno_nombres, CONCAT(a.apellido_paterno, ' ', IFNULL(a.apellido_materno, '')) AS alumno_apellidos,
+                a.correo AS alumno_correo, ad.boleta AS alumno_boleta
             FROM clubes c
             LEFT JOIN inscripciones ip ON c.id = ip.club_id AND ip.rol_en_club = 'encargado_profesor' AND ip.estatus = 'activo'
             LEFT JOIN usuarios p ON ip.usuario_id = p.id
+            LEFT JOIN profesores_detalles pd ON p.id = pd.usuario_id
             LEFT JOIN inscripciones ia ON c.id = ia.club_id AND ia.rol_en_club = 'encargado_alumno' AND ia.estatus = 'activo'
             LEFT JOIN usuarios a ON ia.usuario_id = a.id
+            LEFT JOIN alumnos_detalles ad ON a.id = ad.usuario_id
         `);
         const clubesTratados = rows.map(club => ({ ...club, cronograma: club.cronograma ? JSON.stringify(club.cronograma) : null }));
         res.status(200).json(clubesTratados);
@@ -160,15 +164,19 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
         const [rows] = await db.query(`
             SELECT c.*, 
                 p.id AS profesor_encargado_id, p.nombres AS profesor_nombres, CONCAT(p.apellido_paterno, ' ', IFNULL(p.apellido_materno, '')) AS profesor_apellidos,
+                p.correo AS profesor_correo, pd.num_empleado AS profesor_num_empleado,
                 a.id AS alumno_encargado_id, a.nombres AS alumno_nombres, CONCAT(a.apellido_paterno, ' ', IFNULL(a.apellido_materno, '')) AS alumno_apellidos,
+                a.correo AS alumno_correo, ad.boleta AS alumno_boleta,
                 i.estatus AS inscripcion_estatus, i.fecha_inscripcion, i.rol_en_club AS mi_rol_interno,
                 (SELECT COUNT(*) FROM inscripciones WHERE club_id = c.id AND estatus = 'activo' AND rol_en_club != 'encargado_profesor') AS aceptados_count
             FROM clubes c
             JOIN inscripciones i ON c.id = i.club_id AND i.usuario_id = ? 
             LEFT JOIN inscripciones ip ON c.id = ip.club_id AND ip.rol_en_club = 'encargado_profesor' AND ip.estatus = 'activo'
             LEFT JOIN usuarios p ON ip.usuario_id = p.id
+            LEFT JOIN profesores_detalles pd ON p.id = pd.usuario_id
             LEFT JOIN inscripciones ia ON c.id = ia.club_id AND ia.rol_en_club = 'encargado_alumno' AND ia.estatus = 'activo'
             LEFT JOIN usuarios a ON ia.usuario_id = a.id
+            LEFT JOIN alumnos_detalles ad ON a.id = ad.usuario_id
         `, [userId]);
 
         const clubesTratados = rows.map(club => ({ ...club, cronograma: club.cronograma ? JSON.stringify(club.cronograma) : null }));

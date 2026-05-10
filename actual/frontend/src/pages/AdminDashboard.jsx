@@ -53,11 +53,6 @@ const AdminDashboard = () => {
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
-    const goToCreateClub = () => {
-        setIsSidebarOpen(false);
-        navigate('/crear-club');
-    };
-
     const goToAvisos = () => {
         setIsSidebarOpen(false);
         navigate('/admin/avisos');
@@ -113,9 +108,6 @@ const AdminDashboard = () => {
                         <ul>
                             <li onClick={toggleSidebar}>🏠 Inicio</li>
                             <li onClick={toggleSidebar}>📋 Lista de Clubs</li>
-                            <li onClick={goToCreateClub} className="special-link">
-                                ➕ Crear Club
-                            </li>
                             <li onClick={goToAvisos}>
                                 📢 Gestión de Avisos
                             </li>
