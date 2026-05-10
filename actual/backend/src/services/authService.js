@@ -19,6 +19,7 @@ const login = async (correo, password) => {
         await db.query(`UPDATE usuarios SET intentos_fallidos = intentos_fallidos + 1 WHERE id = ?`, [user.id]);
         const [checkUser] = await db.query(`SELECT intentos_fallidos FROM usuarios WHERE id = ?`, [user.id]);
         const intentos = checkUser[0].intentos_fallidos;
+        
         if (intentos >= 5) {
             await db.query(`UPDATE usuarios SET bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?`, [user.id]);
             throw new Error('Límite de intentos superado. Cuenta bloqueada por 15 minutos.');
@@ -48,7 +49,7 @@ const login = async (correo, password) => {
             apellido_paterno: user.apellido_paterno,
             apellido_materno: user.apellido_materno,
             correo: user.correo,
-            role_id: user.role_id, // ⬅️ CORRECCIÓN CRÍTICA: Ahora sí dice role_id
+            role_id: user.role_id, 
             boleta,
             num_empleado
         }
@@ -56,47 +57,75 @@ const login = async (correo, password) => {
 };
 
 const register = async (userData) => {
-    const { nombres, apellido_paterno, apellido_materno, correo, password, rol_id, nss, boleta, carrera, num_empleado } = userData;
+    const { 
+        nombres, apellido_paterno, apellido_materno, correo, 
+        password, rol_id, nss, boleta, carrera, num_empleado 
+    } = userData;
 
-    // Verificar duplicados
+    const roleIdNum = Number(rol_id);
+
+    // --- VALIDACIONES DE SEGURIDAD GENERALES ---
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!passwordRegex.test(password)) {
+        throw new Error('La contraseña no cumple con los requisitos de seguridad.');
+    }
+
+    if (nombres.length > 50) throw new Error('Nombre demasiado largo.');
+    if (apellido_paterno.length > 30 || (apellido_materno && apellido_materno.length > 30)) {
+        throw new Error('Apellidos demasiado largos.');
+    }
+
     const [existingUser] = await db.query(`SELECT id FROM usuarios WHERE correo = ?`, [correo]);
-    if (existingUser.length > 0) {
-        throw new Error('El correo electrónico ya está registrado');
-    }
+    if (existingUser.length > 0) throw new Error('El correo electrónico ya está registrado');
 
-    const [existingNSS] = await db.query(`SELECT usuario_id FROM alumnos_detalles WHERE nss = ?`, [nss]);
-    if (existingNSS.length > 0) {
-        throw new Error('El NSS ya está registrado');
-    }
+    // --- VALIDACIONES ESTRICTAMENTE SEPARADAS ---
+    if (roleIdNum === 2) { 
+        if (!nss || nss.length > 11) throw new Error('El NSS necesita máximo 11 dígitos');
+        if (!boleta || boleta.length > 10) throw new Error('La boleta necesita máximo 10 dígitos');
 
-    if (rol_id === 2 && boleta) { // Alumno
+        const [existingNSS] = await db.query(`SELECT usuario_id FROM alumnos_detalles WHERE nss = ?`, [nss]);
+        if (existingNSS.length > 0) throw new Error('El NSS ya está registrado');
+
         const [existingBoleta] = await db.query(`SELECT usuario_id FROM alumnos_detalles WHERE boleta = ?`, [boleta]);
-        if (existingBoleta.length > 0) {
-            throw new Error('La boleta ya está registrada');
-        }
-    }
+        if (existingBoleta.length > 0) throw new Error('La boleta ya está registrada');
 
-    if (rol_id === 3 && num_empleado) { // Profesor
+    } else if (roleIdNum === 3) { 
+        if (!num_empleado || num_empleado.length > 15) throw new Error('El número de empleado necesita máximo 15 dígitos');
+
         const [existingEmpleado] = await db.query(`SELECT usuario_id FROM profesores_detalles WHERE num_empleado = ?`, [num_empleado]);
-        if (existingEmpleado.length > 0) {
-            throw new Error('El número de empleado ya está registrado');
-        }
+        if (existingEmpleado.length > 0) throw new Error('El número de empleado ya está registrado');
+    } else {
+        throw new Error('Rol no válido');
     }
 
+    // --- INSERCIÓN EN BASE DE DATOS ---
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
     const [result] = await db.query(
         `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) VALUES (?, ?, ?, ?, ?, ?)`,
-        [nombres, apellido_paterno, apellido_materno, correo, passwordHash, rol_id]
+        [nombres, apellido_paterno, apellido_materno, correo, passwordHash, roleIdNum]
     );
 
     const userId = result.insertId;
 
-    if (rol_id === 2) {
+    if (roleIdNum === 2) {
         await db.query(`INSERT INTO alumnos_detalles (usuario_id, nss, boleta, carrera) VALUES (?, ?, ?, ?)`, [userId, nss, boleta, carrera]);
-    } else if (rol_id === 3) {
+    } else if (roleIdNum === 3) {
         await db.query(`INSERT INTO profesores_detalles (usuario_id, num_empleado) VALUES (?, ?)`, [userId, num_empleado]);
+    }
+
+    // Fichas médicas completas para evitar problemas de inserción en MySQL
+    if (roleIdNum !== 1) { 
+        await db.query(
+            `INSERT INTO fichas_medicas (
+                usuario_id, tipo_sangre, condiciones_preexistentes, 
+                contacto_emergencia_1_nombre, contacto_emergencia_1_telefono,
+                contacto_emergencia_2_nombre, contacto_emergencia_2_telefono,
+                contacto_emergencia_3_nombre, contacto_emergencia_3_telefono
+            ) VALUES (?, 'O+', 'Pendiente por informar', 'Pendiente', '0000000000', 'N/A', '000', 'N/A', '000')`,
+            [userId]
+        );
     }
 
     return { message: "Usuario creado exitosamente" };

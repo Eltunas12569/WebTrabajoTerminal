@@ -10,149 +10,224 @@ const getRandomMultiple = (arr, num) => {
 
 const seedMasivo = async () => {
     try {
-        console.log("🚀 INICIANDO MEGA SEEDER MASIVO (Llenado Total Absoluto)...");
+        console.log("🧹 1. LIMPIANDO BASE DE DATOS...");
+        await db.query('SET FOREIGN_KEY_CHECKS = 0;');
+        const tablas = [
+            'roles', 'usuarios', 'profesores_detalles', 'alumnos_detalles', 
+            'fichas_medicas', 'contactos_emergencia', 'clubes', 'inscripciones', 
+            'historial_encargados', 'avisos_club', 'chat_club', 'solicitudes_recursos', 
+            'avisos_globales', 'eventos_club', 'asistencias_eventos'
+        ];
+        for (const tabla of tablas) {
+            await db.query(`TRUNCATE TABLE ${tabla}`);
+        }
+        await db.query('SET FOREIGN_KEY_CHECKS = 1;');
 
-        console.log("⏳ 1. Configurando roles...");
-        const rolesBase = [ { id: 1, nombre: 'administrador' }, { id: 2, nombre: 'alumno' }, { id: 3, nombre: 'profesor' } ];
+        console.log("🚀 INICIANDO MEGA SEEDER MASIVO...");
+
+        console.log("⏳ 2. Configurando roles estrictos (Sin usuario_basico)...");
+        const rolesBase = [ 
+            { id: 1, nombre: 'administrador' }, 
+            { id: 2, nombre: 'alumno' }, 
+            { id: 3, nombre: 'profesor' }
+        ];
         for (const rol of rolesBase) {
-            await db.query(`INSERT IGNORE INTO roles (id, nombre) VALUES (?, ?)`, [rol.id, rol.nombre]);
+            await db.query(`INSERT INTO roles (id, nombre) VALUES (?, ?)`, [rol.id, rol.nombre]);
         }
 
-        console.log("⏳ 2. Generando 181 usuarios completos...");
+        console.log("⏳ 3. Generando usuarios, fichas médicas y contactos normalizados...");
         const hash = await bcrypt.hash("qwerty", 10);
-        const carreras = ['Ing. en Sistemas', 'Ing. Mecatrónica', 'Lic. en Administración', 'Ing. Civil', 'Ing. Electrónica'];
+        const carreras = ['Ing. en Sistemas Computacionales', 'Ing. en Inteligencia Artificial', 'Lic. en Ciencia de Datos', 'Ing. Mecatrónica'];
+        const parentescos = ['Madre', 'Padre', 'Tutor', 'Hermano/a', 'Tío/a'];
         
         let profeIds = [];
         let alumnoIds = [];
 
-        // Admin
+        // ADMIN
         await db.query(
-            `INSERT INTO usuarios (id, nombres, apellido_paterno, apellido_materno, correo, password, role_id) VALUES (1, 'Carlos', 'Mendoza', 'Ruiz', 'admin@ipn.mx', ?, 1) ON DUPLICATE KEY UPDATE id=1`,
-            [hash]
+            `INSERT INTO usuarios (id, nombres, apellido_paterno, apellido_materno, correo, password, role_id) 
+             VALUES (1, 'Administración', 'ESCOM', 'IPN', 'admin@ipn.mx', ?, 1)`, [hash]
         );
 
-        // Profesores
+        // 30 PROFESORES
         for (let i = 1; i <= 30; i++) {
             const [res] = await db.query(
-                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) VALUES (?, ?, ?, ?, ?, 3)`,
-                [`Profesor ${i}`, `García`, `López`, `profe${i}@ipn.mx`, hash]
+                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) 
+                 VALUES (?, ?, ?, ?, ?, 3)`, 
+                [`Profesor ${i}`, 'García', 'López', `profe${i}@ipn.mx`, hash]
             );
             const profeId = res.insertId;
             profeIds.push(profeId);
-            await db.query(`INSERT INTO profesores_detalles (usuario_id, num_empleado) VALUES (?, ?)`, [profeId, `EMP-${i.toString().padStart(4, '0')}`]);
+
+            await db.query(`INSERT INTO profesores_detalles (usuario_id, num_empleado) VALUES (?, ?)`, [profeId, `EMP${2000 + i}`]);
+
+            await db.query(
+                `INSERT INTO fichas_medicas (usuario_id, tipo_sangre, condiciones_preexistentes) VALUES (?, ?, ?)`, 
+                [profeId, getRandom(['O+', 'A+', 'B+', 'AB+']), getRandom(['Ninguna', 'Hipertensión controlada', 'Asma leve'])]
+            );
+            
+            await db.query(
+                `INSERT INTO contactos_emergencia (usuario_id, nombre, telefono, parentesco) VALUES (?, ?, ?, ?)`,
+                [profeId, `Familiar Profe ${i}`, `551000${i.toString().padStart(4, '0')}`, getRandom(parentescos)]
+            );
         }
 
-        // Alumnos
+        // 150 ALUMNOS
         for (let i = 1; i <= 150; i++) {
             const [res] = await db.query(
-                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) VALUES (?, ?, ?, ?, ?, 2)`,
-                [`Alumno ${i}`, `Pérez`, `Sánchez`, `alumno${i}@ipn.mx`, hash]
+                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) 
+                 VALUES (?, ?, ?, ?, ?, 2)`, 
+                [`Alumno ${i}`, 'Martínez', 'Sánchez', `alumno${i}@alumno.ipn.mx`, hash]
             );
             const alumnoId = res.insertId;
             alumnoIds.push(alumnoId);
-            
-            const nssGenerado = `1111111${i.toString().padStart(4, '0')}`;
-            const boletaGenerada = `2026630${i.toString().padStart(3, '0')}`;
-            const carreraGenerada = getRandom(carreras);
-            
-            await db.query(`INSERT INTO alumnos_detalles (usuario_id, nss, boleta, carrera) VALUES (?, ?, ?, ?)`, [alumnoId, nssGenerado, boletaGenerada, carreraGenerada]);
-            
+
+            const nssGenerado = `12345678${i.toString().padStart(3, '0')}`;
+            const boletaGenerada = `202600${(5000 + i).toString().padStart(4, '0')}`;
+
+            await db.query(`INSERT INTO alumnos_detalles (usuario_id, nss, boleta, carrera) VALUES (?, ?, ?, ?)`, 
+                [alumnoId, nssGenerado, boletaGenerada, getRandom(carreras)]);
+
             await db.query(
-                `INSERT INTO fichas_medicas (
-                    usuario_id, tipo_sangre, alergias, 
-                    contacto_emergencia_1_nombre, contacto_emergencia_1_telefono, 
-                    contacto_emergencia_2_nombre, contacto_emergencia_2_telefono,
-                    contacto_emergencia_3_nombre, contacto_emergencia_3_telefono
-                ) 
-                VALUES (?, 'O+', 'Ninguna', 'Mamá', '5551234567', 'Papá', '5557654321', 'Tío', '5559998888')`,
-                [alumnoId]
+                `INSERT INTO fichas_medicas (usuario_id, tipo_sangre, condiciones_preexistentes) VALUES (?, ?, ?)`, 
+                [alumnoId, getRandom(['O+', 'A+', 'O-', 'B+']), getRandom(['Ninguna', 'Alergia a la penicilina', 'Ninguna', 'Miopía', 'Ninguna'])]
             );
+            
+            const numContactos = Math.random() > 0.5 ? 2 : 1;
+            for(let c = 1; c <= numContactos; c++) {
+                await db.query(
+                    `INSERT INTO contactos_emergencia (usuario_id, nombre, telefono, parentesco) VALUES (?, ?, ?, ?)`,
+                    [alumnoId, `Familiar ${c} Alumno ${i}`, `552000${i.toString().padStart(4, '0')}`, getRandom(parentescos)]
+                );
+            }
         }
 
-        console.log("⏳ 3. Creando 20 clubes con TODOS LOS CAMPOS LLENOS...");
-        const nombresClubes = ['Robótica', 'Ajedrez', 'Desarrollo Web', 'Basquetbol', 'Fútbol', 'Voleibol', 'Danza', 'Teatro', 'Música', 'Fotografía', 'Literatura', 'Ciencias', 'Matemáticas', 'Idiomas', 'Debate', 'Ecología', 'Cine', 'Cocina', 'Emprendimiento', 'Diseño Gráfico'];
-        let clubIds = [];
-
-        for (let i = 0; i < nombresClubes.length; i++) {
-            // Lógica de Estatus: Los primeros 10 activos, siguientes 5 en revisión, 3 rechazados, 2 inactivos.
-            let estatus = 'activo';
-            let codigo = Math.random().toString(36).substring(2, 8).toUpperCase();
-            let motivo_rechazo = null;
-
-            if (i >= 10 && i < 15) { estatus = 'en_revision'; codigo = null; }
-            if (i >= 15 && i < 18) { estatus = 'rechazado'; codigo = null; motivo_rechazo = "Faltan firmas en el PDF de integrantes. Por favor corregir."; }
-            if (i >= 18) { estatus = 'inactivo'; codigo = null; }
-
-            const cronogramaFalso = JSON.stringify([
-                { mes: "Enero", actividad: "Convocatoria y reclutamiento" },
-                { mes: "Marzo", actividad: "Primer proyecto interno" },
-                { mes: "Junio", actividad: "Presentación final" }
-            ]);
-
-            // DATOS FICTICIOS COMPLETOS PARA QUE NINGÚN CAMPO SEA NULL
-            const descripcionFalsa = `Este es el club oficial de ${nombresClubes[i]} de la institución. Un espacio para aprender y compartir conocimientos.`;
-            const objetivoFalso = `Desarrollar habilidades prácticas y teóricas en ${nombresClubes[i]} para todos los estudiantes interesados.`;
-            const detalleActividadesFalso = "Sesiones teóricas de 1 hora seguidas de 2 horas de práctica. Realización de torneos y exposiciones bimestrales.";
-            const espaciosFalsos = "Aula Magna los Lunes de 14:00 a 16:00 y Patio Central los Jueves de 15:00 a 17:00.";
-            const impactoFalso = "Mejora del trabajo en equipo, pensamiento crítico, disciplina y salud integral de los participantes.";
-            const archivoEstudiantes = `https://drive.google.com/file/d/documento_firmado_club_${i}/view`;
+        console.log("⏳ 4. Creando Clubes Activos con Historial Lleno, Recursos, Chat y Eventos...");
+        const nombresClub = [
+            'Robótica Avanzada', 'Ajedrez ESCOM', 'Selección Básquetbol', 'Desarrollo Web',
+            'Ciberseguridad y Hacking', 'Emprendimiento Tech', 'Danza Folclórica', 'Fútbol Femenil', 
+            'Inteligencia Artificial', 'Club de Matemáticas', 'IoT y Hardware', 'Inglés Conversacional'
+        ];
+        
+        for (const nombre of nombresClub) {
+            // Seleccionamos encargados ACTUALES
+            const pEncargado = getRandom(profeIds);
+            const aEncargado = getRandom(alumnoIds);
             
-            const [resClub] = await db.query(
-                `INSERT INTO clubes (
-                    nombre, descripcion, objetivo, cronograma, detalle_actividades, 
-                    espacios_tiempos, impacto, archivo_lista_estudiantes, 
-                    estatus, codigo_union, motivo_rechazo
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            // Seleccionamos encargados del SEMESTRE PASADO (que no sean los mismos de ahora)
+            const pAnterior = getRandom(profeIds.filter(id => id !== pEncargado));
+            const aAnterior = getRandom(alumnoIds.filter(id => id !== aEncargado));
+
+            const codigo = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+            const [clubRes] = await db.query(
+                `INSERT INTO clubes (nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, estatus, codigo_union) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'activo', ?)`,
                 [
-                    `Club de ${nombresClubes[i]}`, descripcionFalsa, objetivoFalso, cronogramaFalso, 
-                    detalleActividadesFalso, espaciosFalsos, impactoFalso, archivoEstudiantes, 
-                    estatus, codigo, motivo_rechazo
+                    nombre, `Espacio dedicado al desarrollo integral mediante el ${nombre}.`, `Preparar a los alumnos para competencias.`, 
+                    JSON.stringify([{ mes: "Agosto", actividad: "Integración" }, { mes: "Diciembre", actividad: "Torneo interno" }]), 
+                    `Práctica intensa. Revisión quincenal.`, `Martes y jueves de 14:00 a 16:00 hrs.`, `Desarrollo de Soft Skills.`, codigo
                 ]
             );
+            const clubId = clubRes.insertId;
+
+            // --- INSCRIPCIÓN Y REGISTRO DE HISTORIAL ---
             
-            const clubId = resClub.insertId;
-            clubIds.push({ id: clubId, nombre: nombresClubes[i] });
+            // 1. Historial del Semestre Pasado (Con fecha_fin llena)
+            await db.query(
+                `INSERT INTO historial_encargados (club_id, usuario_id, rol_desempenado, fecha_inicio, fecha_fin) 
+                 VALUES (?, ?, 'encargado_profesor', DATE_SUB(NOW(), INTERVAL 6 MONTH), DATE_SUB(NOW(), INTERVAL 1 MONTH))`, 
+                [clubId, pAnterior]
+            );
+            await db.query(
+                `INSERT INTO historial_encargados (club_id, usuario_id, rol_desempenado, fecha_inicio, fecha_fin) 
+                 VALUES (?, ?, 'encargado_alumno', DATE_SUB(NOW(), INTERVAL 6 MONTH), DATE_SUB(NOW(), INTERVAL 1 MONTH))`, 
+                [clubId, aAnterior]
+            );
 
-            const profeEncargado = getRandom(profeIds);
-            const alumnoEncargado = getRandom(alumnoIds);
-
-            await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club) VALUES (?, ?, 'encargado_profesor')`, [profeEncargado, clubId]);
-            await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club) VALUES (?, ?, 'encargado_alumno')`, [alumnoEncargado, clubId]);
-
-            const miembrosNormales = getRandomMultiple(alumnoIds.filter(id => id !== alumnoEncargado), 15);
-            for (const miembroId of miembrosNormales) {
-                await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club) VALUES (?, ?, 'miembro')`, [miembroId, clubId]);
-            }
-
-            // Opcional: Agregar interacciones en clubes activos
-            if (estatus === 'activo') {
-                await db.query(`INSERT INTO avisos_club (club_id, usuario_id, contenido) VALUES (?, ?, ?)`, [clubId, profeEncargado, `¡Bienvenidos al club de ${nombresClubes[i]}!`]);
-                await db.query(`INSERT INTO chat_club (club_id, usuario_id, mensaje) VALUES (?, ?, ?)`, [clubId, profeEncargado, `Hola, no olviden traer su material.`]);
-                await db.query(`INSERT INTO solicitudes_recursos (club_id, usuario_id, tipo_recurso, nombre_recurso, cantidad, motivo) VALUES (?, ?, 'material', 'Kits básicos', 5, 'Práctica inicial')`, [clubId, profeEncargado]);
-            }
-        }
-
-        console.log("⏳ 4. Generando Avisos Globales (5 Activos, 5 Caducados)...");
-        for (let i = 1; i <= 10; i++) {
-            const prioridades = ['alta', 'normal', 'baja'];
-            // Del 1 al 5 son futuros (activos), del 6 al 10 son pasados (caducados)
-            const diasVencimiento = i <= 5 ? 15 : -10;
-            const activo = i <= 5 ? 1 : 0;
-            const mensaje = i <= 5 ? "Este aviso tiene una fecha futura y deberías verlo en la app." : "Este aviso ya venció y NO debería aparecer.";
+            // 2. Encargados Actuales (En inscripciones y en historial sin fecha_fin)
+            await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo')`, [clubId, pEncargado]);
+            await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo')`, [clubId, aEncargado]);
 
             await db.query(
+                `INSERT INTO historial_encargados (club_id, usuario_id, rol_desempenado, fecha_inicio) 
+                 VALUES (?, ?, 'encargado_profesor', DATE_SUB(NOW(), INTERVAL 1 MONTH))`, 
+                [clubId, pEncargado]
+            );
+            await db.query(
+                `INSERT INTO historial_encargados (club_id, usuario_id, rol_desempenado, fecha_inicio) 
+                 VALUES (?, ?, 'encargado_alumno', DATE_SUB(NOW(), INTERVAL 1 MONTH))`, 
+                [clubId, aEncargado]
+            );
+
+            // Inscribir Miembros Regulares
+            const integrantes = getRandomMultiple(alumnoIds.filter(id => id !== aEncargado && id !== aAnterior), 18);
+            for (const mId of integrantes) {
+                await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'miembro', 'activo')`, [clubId, mId]);
+            }
+
+            // Crear Solicitudes de Recursos
+            const recursos = ['Proyector', 'Balones oficiales', 'Kits Arduino Uno', 'Tableros de Ajedrez', 'Bocina Bluetooth'];
+            await db.query(
+                `INSERT INTO solicitudes_recursos (club_id, usuario_id, tipo_club, tipo_recurso, nombre_recurso, cantidad, unidad, especificaciones, opciones_marcas, motivo, estatus) 
+                 VALUES (?, ?, 'Académico/Deportivo', ?, ?, ?, 'Piezas', 'Especificaciones estándar', 'Cualquier marca', 'Material necesario para el desarrollo de las prácticas del semestre.', ?)`,
+                [clubId, pEncargado, getRandom(['material', 'espacio']), getRandom(recursos), Math.floor(Math.random() * 10) + 1, getRandom(['pendiente', 'aprobado'])]
+            );
+
+            // Chat y Eventos
+            await db.query(`INSERT INTO avisos_club (club_id, usuario_id, contenido) VALUES (?, ?, ?)`, [clubId, pEncargado, `¡Bienvenidos al club ${nombre}! Empezamos la próxima semana.`]);
+            const [eventoRes] = await db.query(`INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar) VALUES (?, ?, ?, ?, ?, ?)`, [clubId, aEncargado, 'Reunión de Integración', 'Primer encuentro oficial.', 'Próximo Viernes 14:00', 'Salón Múltiple']);
+            for (const asisId of getRandomMultiple(integrantes, 12)) {
+                await db.query(`INSERT INTO asistencias_eventos (evento_id, usuario_id, asistira) VALUES (?, ?, 1)`, [eventoRes.insertId, asisId]);
+            }
+            await db.query(`INSERT INTO chat_club (club_id, usuario_id, mensaje) VALUES (?, ?, ?)`, [clubId, pEncargado, 'Hola a todos, este es el chat oficial.']);
+        }
+
+        console.log("⏳ 5. Creando Clubes RECHAZADOS (Con motivos llenos)...");
+        const clubesRechazados = ['Club de Literatura de Terror', 'Torneos de eSports', 'Club de Gastronomía'];
+        const motivosRechazo = [
+            'El cronograma está incompleto. Faltan detallar las actividades de los meses de Octubre y Noviembre.',
+            'No se especificaron claramente los espacios y tiempos solicitados. Favor de indicar si requieren el auditorio o un salón normal.',
+            'La justificación del impacto académico es muy vaga. Rehacer el plan de trabajo alineado a los valores de la institución.'
+        ];
+
+        for (let i = 0; i < clubesRechazados.length; i++) {
+            const pEncargado = getRandom(profeIds);
+            const aEncargado = getRandom(alumnoIds);
+
+            const [clubRes] = await db.query(
+                `INSERT INTO clubes (nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, estatus, motivo_rechazo) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'rechazado', ?)`,
+                [
+                    clubesRechazados[i], `Club propuesto para ${clubesRechazados[i]}.`, `Objetivo pendiente de mejora.`, 
+                    JSON.stringify([{ mes: "Agosto", actividad: "Inicio" }]), `Actividades pendientes.`, `Horario por definir.`, `Impacto estudiantil.`,
+                    motivosRechazo[i]
+                ]
+            );
+            const clubId = clubRes.insertId;
+
+            await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo')`, [clubId, pEncargado]);
+            await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo')`, [clubId, aEncargado]);
+            
+            // Estos al haber sido rechazados siguen siendo los creadores, por ende los encargados "actuales" de su propuesta
+            await db.query(`INSERT INTO historial_encargados (club_id, usuario_id, rol_desempenado, fecha_inicio) VALUES (?, ?, 'encargado_profesor', NOW())`, [clubId, pEncargado]);
+            await db.query(`INSERT INTO historial_encargados (club_id, usuario_id, rol_desempenado, fecha_inicio) VALUES (?, ?, 'encargado_alumno', NOW())`, [clubId, aEncargado]);
+        }
+
+        console.log("⏳ 6. Generando 15 Avisos Globales...");
+        for (let i = 1; i <= 15; i++) {
+            await db.query(
                 `INSERT INTO avisos_globales (titulo, mensaje, prioridad, autor_id, activo, fecha_vencimiento) 
-                 VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
-                [`Aviso Institucional #${i}`, mensaje, getRandom(prioridades), 1, activo, diasVencimiento]
+                 VALUES (?, ?, ?, 1, 1, DATE_ADD(NOW(), INTERVAL 20 DAY))`,
+                [`Aviso Institucional ${i}`, `Lineamientos de protección civil y uso de instalaciones para la semana ${i}.`, getRandom(['alta', 'normal', 'baja'])]
             );
         }
 
-        console.log(`\n🎉 ¡MEGA SEEDER ABSOLUTO FINALIZADO CON ÉXITO! 🎉`);
-        console.log(`   Puedes revisar tu base de datos, no hay ningún campo en NULL.`);
+        console.log(`\n🎉 SEED MEGA-COMPLETO EXITOSO. Todas las tablas (incluyendo el historial anterior con fechas completas) están listas.`);
         process.exit(0);
 
     } catch (error) {
-        console.error("\n❌ Error Crítico en el Mega Seeder:", error);
+        console.error("❌ ERROR CRÍTICO EN EL SEED:", error);
         process.exit(1);
     }
 };

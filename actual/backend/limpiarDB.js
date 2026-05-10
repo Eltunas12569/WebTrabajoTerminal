@@ -4,38 +4,41 @@ const limpiarBaseDeDatos = async () => {
     try {
         console.log("🧹 INICIANDO LIMPIEZA TOTAL DE LA BASE DE DATOS...");
         
-        // Apagamos las llaves foráneas para evitar errores de restricción al borrar
+        // Apagamos la revisión de llaves foráneas para poder vaciar sin importar el orden
         await db.query('SET FOREIGN_KEY_CHECKS = 0;');
 
-        // Lista de todas las tablas que vamos a vaciar (TRUNCATE reinicia los IDs a 1)
+        // 👇 SE AGREGÓ LA NUEVA TABLA: 'contactos_emergencia' 👇
         const tablas = [
             'roles', 
             'usuarios', 
             'profesores_detalles', 
             'alumnos_detalles', 
-            'fichas_medicas', 
+            'fichas_medicas',
+            'contactos_emergencia', 
             'clubes', 
             'inscripciones', 
             'historial_encargados', 
             'avisos_club', 
             'chat_club', 
             'solicitudes_recursos', 
-            'avisos_globales'
+            'avisos_globales',
+            'eventos_club',
+            'asistencias_eventos'
         ];
 
         for (const tabla of tablas) {
             await db.query(`TRUNCATE TABLE ${tabla}`);
-            console.log(`✅ Tabla '${tabla}' vaciada y reiniciada.`);
+            console.log(`✅ Tabla '${tabla}' vaciada y reiniciada a ID 1.`);
         }
 
-        // Volvemos a prender las llaves foráneas por seguridad
+        // Volvemos a encender la seguridad de la base de datos
         await db.query('SET FOREIGN_KEY_CHECKS = 1;');
         
-        console.log("🚀 Limpieza terminada. Tu base de datos está en blanco y lista para el seed.");
+        console.log("🚀 Limpieza terminada. Tu base de datos está en blanco y lista.");
         process.exit(0);
 
     } catch (error) {
-        console.error("❌ Error Crítico al limpiar la BD:", error);
+        console.error("❌ ERROR AL LIMPIAR:", error);
         process.exit(1);
     }
 };
