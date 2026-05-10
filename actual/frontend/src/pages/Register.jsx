@@ -25,9 +25,26 @@ const Register = () => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        
         // Restricciones institucionales
-        if (name === 'nss' && value.length > 11) return;
-        if (name === 'boleta' && value.length > 10) return;
+        if (name === 'nss') {
+            const onlyNums = value.replace(/\D/g, ''); // NSS es estrictamente numérico
+            if (onlyNums.length > 11) return;
+            setFormData({ ...formData, [name]: onlyNums });
+            return;
+        }
+        if (name === 'boleta') {
+            if (value.length > 10) return;
+            setFormData({ ...formData, [name]: value.toUpperCase() }); // Permite letras (ej. PM, PE) y las hace mayúsculas
+            return;
+        }
+        if (name === 'num_empleado') {
+            const onlyNums = value.replace(/\D/g, '');
+            if (onlyNums.length > 10) return; // Límite razonable para un núm. de empleado
+            setFormData({ ...formData, [name]: onlyNums });
+            return;
+        }
+
         setFormData({ ...formData, [name]: value });
     };
 
@@ -54,7 +71,30 @@ const Register = () => {
     };
 
     return (
-        <div className="register-container">
+        <div className="register-container hide-scrollbar" style={{
+            display: 'flex', 
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%', 
+            height: '100vh', 
+            overflowY: 'auto', 
+            backgroundImage: 'radial-gradient(circle at 50% 0%, #ffffff 0%, #f0f2f5 100%)',
+            backgroundImage: 'linear-gradient(to right, #5290cf 0%, #5290cf 20%, transparent 20%, transparent 80%, #5290cf 80%, #5290cf 100%), radial-gradient(circle at 50% 0%, #ffffff 0%, #f0f2f5 100%)',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            margin: 0,
+            justifyContent: 'center',
+            alignItems: 'center'
+        }}>
+            <style>{`
+                .hide-scrollbar::-webkit-scrollbar {
+                    display: none;
+                }
+                .hide-scrollbar {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+            `}</style>
             <div className="register-card">
                 <h1 className="register-title">Registro en el Sistema</h1>
                 <p className="register-subtitle">Club Deportivo - ESCOM IPN</p>
@@ -97,43 +137,47 @@ const Register = () => {
                     />
                     <div style={{ display: 'flex', gap: '10px' }}>
                         <input name="apellido_paterno" placeholder="Apellido Paterno" value={formData.apellido_paterno} onChange={handleChange} required className="register-input" style={{ flex: 1 }} />
-                        <input name="apellido_materno" placeholder="Apellido Materno (Opcional)" value={formData.apellido_materno} onChange={handleChange} className="register-input" style={{ flex: 1 }} />
+                        <input name="apellido_materno" placeholder="Apellido Materno" value={formData.apellido_materno} onChange={handleChange} className="register-input" style={{ flex: 1 }} />
                     </div>
-                    <input 
-                        name="nss" 
-                        type="number" 
-                        placeholder="NSS (11 dígitos)" 
-                        value={formData.nss} 
-                        onChange={handleChange} 
-                        required 
-                        className="register-input" 
-                    />
 
                     {formData.rol_id === 2 ? (
                         <>
                             <input 
+                                name="nss" 
+                                type="text" 
+                                placeholder="NSS (11 dígitos)" 
+                                value={formData.nss} 
+                                onChange={handleChange} 
+                                required={formData.rol_id === 2}
+                                className="register-input" 
+                            />
+                            <input 
                                 name="boleta" 
-                                type="number" 
+                                type="text" 
                                 placeholder="Boleta (10 dígitos)" 
                                 value={formData.boleta} 
                                 onChange={handleChange} 
                                 required={formData.rol_id === 2}
                                 className="register-input" 
                             />
-                            <input 
+                            <select 
                                 name="carrera" 
-                                type="text" 
-                                placeholder="Carrera (Ej. Ing. en Sistemas)" 
                                 value={formData.carrera} 
                                 onChange={handleChange} 
                                 required={formData.rol_id === 2}
                                 className="register-input" 
-                            />
+                            >
+                                <option value="" disabled>Selecciona tu carrera</option>
+                                <option value="Ing. en Sistemas Computacionales">Ing. en Sistemas Computacionales</option>
+                                <option value="Ing. en Inteligencia Artificial">Ing. en Inteligencia Artificial</option>
+                                <option value="Lic. en Ciencia de Datos">Lic. en Ciencia de Datos</option>
+                                <option value="Ing. Mecatrónica">Ing. Mecatrónica</option>
+                            </select>
                         </>
                     ) : (
                         <input 
                             name="num_empleado" 
-                            type="number" 
+                            type="text" 
                             placeholder="Número de Empleado" 
                             value={formData.num_empleado} 
                             onChange={handleChange} 
@@ -187,7 +231,12 @@ const Register = () => {
                             onChange={(e) => setConfirmPassword(e.target.value)} 
                             required 
                             className="register-input" 
-                            style={{ paddingRight: '45px', width: '100%', boxSizing: 'border-box' }}
+                            style={{ 
+                                paddingRight: '45px', 
+                                width: '100%', 
+                                boxSizing: 'border-box',
+                                borderColor: (confirmPassword && formData.password !== confirmPassword) ? '#dc3545' : '#e1e5eb'
+                            }}
                         />
                         <button
                             type="button"

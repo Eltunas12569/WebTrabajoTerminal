@@ -5,10 +5,12 @@ import Register from './pages/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminDashboard from './pages/AdminDashboard';
 import GestionDashboard from './pages/GestionDashboard';
-import CrearClubPage from './pages/CrearClubPage'; // Asume que este archivo existe
+import CrearClubPage from './pages/CrearClubPage'; 
 import ClubDetailsAdminPage from './pages/ClubDetailsAdminPage';
 import AvisosAdminPage from './pages/AvisosAdminPage';
 import PerfilPage from './pages/PerfilPage';
+import ClubChatPage from './pages/ClubChatPage';
+import ClubDetailsPage from './pages/ClubDetailsPage';
 
 /**
  * Configuración de Rutas del Sistema de Gestión Deportiva - ESCOM
@@ -48,6 +50,13 @@ function App() {
             </ProtectedRoute>
           } />
 
+          {/* Detalles Públicos del Club (Usuarios regulares) */}
+          <Route path="/club/:id" element={
+            <ProtectedRoute rolesPermitidos={[2, 3, 4]}>
+              <ClubDetailsPage />
+            </ProtectedRoute>
+          } />
+
           {/* Detalles del Club (Administrador) */}
           <Route path="/admin/club/:id" element={
             <ProtectedRoute rolesPermitidos={[1]}>
@@ -68,6 +77,13 @@ function App() {
               <PerfilPage />
             </ProtectedRoute>
           } />
+          {/* Chat del Club (Profesores y Alumnos Encargados y alumnos) */}
+          <Route path="/chat/:id" element={
+              <ProtectedRoute rolesPermitidos={[2, 3, 4]}>
+                  <ClubChatPage />
+              </ProtectedRoute>
+          } />
+
 
           {/* Manejo de errores 404 */}
           <Route path="*" element={<div style={{ padding: '20px' }}><h1>404 - Página no encontrada</h1></div>} />

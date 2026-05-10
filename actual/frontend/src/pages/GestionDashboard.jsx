@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'; // Import useEffect
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios'; // Import axios
+import axios from 'axios';
 import './css/Dashboards.css';
 import AccionesAlumno from '../components/AccionesAlumno';
 
@@ -22,6 +22,9 @@ const GestionDashboard = () => {
     const [selectedClubName, setSelectedClubName] = useState('');
     const [selectedClub, setSelectedClub] = useState(null);
     const [sendingReview, setSendingReview] = useState(false);
+    
+    const [allActiveClubs, setAllActiveClubs] = useState([]);
+    const [loadingAllClubs, setLoadingAllClubs] = useState(false);
 
     const API_URL = import.meta.env.VITE_API_URL; // Get API_URL
 
@@ -67,7 +70,23 @@ const GestionDashboard = () => {
                         Authorization: `Bearer ${localStorage.getItem('token')}`
                     }
                 });
-                setAvisos(response.data);
+                
+                const datos = response.data;
+                const pesos = { 'alta': 1, 'normal': 2, 'baja': 3 };
+                const ordenados = [...datos].sort((a, b) => {
+                    const pA = a.prioridad ? String(a.prioridad).toLowerCase().trim() : 'normal';
+                    const pB = b.prioridad ? String(b.prioridad).toLowerCase().trim() : 'normal';
+                    const pesoA = pesos[pA] || 4;
+                    const pesoB = pesos[pB] || 4;
+                    
+                    if (pesoA !== pesoB) return pesoA - pesoB;
+                    
+                    const tA = new Date(a.tiempo).getTime() || 0;
+                    const tB = new Date(b.tiempo).getTime() || 0;
+                    return tB - tA; // Si empatan, el más nuevo primero
+                });
+                
+                setAvisos(ordenados);
             } catch (error) {
                 console.error("Error al obtener los avisos:", error);
             } finally {
@@ -80,6 +99,26 @@ const GestionDashboard = () => {
     useEffect(() => {
         fetchAvisos();
     }, [user, API_URL]);
+
+    const fetchAllActiveClubs = async () => {
+        setLoadingAllClubs(true);
+        try {
+            const response = await axios.get(`${API_URL}/clubes`);
+            // Filtramos solo los clubes que ya pasaron por revisión y están activos
+            const activos = response.data.filter(club => club.estatus === 'activo');
+            setAllActiveClubs(activos);
+        } catch (error) {
+            console.error("Error al obtener todos los clubes activos:", error);
+        } finally {
+            setLoadingAllClubs(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'unirse') {
+            fetchAllActiveClubs();
+        }
+    }, [activeTab, API_URL]);
 
     // Función para refrescar ambos paneles al aceptar/rechazar invitaciones o unirse a un club
     const handleUpdate = () => {
@@ -142,7 +181,7 @@ const GestionDashboard = () => {
                     <nav className="sidebar-links">
                         <ul>
                             <li onClick={() => { setActiveTab('avisos'); setIsSidebarOpen(false); }}>🏠 Inicio</li>
-                            <li onClick={() => { setActiveTab('clubs'); setIsSidebarOpen(false); }}>📅 Mis Actividades</li>
+                            <li onClick={() => { setActiveTab('clubs'); setIsSidebarOpen(false); }}>📅 Mis Clubs</li>
                             
                             {/* Mostrar Unirse a un Club solo a Alumnos (2) */}
                             {user?.role_id === 2 && <li onClick={() => { setActiveTab('unirse'); setIsSidebarOpen(false); }}>🔑 Unirse a un Club</li>}
@@ -185,26 +224,81 @@ const GestionDashboard = () => {
                                     {loadingAvisos ? (
                                         <p style={{ padding: '20px' }}>Cargando avisos...</p>
                                     ) : avisos.length > 0 ? (
-                                        avisos.map(aviso => (
-                                            <div key={`${aviso.tipo}-${aviso.id}`} className="aviso-item" style={{ borderLeft: aviso.prioridad === 'alta' ? '4px solid #dc3545' : '4px solid #003366' }}>
-                                                <div className="aviso-header">
-                                                    <h4>
+                                        avisos.map(aviso => {
+                                            const prioridadStr = aviso.prioridad ? String(aviso.prioridad).toLowerCase().trim() : 'normal';
+                                            let borderColor = '#003366';
+                                            let bgColor = '#f8f9fa';
+                                            
+                                            if (prioridadStr === 'alta') {
+                                                borderColor = '#dc3545';
+                                                bgColor = 'rgba(220, 53, 69, 0.05)';
+                                            } else if (prioridadStr === 'normal') {
+                                                borderColor = '#007bff';
+                                                bgColor = 'rgba(0, 123, 255, 0.05)';
+                                            } else if (prioridadStr === 'baja') {
+                                                borderColor = '#28a745';
+                                                bgColor = 'rgba(40, 167, 69, 0.05)';
+                                            }
+                                            return (
+                                            <div key={`${aviso.tipo}-${aviso.id}`} className="aviso-item" style={{ borderLeft: `5px solid ${borderColor}`, backgroundColor: bgColor, padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
+                                                <div className="aviso-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                    <h4 style={{ margin: 0, color: borderColor }}>
                                                         {aviso.tipo === 'global' ? '🌍 ' : '🛡️ '} 
                                                         {aviso.titulo}
                                                     </h4>
-                                                    <span style={{ fontSize: '0.85rem', color: '#666' }}>
+                                                    <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 'bold' }}>
                                                         {new Date(aviso.tiempo).toLocaleDateString('es-MX')}
                                                     </span>
                                                 </div>
-                                                <p>{aviso.descripcion}</p>
+                                                <p style={{ margin: 0, color: '#333', lineHeight: '1.5' }}>{aviso.descripcion}</p>
                                             </div>
-                                        ))
+                                            );
+                                        })
                                     ) : (
                                         <p style={{ padding: '20px' }}>No hay avisos nuevos por el momento.</p>
                                     )}
                                 </div>
                             ) : activeTab === 'unirse' ? (
-                                <AccionesAlumno onUpdate={() => { handleUpdate(); setActiveTab('clubs'); }} mostrar="codigo" />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                    <AccionesAlumno onUpdate={() => { handleUpdate(); setActiveTab('clubs'); }} mostrar="codigo" />
+                                    
+                                    <div className="clubs-list-simple" style={{ marginTop: '10px' }}>
+                                        <h3 style={{ margin: '0 0 15px 0', color: '#003366', borderBottom: '2px solid #e1e5eb', paddingBottom: '10px' }}>🌍 Clubes Activos en la ESCOM</h3>
+                                        {loadingAllClubs ? (
+                                            <p>Cargando clubes disponibles...</p>
+                                        ) : allActiveClubs.length > 0 ? (
+                                            allActiveClubs.map(club => {
+                                                const isMember = userClubs.some(uc => uc.id === club.id);
+                                                return (
+                                                    <div 
+                                                        key={club.id} 
+                                                        className="club-row" 
+                                                        onClick={() => navigate(`/club/${club.id}`, { state: { club, isMember } })}
+                                                        style={{ cursor: 'pointer', borderLeft: isMember ? '4px solid #28a745' : '4px solid #17a2b8', marginBottom: '15px', transition: 'background-color 0.2s ease, transform 0.2s ease' }}
+                                                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                                                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                                    >
+                                                        <div className="club-row-info">
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                                <h4 style={{ margin: '0 0 5px 0' }}>{club.nombre}</h4>
+                                                                {isMember ? (
+                                                                    <span style={{ fontSize: '0.8rem', background: '#d4edda', color: '#155724', padding: '3px 8px', borderRadius: '12px', fontWeight: 'bold' }}>✓ Ya eres miembro</span>
+                                                                ) : (
+                                                                    <span style={{ fontSize: '0.8rem', color: '#17a2b8', fontWeight: 'bold' }}>ℹ️ Ver Detalles</span>
+                                                                )}
+                                                            </div>
+                                                            <p style={{ margin: '5px 0', color: '#555' }}>{club.descripcion}</p>
+                                                            <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', color: '#666' }}>👨‍🏫 Encargado: {club.profesor_nombres} {club.profesor_apellidos}</p>
+                                                            <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', color: '#666' }}>🕒 Horario: {club.espacios_tiempos}</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        ) : (
+                                            <p>No hay clubes activos en este momento.</p>
+                                        )}
+                                    </div>
+                                </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
@@ -212,17 +306,37 @@ const GestionDashboard = () => {
                                         {loadingClubs ? (
                                             <p>Cargando tus clubes...</p>
                                         ) : userClubs.length > 0 ? (
-                                            userClubs.map(club => (
-                                                <div key={club.id} className="club-row">
+                                            userClubs.map(club => {
+                                                const canEnterChat = club.estatus !== 'en_revision' && club.estatus !== 'esperando_firmas';
+                                                return (
+                                                <div 
+                                                    key={club.id} 
+                                                    className="club-row"
+                                                    onClick={() => {
+                                                        if (canEnterChat) {
+                                                            navigate(`/chat/${club.id}`);
+                                                        }
+                                                    }}
+                                                    style={{ 
+                                                        cursor: canEnterChat ? 'pointer' : 'default',
+                                                        borderLeft: canEnterChat ? '4px solid #1877f2' : 'none',
+                                                        transition: 'background-color 0.2s ease, transform 0.2s ease'
+                                                    }}
+                                                    onMouseOver={(e) => canEnterChat && (e.currentTarget.style.backgroundColor = '#f0f8ff')}
+                                                    onMouseOut={(e) => canEnterChat && (e.currentTarget.style.backgroundColor = 'transparent')}
+                                                >
                                                     <div className="club-row-info">
-                                                        <h4>{club.nombre}</h4>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <h4 style={{ margin: '0 0 5px 0' }}>{club.nombre}</h4>
+                                                            {canEnterChat && <span style={{ color: '#1877f2', fontSize: '0.85rem', fontWeight: 'bold' }}>💬 Abrir chat ➔</span>}
+                                                        </div>
                                                         <p>Encargado: {club.profesor_nombres} {club.profesor_apellidos}</p>
                                                         <p>Estatus del club: {club.estatus}</p>
                                                         
                                                         {/* Botón exclusivo para los Profesores Titulares en etapa de recolección de firmas */}
                                                         {club.mi_rol_interno === 'encargado_profesor' && club.estatus === 'esperando_firmas' && (
                                                             <button 
-                                                                onClick={() => openMembersModal(club)}
+                                                                onClick={(e) => { e.stopPropagation(); openMembersModal(club); }}
                                                                 className="btn-review-club"
                                                                 style={{ marginTop: '12px' }}
                                                             >
@@ -231,7 +345,8 @@ const GestionDashboard = () => {
                                                         )}
                                                     </div>
                                                 </div>
-                                            ))
+                                                );
+                                            })
                                         ) : (
                                             <p>No estás inscrito en ningún club activo.</p>
                                         )}
