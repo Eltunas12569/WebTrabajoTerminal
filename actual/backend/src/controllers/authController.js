@@ -87,10 +87,34 @@ const getPerfil = async (req, res) => {
         const [users] = await db.query('SELECT nombres, apellido_paterno, apellido_materno, correo FROM usuarios WHERE id = ?', [req.user.id]);
         if (users.length === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
         
-        // Obtener ficha médica si existe
+        // Obtener ficha médica y contactos de emergencia si existen
         const [fichas] = await db.query('SELECT * FROM fichas_medicas WHERE usuario_id = ?', [req.user.id]);
+        let ficha_medica = null;
         
-        res.status(200).json({ ...users[0], ficha_medica: fichas.length > 0 ? fichas[0] : null });
+        if (fichas.length > 0) {
+            ficha_medica = {
+                tipo_sangre: fichas[0].tipo_sangre,
+                alergias: fichas[0].condiciones_preexistentes || ''
+            };
+
+            // Consultar tabla de contactos relacionales
+            const [contactos] = await db.query('SELECT nombre, telefono FROM contactos_emergencia WHERE usuario_id = ? ORDER BY id ASC LIMIT 3', [req.user.id]);
+
+            if (contactos[0]) {
+                ficha_medica.contacto_emergencia_1_nombre = contactos[0].nombre;
+                ficha_medica.contacto_emergencia_1_telefono = contactos[0].telefono;
+            }
+            if (contactos[1]) {
+                ficha_medica.contacto_emergencia_2_nombre = contactos[1].nombre;
+                ficha_medica.contacto_emergencia_2_telefono = contactos[1].telefono;
+            }
+            if (contactos[2]) {
+                ficha_medica.contacto_emergencia_3_nombre = contactos[2].nombre;
+                ficha_medica.contacto_emergencia_3_telefono = contactos[2].telefono;
+            }
+        }
+        
+        res.status(200).json({ ...users[0], ficha_medica });
     } catch (error) {
         console.error("Error en getPerfil:", error);
         res.status(500).json({ message: 'Error al obtener perfil' });
@@ -128,25 +152,24 @@ const updatePerfil = async (req, res) => {
         const [fichas] = await db.query('SELECT id FROM fichas_medicas WHERE usuario_id = ?', [req.user.id]);
         if (fichas.length > 0) {
             await db.query(
-                `UPDATE fichas_medicas SET 
-                 tipo_sangre = ?, alergias = ?, 
-                 contacto_emergencia_1_nombre = ?, contacto_emergencia_1_telefono = ?,
-                 contacto_emergencia_2_nombre = ?, contacto_emergencia_2_telefono = ?,
-                 contacto_emergencia_3_nombre = ?, contacto_emergencia_3_telefono = ?
-                 WHERE usuario_id = ?`,
-                [tipo_sangre, alergias, contacto_emergencia_1_nombre, contacto_emergencia_1_telefono, contacto_emergencia_2_nombre, contacto_emergencia_2_telefono, contacto_emergencia_3_nombre, contacto_emergencia_3_telefono, req.user.id]
+                `UPDATE fichas_medicas SET tipo_sangre = ?, condiciones_preexistentes = ? WHERE usuario_id = ?`,
+                [tipo_sangre, alergias, req.user.id]
             );
         } else {
             await db.query(
-                `INSERT INTO fichas_medicas (
-                    usuario_id, tipo_sangre, alergias, 
-                    contacto_emergencia_1_nombre, contacto_emergencia_1_telefono, 
-                    contacto_emergencia_2_nombre, contacto_emergencia_2_telefono,
-                    contacto_emergencia_3_nombre, contacto_emergencia_3_telefono
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [req.user.id, tipo_sangre, alergias, contacto_emergencia_1_nombre, contacto_emergencia_1_telefono, contacto_emergencia_2_nombre, contacto_emergencia_2_telefono, contacto_emergencia_3_nombre, contacto_emergencia_3_telefono]
+                `INSERT INTO fichas_medicas (usuario_id, tipo_sangre, condiciones_preexistentes) VALUES (?, ?, ?)`,
+                [req.user.id, tipo_sangre, alergias]
             );
         }
+
+        // 4. Sincronizar contactos de emergencia (borrar los antiguos e insertar los nuevos)
+        await db.query('DELETE FROM contactos_emergencia WHERE usuario_id = ?', [req.user.id]);
+        const insertContacto = async (nombre, tel, paren) => {
+            if (nombre && tel) await db.query('INSERT INTO contactos_emergencia (usuario_id, nombre, telefono, parentesco) VALUES (?, ?, ?, ?)', [req.user.id, nombre, tel, paren]);
+        };
+        await insertContacto(contacto_emergencia_1_nombre, contacto_emergencia_1_telefono, 'Familiar 1');
+        await insertContacto(contacto_emergencia_2_nombre, contacto_emergencia_2_telefono, 'Familiar 2');
+        await insertContacto(contacto_emergencia_3_nombre, contacto_emergencia_3_telefono, 'Familiar 3');
 
         res.status(200).json({ message: 'Perfil actualizado exitosamente' });
     } catch (error) {

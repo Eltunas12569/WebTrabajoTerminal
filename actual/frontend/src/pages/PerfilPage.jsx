@@ -36,6 +36,8 @@ const PerfilPage = () => {
     const [passwordSuccess, setPasswordSuccess] = useState('');
     const [medicalError, setMedicalError] = useState('');
     const [medicalSuccess, setMedicalSuccess] = useState('');
+    const [personalError, setPersonalError] = useState('');
+    const [personalSuccess, setPersonalSuccess] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [tieneFicha, setTieneFicha] = useState(false);
 
@@ -101,7 +103,14 @@ const PerfilPage = () => {
     }, [API_URL]);
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        // Evitar que el teléfono pase de 15 dígitos y bloquear letras para evitar que MySQL colapse
+        if (name.includes('telefono')) {
+            const soloNumeros = value.replace(/\D/g, '').slice(0, 15);
+            setFormData({ ...formData, [name]: soloNumeros });
+        } else {
+            setFormData({ ...formData, [name]: value });
+        }
     };
 
     const submitData = async (e, type) => {
@@ -110,6 +119,9 @@ const PerfilPage = () => {
         if (type === 'password') {
             setPasswordError('');
             setPasswordSuccess('');
+        } else if (type === 'personal') {
+            setPersonalError('');
+            setPersonalSuccess('');
         } else {
             setMedicalError('');
             setMedicalSuccess('');
@@ -124,6 +136,11 @@ const PerfilPage = () => {
                 setPasswordError('Debes ingresar tu contraseña actual para cambiarla.');
                 return;
             }
+        } else if (type === 'personal') {
+            if (!formData.nombres || !formData.apellido_paterno) {
+                setPersonalError('Los nombres y el apellido paterno son obligatorios.');
+                return;
+            }
         }
 
         setSaving(true);
@@ -134,6 +151,8 @@ const PerfilPage = () => {
             
             if (type === 'password') {
                 setPasswordSuccess(response.data.message);
+            } else if (type === 'personal') {
+                setPersonalSuccess(response.data.message);
             } else {
                 setMedicalSuccess(response.data.message);
             }
@@ -147,6 +166,8 @@ const PerfilPage = () => {
             const errorMsg = err.response?.data?.message || 'Error al actualizar el perfil.';
             if (type === 'password') {
                 setPasswordError(errorMsg);
+            } else if (type === 'personal') {
+                setPersonalError(errorMsg);
             } else {
                 setMedicalError(errorMsg);
             }
@@ -174,6 +195,10 @@ const PerfilPage = () => {
 
     // Comprueba si hay cambios en la contraseña
     const hasPasswordChanges = formData.currentPassword || formData.newPassword || formData.confirmNewPassword;
+
+    // Comprueba si hay cambios en los datos personales
+    const personalFields = ['nombres', 'apellido_paterno', 'apellido_materno'];
+    const hasPersonalChanges = originalData && personalFields.some(field => formData[field] !== originalData[field]);
 
     // Comprueba si hay cambios en los datos médicos
     const medicalFields = [
@@ -244,22 +269,30 @@ const PerfilPage = () => {
                                 <div style={{ display: 'flex', gap: '30px' }}>
                                     {/* Columna Izquierda: Información Personal */}
                                     <div style={{ flex: 1 }}>
-                                        <h3 style={{ marginBottom: '15px', color: '#003366', fontSize: '1.1rem' }}>Datos Personales</h3>
-                                        <div className="form-group"><label>Nombres</label><input type="text" name="nombres" value={formData.nombres} disabled /></div>
-                                        <div style={{ display: 'flex', gap: '10px' }}>
-                                            <div className="form-group" style={{ flex: 1 }}><label>Apellido Paterno</label><input type="text" name="apellido_paterno" value={formData.apellido_paterno} disabled /></div>
-                                            <div className="form-group" style={{ flex: 1 }}><label>Apellido Materno</label><input type="text" name="apellido_materno" value={formData.apellido_materno} disabled /></div>
-                                        </div>
-                                        <div className="form-group"><label>Correo Electrónico</label><input type="email" name="correo" value={formData.correo} disabled /></div>
+                                        <form onSubmit={(e) => submitData(e, 'personal')}>
+                                            <h3 style={{ marginBottom: '15px', color: '#003366', fontSize: '1.1rem' }}>Datos Personales</h3>
+                                            <div className="form-group"><label>Nombres</label><input type="text" name="nombres" value={formData.nombres || ''} onChange={handleChange} required /></div>
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <div className="form-group" style={{ flex: 1 }}><label>Apellido Paterno</label><input type="text" name="apellido_paterno" value={formData.apellido_paterno || ''} onChange={handleChange} required /></div>
+                                                <div className="form-group" style={{ flex: 1 }}><label>Apellido Materno</label><input type="text" name="apellido_materno" value={formData.apellido_materno || ''} onChange={handleChange} /></div>
+                                            </div>
+                                            <div className="form-group"><label>Correo Electrónico</label><input type="email" name="correo" value={formData.correo || ''} disabled title="El correo institucional no puede modificarse" /></div>
+                                            
+                                            {hasPersonalChanges ? (
+                                                <button type="submit" className="btn-crear-club" disabled={saving} style={{ marginTop: '10px', maxWidth: '300px' }}>{saving ? 'Guardando...' : '💾 Guardar Datos Personales'}</button>
+                                            ) : null}
+                                            {personalError && <div className="message-banner error" style={{ marginTop: '10px' }}>{personalError}</div>}
+                                            {personalSuccess && <div className="message-banner success" style={{ marginTop: '10px' }}>{personalSuccess}</div>}
+                                        </form>
                                     </div>
 
                                     {/* Columna Derecha: Seguridad */}
                                     <div style={{ flex: 1 }}>
                                         <form onSubmit={(e) => submitData(e, 'password')}>
                                         <h3 style={{ marginBottom: '15px', color: '#003366', fontSize: '1.1rem' }}>Seguridad</h3>
-                                        <div className="form-group"><label>Contraseña Actual</label><input type="password" name="currentPassword" value={formData.currentPassword} onChange={handleChange} placeholder="Requerida solo si cambiarás de contraseña" /></div>
-                                        <div className="form-group"><label>Nueva Contraseña</label><input type="password" name="newPassword" value={formData.newPassword} onChange={handleChange} placeholder="Mínimo 6 caracteres" /></div>
-                                        <div className="form-group"><label>Confirmar Nueva Contraseña</label><input type="password" name="confirmNewPassword" value={formData.confirmNewPassword} onChange={handleChange} placeholder="Repite la nueva contraseña" /></div>
+                                        <div className="form-group"><label>Contraseña Actual</label><input type="password" name="currentPassword" value={formData.currentPassword || ''} onChange={handleChange} placeholder="Requerida solo si cambiarás de contraseña" /></div>
+                                        <div className="form-group"><label>Nueva Contraseña</label><input type="password" name="newPassword" value={formData.newPassword || ''} onChange={handleChange} placeholder="Mínimo 6 caracteres" /></div>
+                                        <div className="form-group"><label>Confirmar Nueva Contraseña</label><input type="password" name="confirmNewPassword" value={formData.confirmNewPassword || ''} onChange={handleChange} placeholder="Repite la nueva contraseña" /></div>
                                         {hasPasswordChanges ? (
                                             <button type="submit" className="btn-crear-club" disabled={saving} style={{ marginTop: '10px', maxWidth: '300px' }}>{saving ? 'Guardando...' : '💾 Guardar Contraseña'}</button>
                                         ) : null}
@@ -283,7 +316,7 @@ const PerfilPage = () => {
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
                                     <div className="form-group">
                                         <label>Tipo de Sangre</label>
-                                        <select name="tipo_sangre" value={formData.tipo_sangre} onChange={handleChange}>
+                                        <select name="tipo_sangre" value={formData.tipo_sangre || ''} onChange={handleChange}>
                                             <option value="">Selecciona una opción</option>
                                             <option value="O+">O+</option>
                                             <option value="O-">O-</option>
@@ -295,16 +328,16 @@ const PerfilPage = () => {
                                             <option value="AB-">AB-</option>
                                         </select>
                                     </div>
-                                    <div className="form-group"><label>Alergias</label><input type="text" name="alergias" value={formData.alergias} onChange={handleChange} placeholder="Ninguna / Penicilina, etc." /></div>
+                                    <div className="form-group"><label>Alergias</label><input type="text" name="alergias" value={formData.alergias || ''} onChange={handleChange} placeholder="Ninguna / Penicilina, etc." /></div>
                                     
-                                    <div className="form-group"><label>Contacto Emergencia 1 (Nombre)</label><input type="text" name="contacto_emergencia_1_nombre" value={formData.contacto_emergencia_1_nombre} onChange={handleChange} required /></div>
-                                    <div className="form-group"><label>Contacto Emergencia 1 (Teléfono)</label><input type="text" name="contacto_emergencia_1_telefono" value={formData.contacto_emergencia_1_telefono} onChange={handleChange} required /></div>
+                                    <div className="form-group"><label>Contacto Emergencia 1 (Nombre)</label><input type="text" name="contacto_emergencia_1_nombre" value={formData.contacto_emergencia_1_nombre || ''} onChange={handleChange} required /></div>
+                                    <div className="form-group"><label>Contacto Emergencia 1 (Teléfono)</label><input type="text" name="contacto_emergencia_1_telefono" value={formData.contacto_emergencia_1_telefono || ''} onChange={handleChange} required /></div>
                                     
-                                    <div className="form-group"><label>Contacto Emergencia 2 (Nombre)</label><input type="text" name="contacto_emergencia_2_nombre" value={formData.contacto_emergencia_2_nombre} onChange={handleChange} required /></div>
-                                    <div className="form-group"><label>Contacto Emergencia 2 (Teléfono)</label><input type="text" name="contacto_emergencia_2_telefono" value={formData.contacto_emergencia_2_telefono} onChange={handleChange} required /></div>
+                                    <div className="form-group"><label>Contacto Emergencia 2 (Nombre)</label><input type="text" name="contacto_emergencia_2_nombre" value={formData.contacto_emergencia_2_nombre || ''} onChange={handleChange} required /></div>
+                                    <div className="form-group"><label>Contacto Emergencia 2 (Teléfono)</label><input type="text" name="contacto_emergencia_2_telefono" value={formData.contacto_emergencia_2_telefono || ''} onChange={handleChange} required /></div>
                                     
-                                    <div className="form-group"><label>Contacto Emergencia 3 (Nombre)</label><input type="text" name="contacto_emergencia_3_nombre" value={formData.contacto_emergencia_3_nombre} onChange={handleChange} required /></div>
-                                    <div className="form-group"><label>Contacto Emergencia 3 (Teléfono)</label><input type="text" name="contacto_emergencia_3_telefono" value={formData.contacto_emergencia_3_telefono} onChange={handleChange} required /></div>
+                                    <div className="form-group"><label>Contacto Emergencia 3 (Nombre)</label><input type="text" name="contacto_emergencia_3_nombre" value={formData.contacto_emergencia_3_nombre || ''} onChange={handleChange} required /></div>
+                                    <div className="form-group"><label>Contacto Emergencia 3 (Teléfono)</label><input type="text" name="contacto_emergencia_3_telefono" value={formData.contacto_emergencia_3_telefono || ''} onChange={handleChange} required /></div>
                                 </div>
 
                                 {/* El botón y la línea solo aparecen si hasMedicalChanges es true */}

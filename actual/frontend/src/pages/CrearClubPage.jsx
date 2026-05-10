@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import './css/CrearClubPage.css'; // Importa el CSS para esta página
+import './css/Dashboards.css'; // Importa el CSS del Dashboard principal
 
 // Componente interno para selector con búsqueda (Autocomplete)
 const SearchableSelect = ({ options, value, onChange, placeholder }) => {
@@ -115,11 +116,11 @@ const MultiSearchableSelect = ({ options, selectedIds, onChange, placeholder }) 
 };
 
 const CrearClubPage = () => {
-    const { user } = useAuth(); // Importamos el usuario actual
+    const { user, logout } = useAuth(); // Importamos el usuario actual y la función de salida
     const [nombre, setNombre] = useState('');
     const [descripcion, setDescripcion] = useState('');
     const [objetivo, setObjetivo] = useState('');
-    const [cronograma, setCronograma] = useState('');
+    const [cronograma, setCronograma] = useState([{ mes: '', actividad: '' }]);
     const [detalleActividades, setDetalleActividades] = useState('');
     const [espaciosTiempos, setEspaciosTiempos] = useState('');
     const [impacto, setImpacto] = useState('');
@@ -131,6 +132,7 @@ const CrearClubPage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const navigate = useNavigate();
     const API_URL = import.meta.env.VITE_API_URL;
@@ -164,6 +166,33 @@ const CrearClubPage = () => {
         fetchAlumnos();
     }, [API_URL]);
 
+    const handleAddCronogramaItem = () => {
+        setCronograma([...cronograma, { mes: '', actividad: '' }]);
+    };
+
+    const handleCronogramaChange = (index, field, value) => {
+        const newCronograma = [...cronograma];
+        newCronograma[index][field] = value;
+        setCronograma(newCronograma);
+    };
+
+    const handleRemoveCronogramaItem = (index) => {
+        const newCronograma = cronograma.filter((_, i) => i !== index);
+        setCronograma(newCronograma);
+    };
+
+    const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+    const getAvatarColor = (name) => {
+        const colors = [
+            '#800020', '#003366', '#1E8449', '#D4AC0D',
+            '#7D3C98', '#A04000', '#2E4053', '#117864'
+        ];
+        const text = name || "U";
+        const index = text.charCodeAt(0) % colors.length;
+        return colors[index];
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -186,6 +215,13 @@ const CrearClubPage = () => {
             return;
         }
 
+        // Validar que el cronograma no esté vacío
+        if (cronograma.some(item => !item.mes.trim() || !item.actividad.trim())) {
+            setError('Por favor, completa todos los campos del cronograma o elimina los que estén vacíos.');
+            setLoading(false);
+            return;
+        }
+
         try {
             // Garantizar que todos los IDs sean estrictamente numéricos y sin duplicados
             const alumnosArray = Array.from(new Set([Number(alumnoEncargadoId), ...miembrosIds.map(Number)])).filter(id => id > 0);
@@ -194,7 +230,7 @@ const CrearClubPage = () => {
                 nombre,
                 descripcion,
                 objetivo,
-                cronograma,
+                cronograma: JSON.stringify(cronograma),
                 detalle_actividades: detalleActividades,
                 espacios_tiempos: espaciosTiempos,
                 impacto,
@@ -206,6 +242,7 @@ const CrearClubPage = () => {
                 alumno_id: Number(alumnoEncargadoId),
                 
                 miembros_ids: alumnosArray, // ⬅️ CORRECCIÓN: El backend pide 'miembros_ids', no 'alumnos'
+                lista_estudiantes: alumnosArray, // Añadimos esto para coincidir con el backend
                 estatus: 'en_revision', // Se añade el estatus por defecto
                 archivo_lista_estudiantes: 'pendiente.pdf' // Failsafe si la DB lo exige como NOT NULL
             }, {
@@ -218,7 +255,7 @@ const CrearClubPage = () => {
             setNombre('');
             setDescripcion('');
             setObjetivo('');
-            setCronograma('');
+            setCronograma([{ mes: '', actividad: '' }]);
             setDetalleActividades('');
             setEspaciosTiempos('');
             setImpacto('');
@@ -233,8 +270,55 @@ const CrearClubPage = () => {
     };
 
     return (
-        <div className="crear-club-container">
-            <div className="crear-club-card">
+        <div className="web-dashboard">
+            {/* NAVBAR SUPERIOR */}
+            <header className="admin-navbar-fixed" style={{backgroundColor: '#003366', color: '#fff'}}>
+                <div className="nav-left">
+                    <button className="menu-toggle" onClick={toggleSidebar}>☰</button>
+                    <span className="nav-title">🏆 Sistema de Clubs - ESCOM</span>
+                </div>
+                <div className="nav-right">
+                    <div className="profile-container">
+                        <span className="profile-greeting">
+                            Hola, <span className="user-name-highlight">
+                                {user?.nombres || "Cargando..."}
+                            </span>
+                        </span>
+                        <div className="profile-bubble" style={{ backgroundColor: getAvatarColor(user?.nombres) }}>
+                            {(user?.nombres || "U").charAt(0).toUpperCase()}
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            {/* LAYOUT CON SIDEBAR Y CONTENIDO */}
+            <div className="dashboard-layout">
+                <aside className={`admin-sidebar-fixed ${isSidebarOpen ? 'active' : ''}`}>
+                    <nav className="sidebar-links">
+                        <ul>
+                            {user?.role_id === 1 ? (
+                                <>
+                                    <li onClick={() => navigate('/admin')}>🏠 Inicio</li>
+                                    <li onClick={() => navigate('/admin')}>📋 Lista de Clubs</li>
+                                    <li onClick={() => navigate('/admin/avisos')}>📢 Gestión de Avisos</li>
+                                </>
+                            ) : (
+                                <>
+                                    <li onClick={() => navigate('/gestion')}>🏠 Inicio</li>
+                                    <li onClick={() => navigate('/gestion')}>📅 Mis Actividades</li>
+                                    {user?.role_id === 2 && <li onClick={() => navigate('/gestion')}>📋 Pasar Lista</li>}
+                                    {user?.role_id === 3 && <li onClick={() => navigate('/crear-club')} className="special-link">➕ Crear Club</li>}
+                                </>
+                            )}
+                            <li onClick={() => navigate('/perfil')}>⚙️ Configurar Perfil</li>
+                        </ul>
+                    </nav>
+                    <button onClick={logout} className="logout-button">Cerrar Sesión</button>
+                </aside>
+
+                <main className="admin-main-scroll" style={{ backgroundColor: '#f4f6f8', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ maxWidth: '900px', width: '100%', marginTop: '20px', display: 'flex', alignItems: 'flex-start', gap: '20px', padding: '0 20px' }}>
+                        <div className="crear-club-card" style={{ flex: 1, marginTop: '0', maxWidth: '100%' }}>
                 <h1 className="crear-club-title">Crear Nuevo Club Deportivo</h1>
                 <p className="crear-club-subtitle">Completa los datos para registrar un nuevo club.</p>
 
@@ -274,14 +358,43 @@ const CrearClubPage = () => {
                     </div>
                     <div className="form-group">
                         <label htmlFor="cronograma">Cronograma (Plan de Trabajo)</label>
-                        <textarea
-                            id="cronograma"
-                            value={cronograma}
-                            onChange={(e) => setCronograma(e.target.value)}
-                            placeholder="Fechas importantes, fases del proyecto, metas mensuales, etc."
-                            rows="2"
-                            required
-                        ></textarea>
+                        {cronograma.map((item, index) => (
+                            <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Mes (ej. Agosto)"
+                                    value={item.mes}
+                                    onChange={(e) => handleCronogramaChange(index, 'mes', e.target.value)}
+                                    required
+                                    style={{ flex: 1, padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Actividad (ej. Reclutamiento)"
+                                    value={item.actividad}
+                                    onChange={(e) => handleCronogramaChange(index, 'actividad', e.target.value)}
+                                    required
+                                    style={{ flex: 2, padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}
+                                />
+                                {cronograma.length > 1 && (
+                                    <button 
+                                        type="button" 
+                                        onClick={() => handleRemoveCronogramaItem(index)}
+                                        style={{ padding: '10px', background: '#fce8e6', color: '#e53935', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+                                        title="Eliminar actividad"
+                                    >
+                                        ✖
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                        <button 
+                            type="button" 
+                            onClick={handleAddCronogramaItem}
+                            style={{ display: 'inline-block', padding: '8px 12px', background: '#e1e5eb', color: '#333', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
+                        >
+                            ➕ Agregar otra actividad
+                        </button>
                     </div>
                     <div className="form-group">
                         <label htmlFor="detalleActividades">Detalle de Actividades</label>
@@ -340,6 +453,9 @@ const CrearClubPage = () => {
                 {error && <div className="message-banner error">{error}</div>}
                 {success && <div className="message-banner success">{success}</div>}
                 <button onClick={() => navigate(user?.role_id === 1 ? '/admin' : '/gestion')} className="btn-back-to-gestion">🔙 Volver al Dashboard</button>
+                        </div>
+                    </div>
+                </main>
             </div>
         </div>
     );
