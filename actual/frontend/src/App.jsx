@@ -10,6 +10,7 @@ import ClubDetailsAdminPage from './pages/ClubDetailsAdminPage';
 import AvisosAdminPage from './pages/AvisosAdminPage';
 import PerfilPage from './pages/PerfilPage';
 import ClubChatPage from './pages/ClubChatPage';
+import ClubDetailsPage from './pages/ClubDetailsPage';
 
 /**
  * Configuración de Rutas del Sistema de Gestión Deportiva - ESCOM
@@ -46,6 +47,13 @@ function App() {
           <Route path="/crear-club" element={
             <ProtectedRoute rolesPermitidos={[3]}>
               <CrearClubPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Detalles Públicos del Club (Usuarios regulares) */}
+          <Route path="/club/:id" element={
+            <ProtectedRoute rolesPermitidos={[2, 3, 4]}>
+              <ClubDetailsPage />
             </ProtectedRoute>
           } />
 

@@ -109,23 +109,28 @@ const register = async (userData) => {
 
     const userId = result.insertId;
 
-    if (roleIdNum === 2) {
-        await db.query(`INSERT INTO alumnos_detalles (usuario_id, nss, boleta, carrera) VALUES (?, ?, ?, ?)`, [userId, nss, boleta, carrera]);
-    } else if (roleIdNum === 3) {
-        await db.query(`INSERT INTO profesores_detalles (usuario_id, num_empleado) VALUES (?, ?)`, [userId, num_empleado]);
-    }
+    try {
+        if (roleIdNum === 2) {
+            await db.query(`INSERT INTO alumnos_detalles (usuario_id, nss, boleta, carrera) VALUES (?, ?, ?, ?)`, [userId, nss, boleta, carrera]);
+        } else if (roleIdNum === 3) {
+            await db.query(`INSERT INTO profesores_detalles (usuario_id, num_empleado) VALUES (?, ?)`, [userId, num_empleado]);
+        }
 
-    // Fichas médicas completas para evitar problemas de inserción en MySQL
-    if (roleIdNum !== 1) { 
-        await db.query(
-            `INSERT INTO fichas_medicas (
-                usuario_id, tipo_sangre, condiciones_preexistentes, 
-                contacto_emergencia_1_nombre, contacto_emergencia_1_telefono,
-                contacto_emergencia_2_nombre, contacto_emergencia_2_telefono,
-                contacto_emergencia_3_nombre, contacto_emergencia_3_telefono
-            ) VALUES (?, 'O+', 'Pendiente por informar', 'Pendiente', '0000000000', 'N/A', '000', 'N/A', '000')`,
-            [userId]
-        );
+        // Fichas médicas y contactos separados según el esquema de la BD
+        if (roleIdNum !== 1) { 
+            await db.query(
+                `INSERT INTO fichas_medicas (usuario_id, tipo_sangre, condiciones_preexistentes) VALUES (?, 'O+', 'Pendiente por informar')`,
+                [userId]
+            );
+            await db.query(
+                `INSERT INTO contactos_emergencia (usuario_id, nombre, telefono, parentesco) VALUES (?, 'Pendiente', '0000000000', 'Tutor')`,
+                [userId]
+            );
+        }
+    } catch (error) {
+        // Si falla alguna inserción de detalles, eliminamos al usuario para no dejar "datos a medias" que bloqueen futuros registros
+        await db.query(`DELETE FROM usuarios WHERE id = ?`, [userId]);
+        throw error;
     }
 
     return { message: "Usuario creado exitosamente" };

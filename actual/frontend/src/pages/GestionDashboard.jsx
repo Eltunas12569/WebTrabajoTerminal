@@ -22,6 +22,9 @@ const GestionDashboard = () => {
     const [selectedClubName, setSelectedClubName] = useState('');
     const [selectedClub, setSelectedClub] = useState(null);
     const [sendingReview, setSendingReview] = useState(false);
+    
+    const [allActiveClubs, setAllActiveClubs] = useState([]);
+    const [loadingAllClubs, setLoadingAllClubs] = useState(false);
 
     const API_URL = import.meta.env.VITE_API_URL; // Get API_URL
 
@@ -96,6 +99,26 @@ const GestionDashboard = () => {
     useEffect(() => {
         fetchAvisos();
     }, [user, API_URL]);
+
+    const fetchAllActiveClubs = async () => {
+        setLoadingAllClubs(true);
+        try {
+            const response = await axios.get(`${API_URL}/clubes`);
+            // Filtramos solo los clubes que ya pasaron por revisión y están activos
+            const activos = response.data.filter(club => club.estatus === 'activo');
+            setAllActiveClubs(activos);
+        } catch (error) {
+            console.error("Error al obtener todos los clubes activos:", error);
+        } finally {
+            setLoadingAllClubs(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'unirse') {
+            fetchAllActiveClubs();
+        }
+    }, [activeTab, API_URL]);
 
     // Función para refrescar ambos paneles al aceptar/rechazar invitaciones o unirse a un club
     const handleUpdate = () => {
@@ -236,7 +259,46 @@ const GestionDashboard = () => {
                                     )}
                                 </div>
                             ) : activeTab === 'unirse' ? (
-                                <AccionesAlumno onUpdate={() => { handleUpdate(); setActiveTab('clubs'); }} mostrar="codigo" />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                    <AccionesAlumno onUpdate={() => { handleUpdate(); setActiveTab('clubs'); }} mostrar="codigo" />
+                                    
+                                    <div className="clubs-list-simple" style={{ marginTop: '10px' }}>
+                                        <h3 style={{ margin: '0 0 15px 0', color: '#003366', borderBottom: '2px solid #e1e5eb', paddingBottom: '10px' }}>🌍 Clubes Activos en la ESCOM</h3>
+                                        {loadingAllClubs ? (
+                                            <p>Cargando clubes disponibles...</p>
+                                        ) : allActiveClubs.length > 0 ? (
+                                            allActiveClubs.map(club => {
+                                                const isMember = userClubs.some(uc => uc.id === club.id);
+                                                return (
+                                                    <div 
+                                                        key={club.id} 
+                                                        className="club-row" 
+                                                        onClick={() => navigate(`/club/${club.id}`, { state: { club, isMember } })}
+                                                        style={{ cursor: 'pointer', borderLeft: isMember ? '4px solid #28a745' : '4px solid #17a2b8', marginBottom: '15px', transition: 'background-color 0.2s ease, transform 0.2s ease' }}
+                                                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                                                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                                    >
+                                                        <div className="club-row-info">
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                                <h4 style={{ margin: '0 0 5px 0' }}>{club.nombre}</h4>
+                                                                {isMember ? (
+                                                                    <span style={{ fontSize: '0.8rem', background: '#d4edda', color: '#155724', padding: '3px 8px', borderRadius: '12px', fontWeight: 'bold' }}>✓ Ya eres miembro</span>
+                                                                ) : (
+                                                                    <span style={{ fontSize: '0.8rem', color: '#17a2b8', fontWeight: 'bold' }}>ℹ️ Ver Detalles</span>
+                                                                )}
+                                                            </div>
+                                                            <p style={{ margin: '5px 0', color: '#555' }}>{club.descripcion}</p>
+                                                            <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', color: '#666' }}>👨‍🏫 Encargado: {club.profesor_nombres} {club.profesor_apellidos}</p>
+                                                            <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', color: '#666' }}>🕒 Horario: {club.espacios_tiempos}</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        ) : (
+                                            <p>No hay clubes activos en este momento.</p>
+                                        )}
+                                    </div>
+                                </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
