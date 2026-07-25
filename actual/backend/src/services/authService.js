@@ -2,138 +2,149 @@ const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-const login = async (correo, password) => {
-    const [users] = await db.query(`SELECT * FROM usuarios WHERE correo = ?`, [correo]);
-    const user = users[0];
-    
-    if (!user) throw new Error('El correo electrónico no está registrado');
+const iniciarSesion = async (correo, contrasena) => {
+    const [usuarios] = await db.query(`SELECT * FROM usuarios WHERE correo = ?`, [correo]);
+    const usuario = usuarios[0];
 
-    if (user.bloqueado_hasta && new Date(user.bloqueado_hasta) > new Date()) {
-        const tiempoRestante = Math.ceil((new Date(user.bloqueado_hasta) - new Date()) / 60000);
+    if (!usuario) throw new Error('El correo electrónico no está registrado');
+
+    if (usuario.bloqueado_hasta && new Date(usuario.bloqueado_hasta) > new Date()) {
+        const tiempoRestante = Math.ceil((new Date(usuario.bloqueado_hasta) - new Date()) / 60000);
         throw new Error(`Cuenta bloqueada temporalmente. Intenta de nuevo en ${tiempoRestante} minutos.`);
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const coincide = await bcrypt.compare(contrasena, usuario.password);
 
-    if (!isMatch) {
-        await db.query(`UPDATE usuarios SET intentos_fallidos = intentos_fallidos + 1 WHERE id = ?`, [user.id]);
-        const [checkUser] = await db.query(`SELECT intentos_fallidos FROM usuarios WHERE id = ?`, [user.id]);
-        const intentos = checkUser[0].intentos_fallidos;
-        
+    if (!coincide) {
+        await db.query(`UPDATE usuarios SET intentos_fallidos = intentos_fallidos + 1 WHERE id = ?`, [usuario.id]);
+        const [usuarioActualizado] = await db.query(`SELECT intentos_fallidos FROM usuarios WHERE id = ?`, [usuario.id]);
+        const intentos = usuarioActualizado[0].intentos_fallidos;
+
         if (intentos >= 5) {
-            await db.query(`UPDATE usuarios SET bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?`, [user.id]);
+            await db.query(`UPDATE usuarios SET bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?`, [usuario.id]);
             throw new Error('Límite de intentos superado. Cuenta bloqueada por 15 minutos.');
         }
         throw new Error(`Contraseña incorrecta. Intentos restantes: ${5 - intentos}`);
     }
 
-    await db.query(`UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = ?`, [user.id]);
+    await db.query(`UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = ?`, [usuario.id]);
 
-    let boleta = null, num_empleado = null;
-    if (user.role_id === 2) {
-        const [det] = await db.query(`SELECT boleta FROM alumnos_detalles WHERE usuario_id = ?`, [user.id]);
-        if (det.length > 0) boleta = det[0].boleta;
-    } else if (user.role_id === 3) {
-        const [det] = await db.query(`SELECT num_empleado FROM profesores_detalles WHERE usuario_id = ?`, [user.id]);
-        if (det.length > 0) num_empleado = det[0].num_empleado;
+    let boleta = null, numEmpleado = null;
+    if (usuario.role_id === 2) {
+        const [detalle] = await db.query(`SELECT boleta FROM alumnos_detalles WHERE usuario_id = ?`, [usuario.id]);
+        if (detalle.length > 0) boleta = detalle[0].boleta;
+    } else if (usuario.role_id === 3) {
+        const [detalle] = await db.query(`SELECT num_empleado FROM profesores_detalles WHERE usuario_id = ?`, [usuario.id]);
+        if (detalle.length > 0) numEmpleado = detalle[0].num_empleado;
     }
 
-    const token = jwt.sign({ id: user.id, rol: user.role_id }, process.env.JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ id: usuario.id, rol: usuario.role_id }, process.env.JWT_SECRET, { expiresIn: '8h' });
 
+    // Las claves de "user" se mantienen exactas: coinciden con LoginResponse en Kotlin
     return {
         token,
         user: {
-            id: user.id,
-            nombres: user.nombres,
-            apellidos: `${user.apellido_paterno} ${user.apellido_materno || ''}`.trim(),
-            apellido_paterno: user.apellido_paterno,
-            apellido_materno: user.apellido_materno,
-            correo: user.correo,
-            role_id: user.role_id, 
+            id: usuario.id,
+            nombres: usuario.nombres,
+            apellidos: `${usuario.apellido_paterno} ${usuario.apellido_materno || ''}`.trim(),
+            apellido_paterno: usuario.apellido_paterno,
+            apellido_materno: usuario.apellido_materno,
+            correo: usuario.correo,
+            role_id: usuario.role_id,
             boleta,
-            num_empleado
+            num_empleado: numEmpleado
         }
     };
 };
 
-const register = async (userData) => {
-    const { 
-        nombres, apellido_paterno, apellido_materno, correo, 
-        password, rol_id, nss, boleta, carrera, num_empleado 
-    } = userData;
+const registrar = async (datosRegistro) => {
+    const {
+        nombres, apellidoPaterno, apellidoMaterno, correo,
+        contrasena, idRol, nss, boleta, carrera, numEmpleado
+    } = datosRegistro;
 
-    const roleIdNum = Number(rol_id);
-
-    // --- VALIDACIONES DE SEGURIDAD GENERALES ---
-    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-    if (!passwordRegex.test(password)) {
+    // --- VALIDACIONES DE FORMATO (antes de abrir la transacción) ---
+    const expresionContrasena = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!expresionContrasena.test(contrasena)) {
         throw new Error('La contraseña no cumple con los requisitos de seguridad.');
     }
 
     if (nombres.length > 50) throw new Error('Nombre demasiado largo.');
-    if (apellido_paterno.length > 30 || (apellido_materno && apellido_materno.length > 30)) {
+    if (apellidoPaterno.length > 30 || (apellidoMaterno && apellidoMaterno.length > 30)) {
         throw new Error('Apellidos demasiado largos.');
     }
 
-    const [existingUser] = await db.query(`SELECT id FROM usuarios WHERE correo = ?`, [correo]);
-    if (existingUser.length > 0) throw new Error('El correo electrónico ya está registrado');
-
-    // --- VALIDACIONES ESTRICTAMENTE SEPARADAS ---
-    if (roleIdNum === 2) { 
+    if (idRol === 2) {
         if (!nss || nss.length > 11) throw new Error('El NSS necesita máximo 11 dígitos');
         if (!boleta || boleta.length > 10) throw new Error('La boleta necesita máximo 10 dígitos');
-
-        const [existingNSS] = await db.query(`SELECT usuario_id FROM alumnos_detalles WHERE nss = ?`, [nss]);
-        if (existingNSS.length > 0) throw new Error('El NSS ya está registrado');
-
-        const [existingBoleta] = await db.query(`SELECT usuario_id FROM alumnos_detalles WHERE boleta = ?`, [boleta]);
-        if (existingBoleta.length > 0) throw new Error('La boleta ya está registrada');
-
-    } else if (roleIdNum === 3) { 
-        if (!num_empleado || num_empleado.length > 15) throw new Error('El número de empleado necesita máximo 15 dígitos');
-
-        const [existingEmpleado] = await db.query(`SELECT usuario_id FROM profesores_detalles WHERE num_empleado = ?`, [num_empleado]);
-        if (existingEmpleado.length > 0) throw new Error('El número de empleado ya está registrado');
+    } else if (idRol === 3) {
+        if (!numEmpleado || numEmpleado.length > 15) throw new Error('El número de empleado necesita máximo 15 dígitos');
     } else {
         throw new Error('Rol no válido');
     }
 
-    // --- INSERCIÓN EN BASE DE DATOS ---
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
+    const sal = await bcrypt.genSalt(10);
+    const hashContrasena = await bcrypt.hash(contrasena, sal);
 
-    const [result] = await db.query(
-        `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) VALUES (?, ?, ?, ?, ?, ?)`,
-        [nombres, apellido_paterno, apellido_materno, correo, passwordHash, roleIdNum]
-    );
-
-    const userId = result.insertId;
-
+    // --- TRANSACCIÓN ACID REAL ---
+    const conexion = await db.getConnection();
     try {
-        if (roleIdNum === 2) {
-            await db.query(`INSERT INTO alumnos_detalles (usuario_id, nss, boleta, carrera) VALUES (?, ?, ?, ?)`, [userId, nss, boleta, carrera]);
-        } else if (roleIdNum === 3) {
-            await db.query(`INSERT INTO profesores_detalles (usuario_id, num_empleado) VALUES (?, ?)`, [userId, num_empleado]);
+        await conexion.beginTransaction();
+
+        // FOR UPDATE bloquea la fila mientras dura la transacción, evitando
+        // que dos registros simultáneos con el mismo correo pasen la validación a la vez
+        const [correoExistente] = await conexion.query(
+            `SELECT id FROM usuarios WHERE correo = ? FOR UPDATE`, [correo]
+        );
+        if (correoExistente.length > 0) throw new Error('El correo electrónico ya está registrado');
+
+        if (idRol === 2) {
+            const [nssExistente] = await conexion.query(`SELECT usuario_id FROM alumnos_detalles WHERE nss = ?`, [nss]);
+            if (nssExistente.length > 0) throw new Error('El NSS ya está registrado');
+
+            const [boletaExistente] = await conexion.query(`SELECT usuario_id FROM alumnos_detalles WHERE boleta = ?`, [boleta]);
+            if (boletaExistente.length > 0) throw new Error('La boleta ya está registrada');
+        } else {
+            const [empleadoExistente] = await conexion.query(`SELECT usuario_id FROM profesores_detalles WHERE num_empleado = ?`, [numEmpleado]);
+            if (empleadoExistente.length > 0) throw new Error('El número de empleado ya está registrado');
         }
 
-        // Fichas médicas y contactos separados según el esquema de la BD
-        if (roleIdNum !== 1) { 
-            await db.query(
-                `INSERT INTO fichas_medicas (usuario_id, tipo_sangre, condiciones_preexistentes) VALUES (?, 'O+', 'Pendiente por informar')`,
-                [userId]
+        const [resultadoUsuario] = await conexion.query(
+            `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) VALUES (?, ?, ?, ?, ?, ?)`,
+            [nombres, apellidoPaterno, apellidoMaterno, correo, hashContrasena, idRol]
+        );
+        const idUsuarioNuevo = resultadoUsuario.insertId;
+
+        if (idRol === 2) {
+            await conexion.query(
+                `INSERT INTO alumnos_detalles (usuario_id, nss, boleta, carrera) VALUES (?, ?, ?, ?)`,
+                [idUsuarioNuevo, nss, boleta, carrera]
             );
-            await db.query(
-                `INSERT INTO contactos_emergencia (usuario_id, nombre, telefono, parentesco) VALUES (?, 'Pendiente', '0000000000', 'Tutor')`,
-                [userId]
+        } else {
+            await conexion.query(
+                `INSERT INTO profesores_detalles (usuario_id, num_empleado) VALUES (?, ?)`,
+                [idUsuarioNuevo, numEmpleado]
             );
         }
+
+        await conexion.query(
+            `INSERT INTO fichas_medicas (usuario_id, tipo_sangre, condiciones_preexistentes) VALUES (?, 'O+', 'Pendiente por informar')`,
+            [idUsuarioNuevo]
+        );
+        await conexion.query(
+            `INSERT INTO contactos_emergencia (usuario_id, nombre, telefono, parentesco) VALUES (?, 'Pendiente', '0000000000', 'Tutor')`,
+            [idUsuarioNuevo]
+        );
+
+        await conexion.commit();
+        return { message: "Usuario creado exitosamente" };
+
     } catch (error) {
-        // Si falla alguna inserción de detalles, eliminamos al usuario para no dejar "datos a medias" que bloqueen futuros registros
-        await db.query(`DELETE FROM usuarios WHERE id = ?`, [userId]);
+        await conexion.rollback();
         throw error;
+    } finally {
+        conexion.release();
     }
-
-    return { message: "Usuario creado exitosamente" };
 };
 
-module.exports = { login, register };
+module.exports = { iniciarSesion, registrar };
