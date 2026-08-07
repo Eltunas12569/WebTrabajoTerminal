@@ -91,29 +91,24 @@ const obtenerPerfil = async (req, res) => {
         let ficha_medica = null;
 
         if (fichas.length > 0) {
+            // Ya no hay límite de 3: se traen TODOS los contactos registrados (relación 1:N real)
+            const [contactos] = await db.query(
+                'SELECT nombre, telefono, parentesco FROM contactos_emergencia WHERE usuario_id = ? ORDER BY id ASC',
+                [req.user.id]
+            );
+
             ficha_medica = {
                 tipo_sangre: fichas[0].tipo_sangre,
-                alergias: fichas[0].condiciones_preexistentes || ''
+                alergias: fichas[0].condiciones_preexistentes || '',
+                // Arreglo dinámico: reemplaza a los campos planos con sufijo numérico
+                contactos: contactos.map(contacto => ({
+                    nombre: contacto.nombre,
+                    telefono: contacto.telefono,
+                    parentesco: contacto.parentesco
+                }))
             };
-
-            const [contactos] = await db.query('SELECT nombre, telefono FROM contactos_emergencia WHERE usuario_id = ? ORDER BY id ASC LIMIT 3', [req.user.id]);
-
-            if (contactos[0]) {
-                ficha_medica.contacto_emergencia_1_nombre = contactos[0].nombre;
-                ficha_medica.contacto_emergencia_1_telefono = contactos[0].telefono;
-            }
-            if (contactos[1]) {
-                ficha_medica.contacto_emergencia_2_nombre = contactos[1].nombre;
-                ficha_medica.contacto_emergencia_2_telefono = contactos[1].telefono;
-            }
-            if (contactos[2]) {
-                ficha_medica.contacto_emergencia_3_nombre = contactos[2].nombre;
-                ficha_medica.contacto_emergencia_3_telefono = contactos[2].telefono;
-            }
         }
 
-        // Las claves de salida (nombres, apellido_paterno, ficha_medica, etc.)
-        // se mantienen exactas: PerfilActivity.kt las espera así
         res.status(200).json({ ...filasUsuario[0], ficha_medica });
     } catch (error) {
         console.error("Error en obtenerPerfil:", error);
@@ -128,20 +123,34 @@ const actualizarPerfil = async (req, res) => {
             nombres, apellido_paterno, apellido_materno,
             currentPassword: contrasenaActual, newPassword: contrasenaNueva,
             tipo_sangre, alergias,
-            contacto_emergencia_1_nombre, contacto_emergencia_1_telefono,
-            contacto_emergencia_2_nombre, contacto_emergencia_2_telefono,
-            contacto_emergencia_3_nombre, contacto_emergencia_3_telefono
+            contactos
         } = req.body;
 
-        // --- VALIDACIÓN ESTRICTA DE TIPO DE SANGRE ---
-        // Solo se valida si el campo viene en la petición, para no romper
-        // actualizaciones de perfil que no tocan la ficha médica.
+        // --- VALIDACIÓN ESTRICTA DE TIPO DE SANGRE (se mantiene igual que antes) ---
         const tiposSangreValidos = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
         if (tipo_sangre !== undefined && tipo_sangre !== null && tipo_sangre !== '') {
             if (!tiposSangreValidos.includes(tipo_sangre)) {
                 return res.status(400).json({
                     message: `Tipo de sangre inválido. Los valores permitidos son: ${tiposSangreValidos.join(', ')}`
                 });
+            }
+        }
+
+        // --- VALIDACIÓN ESTRICTA DE CONTACTOS DE EMERGENCIA (arreglo dinámico) ---
+        // Ya no hay límite máximo (antes eran 3 fijos), pero se exige un mínimo de 2
+        // para garantizar que siempre haya al menos dos formas de contactar a alguien.
+        if (!Array.isArray(contactos)) {
+            return res.status(400).json({ message: "El campo 'contactos' debe ser un arreglo." });
+        }
+        if (contactos.length < 2) {
+            return res.status(400).json({ message: "Debes registrar al menos 2 contactos de emergencia." });
+        }
+        for (const [indice, contacto] of contactos.entries()) {
+            if (!contacto.nombre || !contacto.nombre.trim()) {
+                return res.status(400).json({ message: `El contacto #${indice + 1} necesita un nombre.` });
+            }
+            if (!contacto.telefono || !contacto.telefono.trim()) {
+                return res.status(400).json({ message: `El contacto #${indice + 1} necesita un teléfono.` });
             }
         }
 
@@ -176,14 +185,15 @@ const actualizarPerfil = async (req, res) => {
             );
         }
 
-        // Sincronizar contactos de emergencia (borrar los antiguos e insertar los nuevos)
+        // Sincronizar contactos de emergencia: se borran los antiguos y se insertan
+        // TODOS los que vengan en el arreglo, sin límite fijo de 3.
         await db.query('DELETE FROM contactos_emergencia WHERE usuario_id = ?', [req.user.id]);
-        const insertarContacto = async (nombre, telefono, parentesco) => {
-            if (nombre && telefono) await db.query('INSERT INTO contactos_emergencia (usuario_id, nombre, telefono, parentesco) VALUES (?, ?, ?, ?)', [req.user.id, nombre, telefono, parentesco]);
-        };
-        await insertarContacto(contacto_emergencia_1_nombre, contacto_emergencia_1_telefono, 'Familiar 1');
-        await insertarContacto(contacto_emergencia_2_nombre, contacto_emergencia_2_telefono, 'Familiar 2');
-        await insertarContacto(contacto_emergencia_3_nombre, contacto_emergencia_3_telefono, 'Familiar 3');
+        for (const contacto of contactos) {
+            await db.query(
+                'INSERT INTO contactos_emergencia (usuario_id, nombre, telefono, parentesco) VALUES (?, ?, ?, ?)',
+                [req.user.id, contacto.nombre.trim(), contacto.telefono.trim(), contacto.parentesco || null]
+            );
+        }
 
         res.status(200).json({ message: 'Perfil actualizado exitosamente' });
     } catch (error) {
