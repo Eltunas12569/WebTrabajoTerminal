@@ -176,7 +176,7 @@ const seedMasivo = async () => {
 
             // Chat y Eventos
             await db.query(`INSERT INTO avisos_club (club_id, usuario_id, contenido) VALUES (?, ?, ?)`, [clubId, pEncargado, `¡Bienvenidos al club ${nombre}! Empezamos la próxima semana.`]);
-            const [eventoRes] = await db.query(`INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar) VALUES (?, ?, ?, ?, ?, ?)`, [clubId, aEncargado, 'Reunión de Integración', 'Primer encuentro oficial.', 'Próximo Viernes 14:00', 'Salón Múltiple']);
+            const [eventoRes] = await db.query(`INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar) VALUES (?, ?, ?, ?, ?, ?)`, [clubId, aEncargado, 'Reunión de Integración', 'Primer encuentro oficial.', '2026-08-21 14:00:00', 'Salón Múltiple']);
             for (const asisId of getRandomMultiple(integrantes, 12)) {
                 await db.query(`INSERT INTO asistencias_eventos (evento_id, usuario_id, asistira) VALUES (?, ?, 1)`, [eventoRes.insertId, asisId]);
             }
