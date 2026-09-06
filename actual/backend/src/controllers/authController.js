@@ -67,8 +67,21 @@ const registrar = async (req, res) => {
 
 const obtenerPerfil = async (req, res) => {
     try {
-        const [filasUsuario] = await db.query('SELECT nombres, apellido_paterno, apellido_materno, correo, verificado FROM usuarios WHERE id = ?', [req.user.id]);
+        // Hacemos LEFT JOIN para traer boleta/carrera (si es alumno) o num_empleado (si es profesor)
+        const queryUsuario = `
+            SELECT u.nombres, u.apellido_paterno, u.apellido_materno, u.correo, u.verificado, u.role_id,
+                   a.boleta, a.carrera, a.nss,
+                   p.num_empleado
+            FROM usuarios u
+            LEFT JOIN alumnos_detalles a ON u.id = a.usuario_id
+            LEFT JOIN profesores_detalles p ON u.id = p.usuario_id
+            WHERE u.id = ?
+        `;
+        const [filasUsuario] = await db.query(queryUsuario, [req.user.id]);
+        
         if (filasUsuario.length === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+        const usuarioInfo = filasUsuario[0];
 
         const [fichas] = await db.query('SELECT * FROM fichas_medicas WHERE usuario_id = ?', [req.user.id]);
         let ficha_medica = null;
@@ -86,10 +99,18 @@ const obtenerPerfil = async (req, res) => {
             };
         }
 
-        // Se envía la bandera 'verificado' boolean para que Android la guarde/use
+        // Construimos el objeto final dependiendo del rol
         res.status(200).json({ 
-            ...filasUsuario[0], 
-            verificado: filasUsuario[0].verificado === 1,
+            nombres: usuarioInfo.nombres,
+            apellido_paterno: usuarioInfo.apellido_paterno,
+            apellido_materno: usuarioInfo.apellido_materno,
+            correo: usuarioInfo.correo,
+            verificado: usuarioInfo.verificado === 1,
+            role_id: usuarioInfo.role_id,
+            boleta: usuarioInfo.boleta,
+            carrera: usuarioInfo.carrera,
+            nss: usuarioInfo.nss,
+            num_empleado: usuarioInfo.num_empleado,
             ficha_medica 
         });
     } catch (error) {
