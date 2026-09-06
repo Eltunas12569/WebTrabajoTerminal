@@ -43,17 +43,17 @@ const seedMasivo = async () => {
         let profeIds = [];
         let alumnoIds = [];
 
-        // ADMIN
+        // ADMIN (Marcado como verificado para no bloquearlo)
         await db.query(
-            `INSERT INTO usuarios (id, nombres, apellido_paterno, apellido_materno, correo, password, role_id) 
-             VALUES (1, 'Administración', 'ESCOM', 'IPN', 'admin@ipn.mx', ?, 1)`, [hash]
+            `INSERT INTO usuarios (id, nombres, apellido_paterno, apellido_materno, correo, password, role_id, verificado) 
+             VALUES (1, 'Administración', 'ESCOM', 'IPN', 'admin@ipn.mx', ?, 1, 1)`, [hash]
         );
 
-        // 30 PROFESORES
+        // 30 PROFESORES (Marcados como verificados)
         for (let i = 1; i <= 30; i++) {
             const [res] = await db.query(
-                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) 
-                 VALUES (?, ?, ?, ?, ?, 3)`, 
+                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id, verificado) 
+                 VALUES (?, ?, ?, ?, ?, 3, 1)`, 
                 [`Profesor ${i}`, 'García', 'López', `profe${i}@ipn.mx`, hash]
             );
             const profeId = res.insertId;
@@ -72,11 +72,11 @@ const seedMasivo = async () => {
             );
         }
 
-        // 150 ALUMNOS
+        // 150 ALUMNOS (Marcados como verificados)
         for (let i = 1; i <= 150; i++) {
             const [res] = await db.query(
-                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id) 
-                 VALUES (?, ?, ?, ?, ?, 2)`, 
+                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id, verificado) 
+                 VALUES (?, ?, ?, ?, ?, 2, 1)`, 
                 [`Alumno ${i}`, 'Martínez', 'Sánchez', `alumno${i}@alumno.ipn.mx`, hash]
             );
             const alumnoId = res.insertId;
@@ -110,11 +110,9 @@ const seedMasivo = async () => {
         ];
         
         for (const nombre of nombresClub) {
-            // Seleccionamos encargados ACTUALES
             const pEncargado = getRandom(profeIds);
             const aEncargado = getRandom(alumnoIds);
             
-            // Seleccionamos encargados del SEMESTRE PASADO (que no sean los mismos de ahora)
             const pAnterior = getRandom(profeIds.filter(id => id !== pEncargado));
             const aAnterior = getRandom(alumnoIds.filter(id => id !== aEncargado));
 
@@ -131,9 +129,6 @@ const seedMasivo = async () => {
             );
             const clubId = clubRes.insertId;
 
-            // --- INSCRIPCIÓN Y REGISTRO DE HISTORIAL ---
-            
-            // 1. Historial del Semestre Pasado (Con fecha_fin llena)
             await db.query(
                 `INSERT INTO historial_encargados (club_id, usuario_id, rol_desempenado, fecha_inicio, fecha_fin) 
                  VALUES (?, ?, 'encargado_profesor', DATE_SUB(NOW(), INTERVAL 6 MONTH), DATE_SUB(NOW(), INTERVAL 1 MONTH))`, 
@@ -145,7 +140,6 @@ const seedMasivo = async () => {
                 [clubId, aAnterior]
             );
 
-            // 2. Encargados Actuales (En inscripciones y en historial sin fecha_fin)
             await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo')`, [clubId, pEncargado]);
             await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo')`, [clubId, aEncargado]);
 
@@ -160,13 +154,11 @@ const seedMasivo = async () => {
                 [clubId, aEncargado]
             );
 
-            // Inscribir Miembros Regulares
             const integrantes = getRandomMultiple(alumnoIds.filter(id => id !== aEncargado && id !== aAnterior), 18);
             for (const mId of integrantes) {
                 await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'miembro', 'activo')`, [clubId, mId]);
             }
 
-            // Crear Solicitudes de Recursos
             const recursos = ['Proyector', 'Balones oficiales', 'Kits Arduino Uno', 'Tableros de Ajedrez', 'Bocina Bluetooth'];
             await db.query(
                 `INSERT INTO solicitudes_recursos (club_id, usuario_id, tipo_club, tipo_recurso, nombre_recurso, cantidad, unidad, especificaciones, opciones_marcas, motivo, estatus) 
@@ -174,9 +166,8 @@ const seedMasivo = async () => {
                 [clubId, pEncargado, getRandom(['material', 'espacio']), getRandom(recursos), Math.floor(Math.random() * 10) + 1, getRandom(['pendiente', 'aprobado'])]
             );
 
-            // Chat y Eventos
             await db.query(`INSERT INTO avisos_club (club_id, usuario_id, contenido) VALUES (?, ?, ?)`, [clubId, pEncargado, `¡Bienvenidos al club ${nombre}! Empezamos la próxima semana.`]);
-            const [eventoRes] = await db.query(`INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar) VALUES (?, ?, ?, ?, ?, ?)`, [clubId, aEncargado, 'Reunión de Integración', 'Primer encuentro oficial.', 'Próximo Viernes 14:00', 'Salón Múltiple']);
+            const [eventoRes] = await db.query(`INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar) VALUES (?, ?, ?, ?, ?, ?)`, [clubId, aEncargado, 'Reunión de Integración', 'Primer encuentro oficial.', '2026-08-21 14:00:00', 'Salón Múltiple']);
             for (const asisId of getRandomMultiple(integrantes, 12)) {
                 await db.query(`INSERT INTO asistencias_eventos (evento_id, usuario_id, asistira) VALUES (?, ?, 1)`, [eventoRes.insertId, asisId]);
             }
@@ -209,7 +200,6 @@ const seedMasivo = async () => {
             await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo')`, [clubId, pEncargado]);
             await db.query(`INSERT INTO inscripciones (club_id, usuario_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo')`, [clubId, aEncargado]);
             
-            // Estos al haber sido rechazados siguen siendo los creadores, por ende los encargados "actuales" de su propuesta
             await db.query(`INSERT INTO historial_encargados (club_id, usuario_id, rol_desempenado, fecha_inicio) VALUES (?, ?, 'encargado_profesor', NOW())`, [clubId, pEncargado]);
             await db.query(`INSERT INTO historial_encargados (club_id, usuario_id, rol_desempenado, fecha_inicio) VALUES (?, ?, 'encargado_alumno', NOW())`, [clubId, aEncargado]);
         }

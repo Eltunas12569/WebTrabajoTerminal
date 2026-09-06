@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const verificarToken = require('../middlewares/authMiddleware');
+const requireVerificado = require('../middlewares/verificarCuentaMiddleware'); // NUEVO
 const checkRole = require('../middlewares/roleAuth');
 const ROLES = require('../config/roles');
 
 // Obtener profesores
-router.get('/professors', verificarToken, async (req, res) => {
+router.get('/professors', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [profesores] = await db.query(`
             SELECT id, nombres, CONCAT(apellido_paterno, ' ', IFNULL(apellido_materno, '')) AS apellidos
@@ -19,7 +20,7 @@ router.get('/professors', verificarToken, async (req, res) => {
 });
 
 // Obtener alumnos para encargados
-router.get('/students-in-charge', verificarToken, async (req, res) => {
+router.get('/students-in-charge', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [alumnos] = await db.query(`
             SELECT id, nombres, CONCAT(apellido_paterno, ' ', IFNULL(apellido_materno, '')) AS apellidos,
@@ -35,7 +36,7 @@ router.get('/students-in-charge', verificarToken, async (req, res) => {
 // --- BUSCADOR UNIVERSAL (asegurado) ---
 // Restringido a Administrador y Profesor, según tu confirmación.
 // Requiere término de búsqueda (evita el dump completo de la tabla) y limita a 20 resultados.
-router.get('/', verificarToken, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR]), async (req, res) => {
+router.get('/', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR]), async (req, res) => {
     const { busqueda } = req.query;
 
     if (!busqueda || busqueda.trim().length < 2) {

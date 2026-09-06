@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const verifyToken = require('../middlewares/authMiddleware');
+const requireVerificado = require('../middlewares/verificarCuentaMiddleware'); // NUEVO
 
 router.get('/', async (req, res) => {
     try {
@@ -33,7 +34,7 @@ router.get('/', async (req, res) => {
 });
 
 // NUEVA RUTA: Avisos combinados para un usuario (Globales + Clubs inscritos)
-router.get('/user/:userId', verifyToken, async (req, res) => {
+router.get('/user/:userId', verifyToken, requireVerificado, async (req, res) => {
     const { userId } = req.params;
     try {
         // 1. Avisos globales
@@ -63,7 +64,7 @@ router.get('/user/:userId', verifyToken, async (req, res) => {
 });
 
 // NUEVA RUTA: Para que el admin vea TODOS los avisos (globales y de club)
-router.get('/all-for-admin', verifyToken, async (req, res) => {
+router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) => {
     try {
         // Verificación infalible: Consultamos el rol directamente en la BD
         // usando el ID del usuario validado por el token.

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const verificarToken = require('../middlewares/authMiddleware');
+const requireVerificado = require('../middlewares/verificarCuentaMiddleware'); // NUEVO
 
 // Convierte cualquier valor de fecha recibido del cliente a formato DATETIME de MySQL.
 // Devuelve null si el valor no es una fecha válida, para que el endpoint pueda rechazarla.
@@ -14,7 +15,7 @@ function convertirAFechaMySQL(valor) {
 // ==========================================
 // --- SISTEMA DE INVITACIONES Y NOTIFICACIONES ---
 // ==========================================
-router.get('/invitaciones/pendientes', verificarToken, async (req, res) => {
+router.get('/invitaciones/pendientes', verificarToken, requireVerificado, async (req, res) => {
     const idUsuario = req.user.id;
     try {
         const [filas] = await db.query(`
@@ -26,7 +27,7 @@ router.get('/invitaciones/pendientes', verificarToken, async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error interno" }); }
 });
 
-router.put('/invitaciones/:idClub/responder', verificarToken, async (req, res) => {
+router.put('/invitaciones/:idClub/responder', verificarToken, requireVerificado, async (req, res) => {
     const { idClub } = req.params;
     const { accion } = req.body;
     const idUsuario = req.user.id;
@@ -41,7 +42,7 @@ router.put('/invitaciones/:idClub/responder', verificarToken, async (req, res) =
     } catch (error) { res.status(500).json({ message: "Error interno" }); }
 });
 
-router.put('/:id/enviar-revision', verificarToken, async (req, res) => {
+router.put('/:id/enviar-revision', verificarToken, requireVerificado, async (req, res) => {
     const { id } = req.params;
     try {
         const [resultadoConteo] = await db.query(`SELECT COUNT(*) as total FROM inscripciones WHERE club_id = ? AND estatus = 'activo' AND rol_en_club != 'encargado_profesor'`, [id]);
@@ -55,7 +56,7 @@ router.put('/:id/enviar-revision', verificarToken, async (req, res) => {
 // ==========================================
 // --- DASHBOARD DEL CLUB (CHAT, AVISOS, EVENTOS, RECURSOS) ---
 // ==========================================
-router.get('/:id/chat', verificarToken, async (req, res) => {
+router.get('/:id/chat', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [mensajes] = await db.query(`
             SELECT c.id, c.club_id, c.usuario_id, c.mensaje, c.fecha_envio, CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre
@@ -66,7 +67,7 @@ router.get('/:id/chat', verificarToken, async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al cargar chat" }); }
 });
 
-router.get('/:id/avisos', verificarToken, async (req, res) => {
+router.get('/:id/avisos', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [avisos] = await db.query(`
             SELECT a.*, CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre
@@ -77,7 +78,7 @@ router.get('/:id/avisos', verificarToken, async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al cargar avisos" }); }
 });
 
-router.post('/:id/avisos', verificarToken, async (req, res) => {
+router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) => {
     const { contenido } = req.body;
     try {
         await db.query(`INSERT INTO avisos_club (club_id, usuario_id, contenido) VALUES (?, ?, ?)`, [req.params.id, req.user.id, contenido]);
@@ -91,7 +92,7 @@ router.post('/:id/avisos', verificarToken, async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al crear aviso" }); }
 });
 
-router.get('/:id/eventos', verificarToken, async (req, res) => {
+router.get('/:id/eventos', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [eventos] = await db.query(`
             SELECT e.*,
@@ -105,7 +106,7 @@ router.get('/:id/eventos', verificarToken, async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al cargar eventos" }); }
 });
 
-router.post('/:id/eventos', verificarToken, async (req, res) => {
+router.post('/:id/eventos', verificarToken, requireVerificado, async (req, res) => {
     const { titulo, descripcion, fecha_evento, lugar } = req.body;
 
     // Validamos y convertimos la fecha ANTES de tocar la base de datos,
@@ -128,7 +129,7 @@ router.post('/:id/eventos', verificarToken, async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al crear evento" }); }
 });
 
-router.post('/:id/eventos/:idEvento/asistencia', verificarToken, async (req, res) => {
+router.post('/:id/eventos/:idEvento/asistencia', verificarToken, requireVerificado, async (req, res) => {
     const { asistira } = req.body;
     try {
         await db.query(
@@ -139,7 +140,7 @@ router.post('/:id/eventos/:idEvento/asistencia', verificarToken, async (req, res
     } catch (error) { res.status(500).json({ message: "Error al registrar asistencia" }); }
 });
 
-router.post('/:id/recursos', verificarToken, async (req, res) => {
+router.post('/:id/recursos', verificarToken, requireVerificado, async (req, res) => {
     const { tipo_club, tipo_recurso, nombre_recurso, cantidad, unidad, especificaciones, opciones_marcas, motivo } = req.body;
     try {
         await db.query(
@@ -153,7 +154,7 @@ router.post('/:id/recursos', verificarToken, async (req, res) => {
 // ==========================================
 // --- OBTENER CLUBES GLOBALES ---
 // ==========================================
-router.get('/', async (req, res) => {
+router.get('/', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [filas] = await db.query(`
             SELECT c.*,
@@ -174,7 +175,7 @@ router.get('/', async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error interno" }); }
 });
 
-router.get('/user/:idUsuario', verificarToken, async (req, res) => {
+router.get('/user/:idUsuario', verificarToken, requireVerificado, async (req, res) => {
     const { idUsuario } = req.params;
     try {
         const [filas] = await db.query(`
@@ -203,7 +204,7 @@ router.get('/user/:idUsuario', verificarToken, async (req, res) => {
 // ==========================================
 // --- CREACIÓN, EDICIÓN Y ACCIONES DE ADMIN ---
 // ==========================================
-router.post('/', verificarToken, async (req, res) => {
+router.post('/', verificarToken, requireVerificado, async (req, res) => {
     const { nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, profesor_encargado_id, alumno_encargado_id, lista_estudiantes } = req.body;
     const estatus = 'esperando_firmas';
 
@@ -233,7 +234,7 @@ router.post('/', verificarToken, async (req, res) => {
     }
 });
 
-router.put('/:id', verificarToken, async (req, res) => {
+router.put('/:id', verificarToken, requireVerificado, async (req, res) => {
     const { id } = req.params;
     const { nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, nuevo_profesor_id, nuevo_alumno_id } = req.body;
     try {
@@ -261,7 +262,7 @@ router.put('/:id', verificarToken, async (req, res) => {
     }
 });
 
-router.put('/:id/aprobar', verificarToken, async (req, res) => {
+router.put('/:id/aprobar', verificarToken, requireVerificado, async (req, res) => {
     const { id } = req.params;
     const codigoGenerado = Math.random().toString(36).substring(2, 8).toUpperCase();
     try {
@@ -270,28 +271,28 @@ router.put('/:id/aprobar', verificarToken, async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
 
-router.put('/:id/rechazar', verificarToken, async (req, res) => {
+router.put('/:id/rechazar', verificarToken, requireVerificado, async (req, res) => {
     try {
         await db.query(`UPDATE clubes SET estatus = 'rechazado', motivo_rechazo = ? WHERE id = ?`, [req.body.motivo, req.params.id]);
         res.status(200).json({ message: "Rechazado" });
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
 
-router.put('/:id/pausar', verificarToken, async (req, res) => {
+router.put('/:id/pausar', verificarToken, requireVerificado, async (req, res) => {
     try {
         await db.query(`UPDATE clubes SET estatus = 'inactivo' WHERE id = ?`, [req.params.id]);
         res.status(200).json({ message: "Pausado" });
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
 
-router.put('/:id/reactivar', verificarToken, async (req, res) => {
+router.put('/:id/reactivar', verificarToken, requireVerificado, async (req, res) => {
     try {
         await db.query(`UPDATE clubes SET estatus = 'activo' WHERE id = ?`, [req.params.id]);
         res.status(200).json({ message: "Reactivado" });
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
 
-router.delete('/:id', verificarToken, async (req, res) => {
+router.delete('/:id', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [encargados] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno')`, [req.params.id]);
         await db.query('DELETE FROM clubes WHERE id = ?', [req.params.id]);
@@ -304,7 +305,7 @@ router.delete('/:id', verificarToken, async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
 
-router.post('/unirse', verificarToken, async (req, res) => {
+router.post('/unirse', verificarToken, requireVerificado, async (req, res) => {
     if (!req.body.codigo) return res.status(400).json({ message: "Código obligatorio" });
     try {
         const [clubesEncontrados] = await db.query('SELECT id FROM clubes WHERE codigo_union = ? AND estatus = "activo"', [req.body.codigo]);
@@ -317,7 +318,7 @@ router.post('/unirse', verificarToken, async (req, res) => {
 // ==========================================
 // --- OBTENER ESTADO DE FIRMAS (PROFESOR) ---
 // ==========================================
-router.get('/:id/miembros', verificarToken, async (req, res) => {
+router.get('/:id/miembros', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [miembros] = await db.query(`
             SELECT u.id, u.nombres, CONCAT(u.apellido_paterno, ' ', IFNULL(u.apellido_materno, '')) AS apellidos,
