@@ -71,7 +71,15 @@ const ClubDetailsPage = () => {
                         
                         <div style={{ marginTop: '10px' }}>
                             {isMember ? (
-                                <span style={{ fontSize: '1rem', background: '#d4edda', color: '#155724', padding: '8px 16px', borderRadius: '20px', fontWeight: 'bold' }}>✓ Ya eres miembro de este club</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                    <span style={{ fontSize: '1rem', background: '#d4edda', color: '#155724', padding: '8px 16px', borderRadius: '20px', fontWeight: 'bold' }}>✓ Ya eres miembro de este club</span>
+                                    <button
+                                        onClick={() => navigate(`/club/${id}/panel`)}
+                                        style={{ padding: '10px 20px', background: '#003366', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                                    >
+                                        📋 Ir al panel del club
+                                    </button>
+                                </div>
                             ) : (
                                 <p style={{ color: '#666', fontSize: '1rem', margin: 0 }}>Para unirte, solicita el <b>Código de Unión</b> al Profesor o Alumno Líder e ingrésalo en la sección "Unirse a un Club".</p>
                             )}

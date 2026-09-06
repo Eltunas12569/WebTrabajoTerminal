@@ -34,7 +34,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder }) => {
                 }}>
                     {options.filter(op => `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())).map(op => (
                         <li key={op.id} style={{ padding: '10px', cursor: 'pointer', borderBottom: '1px solid #eee' }} onMouseDown={() => { onChange(op.id); setIsOpen(false); }} onMouseEnter={(e) => e.target.style.backgroundColor = '#f0f2f5'} onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}>
-                            {op.nombres} {op.apellidos} (Boleta: {op.boleta})
+                            {op.nombres} {op.apellidos}{op.boleta ? ` (Boleta: ${op.boleta})` : ''}
                         </li>
                     ))}
                 </ul>
@@ -56,6 +56,9 @@ const ClubDetailsAdminPage = () => {
     const [alumnos, setAlumnos] = useState([]);
     const [saving, setSaving] = useState(false);
     const [approving, setApproving] = useState(false);
+    const [actionLoading, setActionLoading] = useState('');
+    const [rejectMotivo, setRejectMotivo] = useState('');
+    const [showRejectModal, setShowRejectModal] = useState(false);
     const [actionError, setActionError] = useState('');
 
     useEffect(() => {
@@ -100,6 +103,11 @@ const ClubDetailsAdminPage = () => {
             await api.put(`/clubes/${id}`, {
                 nombre: editData.nombre,
                 descripcion: editData.descripcion,
+                objetivo: club.objetivo,
+                cronograma: club.cronograma,
+                detalle_actividades: club.detalle_actividades,
+                espacios_tiempos: club.espacios_tiempos,
+                impacto: club.impacto,
                 nuevo_profesor_id: editData.profesor_encargado_id,
                 nuevo_alumno_id: editData.alumno_encargado_id
             });
@@ -132,6 +140,51 @@ const ClubDetailsAdminPage = () => {
             navigate('/admin');
         } catch (error) {
             alert('No se pudo eliminar el club.');
+        }
+    };
+
+    const handleRejectClub = async () => {
+        if (!rejectMotivo.trim()) {
+            setActionError('Debes indicar el motivo del rechazo.');
+            return;
+        }
+        setActionLoading('rechazar');
+        setActionError('');
+        try {
+            await api.put(`/clubes/${id}/rechazar`, { motivo: rejectMotivo.trim() });
+            setShowRejectModal(false);
+            navigate('/admin');
+        } catch (error) {
+            setActionError(error.response?.data?.message || 'Error al rechazar el club.');
+        } finally {
+            setActionLoading('');
+        }
+    };
+
+    const handlePauseClub = async () => {
+        if (!window.confirm('¿Pausar este club? Los miembros no podrán usar sus funciones activas.')) return;
+        setActionLoading('pausar');
+        setActionError('');
+        try {
+            await api.put(`/clubes/${id}/pausar`, {});
+            setClub({ ...club, estatus: 'inactivo' });
+        } catch (error) {
+            setActionError(error.response?.data?.message || 'Error al pausar el club.');
+        } finally {
+            setActionLoading('');
+        }
+    };
+
+    const handleReactivateClub = async () => {
+        setActionLoading('reactivar');
+        setActionError('');
+        try {
+            await api.put(`/clubes/${id}/reactivar`, {});
+            setClub({ ...club, estatus: 'activo' });
+        } catch (error) {
+            setActionError(error.response?.data?.message || 'Error al reactivar el club.');
+        } finally {
+            setActionLoading('');
         }
     };
 
@@ -195,10 +248,25 @@ const ClubDetailsAdminPage = () => {
                                 {club.estatus}
                             </span>
                             
-                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                                {club.estatus === 'en_revision' && (
-                                    <button onClick={handleApproveClub} disabled={approving} style={{ padding: '10px 20px', background: '#1877f2', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'background 0.2s' }}>
-                                        {approving ? 'Aprobando...' : '✅ Aprobar Club'}
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                {['en_revision', 'esperando_firmas'].includes(club.estatus) && (
+                                    <>
+                                        <button onClick={handleApproveClub} disabled={approving} style={{ padding: '10px 20px', background: '#1877f2', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'background 0.2s' }}>
+                                            {approving ? 'Aprobando...' : '✅ Aprobar Club'}
+                                        </button>
+                                        <button onClick={() => setShowRejectModal(true)} style={{ padding: '10px 20px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}>
+                                            ❌ Rechazar Club
+                                        </button>
+                                    </>
+                                )}
+                                {club.estatus === 'activo' && (
+                                    <button onClick={handlePauseClub} disabled={actionLoading === 'pausar'} style={{ padding: '10px 20px', background: '#ffc107', color: '#1c1e21', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}>
+                                        {actionLoading === 'pausar' ? 'Pausando...' : '⏸️ Pausar Club'}
+                                    </button>
+                                )}
+                                {club.estatus === 'inactivo' && (
+                                    <button onClick={handleReactivateClub} disabled={actionLoading === 'reactivar'} style={{ padding: '10px 20px', background: '#28a745', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}>
+                                        {actionLoading === 'reactivar' ? 'Reactivando...' : '▶️ Reactivar Club'}
                                     </button>
                                 )}
                                 <button onClick={() => setIsEditing(true)} style={{ padding: '10px 20px', background: '#e4e6eb', color: '#1c1e21', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'background 0.2s' }}>
@@ -326,6 +394,28 @@ const ClubDetailsAdminPage = () => {
                     </div>
                 )}
             </div>
+
+            {showRejectModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }} onClick={() => setShowRejectModal(false)}>
+                    <div style={{ background: '#fff', padding: '24px', borderRadius: '10px', width: '90%', maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
+                        <h3 style={{ marginTop: 0, color: '#dc3545' }}>Rechazar club</h3>
+                        <p style={{ color: '#555' }}>Indica el motivo del rechazo. Será visible para los encargados.</p>
+                        <textarea
+                            rows="4"
+                            value={rejectMotivo}
+                            onChange={(e) => setRejectMotivo(e.target.value)}
+                            placeholder="Motivo del rechazo..."
+                            style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                        />
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '16px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => setShowRejectModal(false)} style={{ padding: '10px 16px', border: 'none', borderRadius: '6px', background: '#e4e6eb', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
+                            <button onClick={handleRejectClub} disabled={actionLoading === 'rechazar'} style={{ padding: '10px 16px', border: 'none', borderRadius: '6px', background: '#dc3545', color: '#fff', cursor: 'pointer', fontWeight: 'bold' }}>
+                                {actionLoading === 'rechazar' ? 'Rechazando...' : 'Confirmar rechazo'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

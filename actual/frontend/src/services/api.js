@@ -25,7 +25,8 @@ api.interceptors.response.use(
     (error) => {
         // 401 Unauthorized: El token ya no es válido o ha sido manipulado
         if (error.response && error.response.status === 401) {
-            localStorage.removeItem('user');
+            localStorage.removeItem('user_data');
+            localStorage.removeItem('token');
             // Redirección forzosa para evitar que el usuario vea datos cacheados
             window.location.href = '/';
         }

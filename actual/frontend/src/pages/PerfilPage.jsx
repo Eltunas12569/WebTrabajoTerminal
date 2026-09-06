@@ -22,12 +22,7 @@ const PerfilPage = () => {
         confirmNewPassword: '',
         tipo_sangre: '',
         alergias: '',
-        contacto_emergencia_1_nombre: '',
-        contacto_emergencia_1_telefono: '',
-        contacto_emergencia_2_nombre: '',
-        contacto_emergencia_2_telefono: '',
-        contacto_emergencia_3_nombre: '',
-        contacto_emergencia_3_telefono: ''
+        contactos: [{ nombre: '', telefono: '' }, { nombre: '', telefono: '' }] // Mínimo 2 contactos
     });
 
     const [loading, setLoading] = useState(true);
@@ -64,12 +59,7 @@ const PerfilPage = () => {
                     confirmNewPassword: '',
                     tipo_sangre: data.ficha_medica?.tipo_sangre || '',
                     alergias: data.ficha_medica?.alergias || '',
-                    contacto_emergencia_1_nombre: data.ficha_medica?.contacto_emergencia_1_nombre || '',
-                    contacto_emergencia_1_telefono: data.ficha_medica?.contacto_emergencia_1_telefono || '',
-                    contacto_emergencia_2_nombre: data.ficha_medica?.contacto_emergencia_2_nombre || '',
-                    contacto_emergencia_2_telefono: data.ficha_medica?.contacto_emergencia_2_telefono || '',
-                    contacto_emergencia_3_nombre: data.ficha_medica?.contacto_emergencia_3_nombre || '',
-                    contacto_emergencia_3_telefono: data.ficha_medica?.contacto_emergencia_3_telefono || ''
+                    contactos: data.ficha_medica?.contactos?.length > 0 ? data.ficha_medica.contactos : [{ nombre: '', telefono: '' }, { nombre: '', telefono: '' }]
                 };
                 setFormData(loadedData);
                 setOriginalData(loadedData); // Guardamos la "foto" original
@@ -86,12 +76,7 @@ const PerfilPage = () => {
                     confirmNewPassword: '',
                     tipo_sangre: '',
                     alergias: '',
-                    contacto_emergencia_1_nombre: '',
-                    contacto_emergencia_1_telefono: '',
-                    contacto_emergencia_2_nombre: '',
-                    contacto_emergencia_2_telefono: '',
-                    contacto_emergencia_3_nombre: '',
-                    contacto_emergencia_3_telefono: ''
+                    contactos: [{ nombre: '', telefono: '' }, { nombre: '', telefono: '' }]
                 };
                 setFormData(fallbackData);
                 setOriginalData(fallbackData); // Guardamos la "foto" original
@@ -104,13 +89,62 @@ const PerfilPage = () => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        // Evitar que el teléfono pase de 15 dígitos y bloquear letras para evitar que MySQL colapse
-        if (name.includes('telefono')) {
-            const soloNumeros = value.replace(/\D/g, '').slice(0, 15);
-            setFormData({ ...formData, [name]: soloNumeros });
+        setFormData({ ...formData, [name]: value });
+    };
+
+    const handleContactChange = (index, field, value) => {
+        const newContacts = [...formData.contactos];
+        if (field === 'telefono') {
+            newContacts[index][field] = value.replace(/\D/g, '').slice(0, 15);
         } else {
-            setFormData({ ...formData, [name]: value });
+            newContacts[index][field] = value;
         }
+        setFormData({ ...formData, contactos: newContacts });
+    };
+
+    const addContact = () => {
+        setFormData({ ...formData, contactos: [...formData.contactos, { nombre: '', telefono: '' }] });
+    };
+
+    const removeContact = (index) => {
+        // No permitir eliminar si solo quedan 2
+        if (formData.contactos.length <= 2) return;
+        const newContacts = formData.contactos.filter((_, i) => i !== index);
+        setFormData({ ...formData, contactos: newContacts });
+    };
+
+    const buildPayload = (type) => {
+        const base = originalData || formData;
+        if (type === 'personal') {
+            return {
+                nombres: formData.nombres,
+                apellido_paterno: formData.apellido_paterno,
+                apellido_materno: formData.apellido_materno,
+                tipo_sangre: base.tipo_sangre,
+                alergias: base.alergias,
+                contactos: base.contactos
+            };
+        }
+        if (type === 'password') {
+            return {
+                nombres: base.nombres,
+                apellido_paterno: base.apellido_paterno,
+                apellido_materno: base.apellido_materno,
+                currentPassword: formData.currentPassword,
+                newPassword: formData.newPassword,
+                tipo_sangre: base.tipo_sangre,
+                alergias: base.alergias,
+                contactos: base.contactos
+            };
+        }
+        return {
+            nombres: base.nombres,
+            apellido_paterno: base.apellido_paterno,
+            apellido_materno: base.apellido_materno,
+            tipo_sangre: formData.tipo_sangre,
+            alergias: formData.alergias,
+            contactos: formData.contactos
+        };
     };
 
     const submitData = async (e, type) => {
@@ -136,16 +170,44 @@ const PerfilPage = () => {
                 setPasswordError('Debes ingresar tu contraseña actual para cambiarla.');
                 return;
             }
+            if (formData.newPassword && formData.newPassword.length < 8) {
+                setPasswordError('La nueva contraseña debe tener al menos 8 caracteres.');
+                return;
+            }
+            const contactosBase = (originalData || formData).contactos || [];
+            const contactosValidos = contactosBase.filter(c => c.nombre?.trim() && c.telefono?.trim());
+            if (contactosValidos.length < 2) {
+                setPasswordError('Completa primero la sección de datos médicos con al menos 2 contactos de emergencia.');
+                return;
+            }
         } else if (type === 'personal') {
             if (!formData.nombres || !formData.apellido_paterno) {
                 setPersonalError('Los nombres y el apellido paterno son obligatorios.');
                 return;
             }
+            const contactosBase = (originalData || formData).contactos || [];
+            const contactosValidos = contactosBase.filter(c => c.nombre?.trim() && c.telefono?.trim());
+            if (contactosValidos.length < 2) {
+                setPersonalError('Completa primero la sección de datos médicos con al menos 2 contactos de emergencia.');
+                return;
+            }
+        } else if (type === 'medical') {
+            if (formData.contactos.length < 2) {
+                setMedicalError('Debes registrar al menos 2 contactos de emergencia.');
+                return;
+            }
+            for (const contacto of formData.contactos) {
+                if (!contacto.nombre.trim() || !contacto.telefono.trim()) {
+                    setMedicalError('Todos los contactos de emergencia deben tener nombre y teléfono.');
+                    return;
+                }
+            }
         }
 
         setSaving(true);
         try {
-            const response = await axios.put(`${API_URL}/auth/perfil`, formData, {
+            const payload = buildPayload(type);
+            const response = await axios.put(`${API_URL}/auth/perfil`, payload, {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
             
@@ -202,10 +264,9 @@ const PerfilPage = () => {
 
     // Comprueba si hay cambios en los datos médicos
     const medicalFields = [
-        'tipo_sangre', 'alergias', 'contacto_emergencia_1_nombre', 'contacto_emergencia_1_telefono',
-        'contacto_emergencia_2_nombre', 'contacto_emergencia_2_telefono', 'contacto_emergencia_3_nombre', 'contacto_emergencia_3_telefono'
+        'tipo_sangre', 'alergias'
     ];
-    const hasMedicalChanges = originalData && medicalFields.some(field => formData[field] !== originalData[field]);
+    const hasMedicalChanges = originalData && (medicalFields.some(field => formData[field] !== originalData[field]) || JSON.stringify(formData.contactos) !== JSON.stringify(originalData.contactos));
 
     return (
         <div className="web-dashboard">
@@ -291,7 +352,7 @@ const PerfilPage = () => {
                                         <form onSubmit={(e) => submitData(e, 'password')}>
                                         <h3 style={{ marginBottom: '15px', color: '#003366', fontSize: '1.1rem' }}>Seguridad</h3>
                                         <div className="form-group"><label>Contraseña Actual</label><input type="password" name="currentPassword" value={formData.currentPassword || ''} onChange={handleChange} placeholder="Requerida solo si cambiarás de contraseña" /></div>
-                                        <div className="form-group"><label>Nueva Contraseña</label><input type="password" name="newPassword" value={formData.newPassword || ''} onChange={handleChange} placeholder="Mínimo 6 caracteres" /></div>
+                                        <div className="form-group"><label>Nueva Contraseña</label><input type="password" name="newPassword" value={formData.newPassword || ''} onChange={handleChange} placeholder="Mínimo 8 caracteres" /></div>
                                         <div className="form-group"><label>Confirmar Nueva Contraseña</label><input type="password" name="confirmNewPassword" value={formData.confirmNewPassword || ''} onChange={handleChange} placeholder="Repite la nueva contraseña" /></div>
                                         {hasPasswordChanges ? (
                                             <button type="submit" className="btn-crear-club" disabled={saving} style={{ marginTop: '10px', maxWidth: '300px' }}>{saving ? 'Guardando...' : '💾 Guardar Contraseña'}</button>
@@ -329,16 +390,32 @@ const PerfilPage = () => {
                                         </select>
                                     </div>
                                     <div className="form-group"><label>Alergias</label><input type="text" name="alergias" value={formData.alergias || ''} onChange={handleChange} placeholder="Ninguna / Penicilina, etc." /></div>
-                                    
-                                    <div className="form-group"><label>Contacto Emergencia 1 (Nombre)</label><input type="text" name="contacto_emergencia_1_nombre" value={formData.contacto_emergencia_1_nombre || ''} onChange={handleChange} required /></div>
-                                    <div className="form-group"><label>Contacto Emergencia 1 (Teléfono)</label><input type="text" name="contacto_emergencia_1_telefono" value={formData.contacto_emergencia_1_telefono || ''} onChange={handleChange} required /></div>
-                                    
-                                    <div className="form-group"><label>Contacto Emergencia 2 (Nombre)</label><input type="text" name="contacto_emergencia_2_nombre" value={formData.contacto_emergencia_2_nombre || ''} onChange={handleChange} required /></div>
-                                    <div className="form-group"><label>Contacto Emergencia 2 (Teléfono)</label><input type="text" name="contacto_emergencia_2_telefono" value={formData.contacto_emergencia_2_telefono || ''} onChange={handleChange} required /></div>
-                                    
-                                    <div className="form-group"><label>Contacto Emergencia 3 (Nombre)</label><input type="text" name="contacto_emergencia_3_nombre" value={formData.contacto_emergencia_3_nombre || ''} onChange={handleChange} required /></div>
-                                    <div className="form-group"><label>Contacto Emergencia 3 (Teléfono)</label><input type="text" name="contacto_emergencia_3_telefono" value={formData.contacto_emergencia_3_telefono || ''} onChange={handleChange} required /></div>
                                 </div>
+
+                                {formData.contactos.map((contacto, index) => (
+                                    <div key={index} style={{ display: 'flex', gap: '15px', alignItems: 'center', marginTop: '15px', padding: '15px', border: '1px solid #e1e5eb', borderRadius: '8px' }}>
+                                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                                            <label>Contacto de Emergencia #{index + 1} (Nombre)</label>
+                                            <input type="text" value={contacto.nombre} onChange={(e) => handleContactChange(index, 'nombre', e.target.value)} required />
+                                        </div>
+                                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                                            <label>Contacto de Emergencia #{index + 1} (Teléfono)</label>
+                                            <input type="text" value={contacto.telefono} onChange={(e) => handleContactChange(index, 'telefono', e.target.value)} required />
+                                        </div>
+                                        {formData.contactos.length > 2 && (
+                                            <button type="button" onClick={() => removeContact(index)} style={{ padding: '10px', background: '#fce8e6', color: '#e53935', border: 'none', borderRadius: '5px', cursor: 'pointer', alignSelf: 'flex-end', marginBottom: '5px' }} title="Eliminar contacto">
+                                                ✖
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={addContact}
+                                    style={{ display: 'inline-block', padding: '8px 12px', background: '#e1e5eb', color: '#333', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', marginTop: '15px' }}
+                                >
+                                    ➕ Agregar otro contacto
+                                </button>
 
                                 {/* El botón y la línea solo aparecen si hasMedicalChanges es true */}
                                 {hasMedicalChanges && (

@@ -67,10 +67,17 @@ const ClubChatPage = () => {
         fetchMensajes();
 
         const socketUrl = API_URL.replace('/api', '');
-        socketRef.current = io(socketUrl);
+        const token = localStorage.getItem('token');
+        socketRef.current = io(socketUrl, {
+            auth: { token }
+        });
 
         socketRef.current.on('connect', () => {
             socketRef.current.emit('unirse_club', club.id);
+        });
+
+        socketRef.current.on('connect_error', (err) => {
+            console.error('Error de conexión al chat:', err.message);
         });
 
         socketRef.current.on('nuevo_mensaje', (mensaje) => {
@@ -89,9 +96,7 @@ const ClubChatPage = () => {
 
         socketRef.current.emit('enviar_mensaje', {
             club_id: club.id,
-            usuario_id: user.id,
-            mensaje: nuevoMensaje,
-            autor_nombre: `${user.nombres} ${user.apellido_paterno}`
+            mensaje: nuevoMensaje
         });
         setNuevoMensaje('');
     };

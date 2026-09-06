@@ -203,7 +203,7 @@ const AdminDashboard = () => {
                                         <p>{club.descripcion}</p>
                                     </div>
                                     <div className="club-card-footer">
-                                        {club.estatus === 'en_revision' ? (
+                                        {['en_revision', 'esperando_firmas'].includes(club.estatus) ? (
                                             <button className="btn-review-club" onClick={() => goToClubDetails(club.id)}>Revisar</button>
                                         ) : (
                                             <button className="btn-view-club" onClick={() => goToClubDetails(club.id)}>Ver Detalles</button>

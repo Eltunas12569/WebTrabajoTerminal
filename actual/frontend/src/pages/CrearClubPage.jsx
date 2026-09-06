@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
+import api from '../services/api';
 import './css/CrearClubPage.css'; // Importa el CSS para esta página
 import './css/Dashboards.css'; // Importa el CSS del Dashboard principal
 
@@ -63,10 +64,18 @@ const SearchableSelect = ({ options, value, onChange, placeholder }) => {
     );
 };
 
+const MIN_ESTUDIANTES = 19;
+
 // Componente interno para selector múltiple (Autocomplete para múltiples alumnos)
-const MultiSearchableSelect = ({ options, selectedIds, onChange, placeholder }) => {
+const MultiSearchableSelect = ({ options, selectedIds, onChange, placeholder, onRemoteSearch }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        if (onRemoteSearch && searchTerm.trim().length >= 2) {
+            onRemoteSearch(searchTerm.trim());
+        }
+    }, [searchTerm, onRemoteSearch]);
 
     const handleSelect = (id) => {
         if (!selectedIds.includes(id)) {
@@ -128,6 +137,7 @@ const CrearClubPage = () => {
     const [alumnoEncargadoId, setAlumnoEncargadoId] = useState(''); // Ahora almacenará el ID del alumno seleccionado
     const [miembrosIds, setMiembrosIds] = useState([]); // Nuevo estado para los miembros a agregar
     const [alumnosDisponibles, setAlumnosDisponibles] = useState([]); // Nuevo estado para los alumnos
+    const [alumnosBuscados, setAlumnosBuscados] = useState([]);
     const [loadingAlumnos, setLoadingAlumnos] = useState(true); // Estado de carga para alumnos
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -165,6 +175,29 @@ const CrearClubPage = () => {
         };
         fetchAlumnos();
     }, [API_URL]);
+
+    const handleBuscarAlumnos = async (termino) => {
+        try {
+            const response = await api.get('/users', { params: { busqueda: termino } });
+            const alumnos = response.data
+                .filter((u) => [2, 4].includes(Number(u.role_id)))
+                .map((u) => ({
+                    id: u.id,
+                    nombres: u.nombres,
+                    apellidos: u.apellidos,
+                    boleta: u.boleta
+                }));
+            setAlumnosBuscados(alumnos);
+        } catch (err) {
+            console.error('Error al buscar alumnos:', err);
+        }
+    };
+
+    const opcionesAlumnos = React.useMemo(() => {
+        const mapa = new Map();
+        [...alumnosDisponibles, ...alumnosBuscados].forEach((alumno) => mapa.set(alumno.id, alumno));
+        return Array.from(mapa.values());
+    }, [alumnosDisponibles, alumnosBuscados]);
 
     const handleAddCronogramaItem = () => {
         setCronograma([...cronograma, { mes: '', actividad: '' }]);
@@ -208,9 +241,10 @@ const CrearClubPage = () => {
             return;
         }
 
-        // Obligar a que agreguen al menos un alumno en la lista de miembros
-        if (miembrosIds.length === 0) {
-            setError('Debes agregar al menos a un miembro adicional en la lista de "Miembros del Club".');
+        // Obligar a que la lista total incluya al encargado y cumpla el mínimo del backend
+        const alumnosArray = Array.from(new Set([Number(alumnoEncargadoId), ...miembrosIds.map(Number)])).filter(id => id > 0);
+        if (alumnosArray.length < MIN_ESTUDIANTES) {
+            setError(`Debes registrar al menos ${MIN_ESTUDIANTES} alumnos en total (incluyendo al encargado). Actualmente tienes ${alumnosArray.length}.`);
             setLoading(false);
             return;
         }
@@ -224,8 +258,6 @@ const CrearClubPage = () => {
 
         try {
             // Garantizar que todos los IDs sean estrictamente numéricos y sin duplicados
-            const alumnosArray = Array.from(new Set([Number(alumnoEncargadoId), ...miembrosIds.map(Number)])).filter(id => id > 0);
-
             const response = await axios.post(`${API_URL}/clubes`, {
                 nombre,
                 descripcion,
@@ -243,7 +275,7 @@ const CrearClubPage = () => {
                 
                 miembros_ids: alumnosArray, // ⬅️ CORRECCIÓN: El backend pide 'miembros_ids', no 'alumnos'
                 lista_estudiantes: alumnosArray, // Añadimos esto para coincidir con el backend
-                estatus: 'en_revision', // Se añade el estatus por defecto
+                estatus: 'esperando_firmas', // Se cambia a 'esperando_firmas' para el flujo de recolección
                 archivo_lista_estudiantes: 'pendiente.pdf' // Failsafe si la DB lo exige como NOT NULL
             }, {
                 headers: {
@@ -430,20 +462,24 @@ const CrearClubPage = () => {
                     <div className="form-group">
                         <label htmlFor="alumnoEncargadoId">Alumno Encargado</label>
                         <SearchableSelect 
-                            options={alumnosDisponibles}
+                            options={opcionesAlumnos}
                             value={alumnoEncargadoId}
                             onChange={(id) => setAlumnoEncargadoId(id)}
                             placeholder={loadingAlumnos ? "Cargando..." : "Buscar alumno por nombre o boleta..."}
                         />
                     </div>
                     <div className="form-group">
-                        <label htmlFor="miembrosIds">Miembros del Club (Agrega a los alumnos inscritos)</label>
+                        <label htmlFor="miembrosIds">Miembros del Club ({MIN_ESTUDIANTES} alumnos en total, incluyendo encargado)</label>
                         <MultiSearchableSelect 
-                            options={alumnosDisponibles}
+                            options={opcionesAlumnos}
                             selectedIds={miembrosIds}
                             onChange={(ids) => setMiembrosIds(ids)}
-                            placeholder={loadingAlumnos ? "Cargando..." : "Buscar y agregar alumnos..."}
+                            onRemoteSearch={handleBuscarAlumnos}
+                            placeholder={loadingAlumnos ? "Cargando..." : "Buscar y agregar alumnos (mín. 2 caracteres)..."}
                         />
+                        <p style={{ margin: '8px 0 0', fontSize: '0.9rem', color: '#666' }}>
+                            Seleccionados: {Array.from(new Set([Number(alumnoEncargadoId), ...miembrosIds.map(Number)])).filter(id => id > 0).length} / {MIN_ESTUDIANTES}
+                        </p>
                     </div>
                     <button type="submit" className="btn-crear-club" disabled={loading}>
                         {loading ? 'Creando...' : 'Registrar Club'}

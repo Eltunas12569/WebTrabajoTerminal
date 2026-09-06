@@ -79,7 +79,6 @@ const Register = () => {
             width: '100%', 
             height: '100vh', 
             overflowY: 'auto', 
-            backgroundImage: 'radial-gradient(circle at 50% 0%, #ffffff 0%, #f0f2f5 100%)',
             backgroundImage: 'linear-gradient(to right, #5290cf 0%, #5290cf 20%, transparent 20%, transparent 80%, #5290cf 80%, #5290cf 100%), radial-gradient(circle at 50% 0%, #ffffff 0%, #f0f2f5 100%)',
             fontFamily: 'system-ui, -apple-system, sans-serif',
             margin: 0,

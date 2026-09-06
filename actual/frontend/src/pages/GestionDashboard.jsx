@@ -312,26 +312,33 @@ const GestionDashboard = () => {
                                                 <div 
                                                     key={club.id} 
                                                     className="club-row"
-                                                    onClick={() => {
-                                                        if (canEnterChat) {
-                                                            navigate(`/chat/${club.id}`);
-                                                        }
-                                                    }}
                                                     style={{ 
-                                                        cursor: canEnterChat ? 'pointer' : 'default',
-                                                        borderLeft: canEnterChat ? '4px solid #1877f2' : 'none',
-                                                        transition: 'background-color 0.2s ease, transform 0.2s ease'
+                                                        borderLeft: canEnterChat ? '4px solid #1877f2' : 'none'
                                                     }}
-                                                    onMouseOver={(e) => canEnterChat && (e.currentTarget.style.backgroundColor = '#f0f8ff')}
-                                                    onMouseOut={(e) => canEnterChat && (e.currentTarget.style.backgroundColor = 'transparent')}
                                                 >
                                                     <div className="club-row-info">
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                             <h4 style={{ margin: '0 0 5px 0' }}>{club.nombre}</h4>
-                                                            {canEnterChat && <span style={{ color: '#1877f2', fontSize: '0.85rem', fontWeight: 'bold' }}>💬 Abrir chat ➔</span>}
                                                         </div>
                                                         <p>Encargado: {club.profesor_nombres} {club.profesor_apellidos}</p>
                                                         <p>Estatus del club: {club.estatus}</p>
+
+                                                        {canEnterChat && (
+                                                            <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
+                                                                <button
+                                                                    onClick={() => navigate(`/club/${club.id}/panel`)}
+                                                                    className="btn-review-club"
+                                                                >
+                                                                    📋 Panel del club
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => navigate(`/chat/${club.id}`)}
+                                                                    style={{ padding: '8px 14px', background: '#1877f2', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                                                                >
+                                                                    💬 Chat
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                         
                                                         {/* Botón exclusivo para los Profesores Titulares en etapa de recolección de firmas */}
                                                         {club.mi_rol_interno === 'encargado_profesor' && club.estatus === 'esperando_firmas' && (

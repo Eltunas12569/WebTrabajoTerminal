@@ -11,6 +11,7 @@ import AvisosAdminPage from './pages/AvisosAdminPage';
 import PerfilPage from './pages/PerfilPage';
 import ClubChatPage from './pages/ClubChatPage';
 import ClubDetailsPage from './pages/ClubDetailsPage';
+import ClubPanelPage from './pages/ClubPanelPage';
 
 /**
  * Configuración de Rutas del Sistema de Gestión Deportiva - ESCOM
@@ -77,6 +78,13 @@ function App() {
               <PerfilPage />
             </ProtectedRoute>
           } />
+          {/* Panel del club: avisos, eventos y recursos */}
+          <Route path="/club/:id/panel" element={
+            <ProtectedRoute rolesPermitidos={[2, 3, 4]}>
+              <ClubPanelPage />
+            </ProtectedRoute>
+          } />
+
           {/* Chat del Club (Profesores y Alumnos Encargados y alumnos) */}
           <Route path="/chat/:id" element={
               <ProtectedRoute rolesPermitidos={[2, 3, 4]}>
