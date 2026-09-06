@@ -54,7 +54,7 @@ const iniciarSesion = async (correo, contrasena) => {
             role_id: usuario.role_id,
             boleta,
             num_empleado: numEmpleado,
-            verificado: usuario.verificado === 1 // NUEVO: Bandera booleana para el frontend móvil
+            verificado: usuario.verificado === 1 || usuario.verificado === true 
         }
     };
 };
