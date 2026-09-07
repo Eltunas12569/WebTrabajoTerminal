@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
 import api from '../services/api';
 import './css/CrearClubPage.css'; // Importa el CSS para esta página
 import './css/Dashboards.css'; // Importa el CSS del Dashboard principal
@@ -145,8 +144,6 @@ const CrearClubPage = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const navigate = useNavigate();
-    const API_URL = import.meta.env.VITE_API_URL;
-
     // Preseleccionar al profesor actual automáticamente si es quien está creando el club
     useEffect(() => {
         // Cubrimos si viene como role_id o como rol desde el token
@@ -160,11 +157,7 @@ const CrearClubPage = () => {
         const fetchAlumnos = async () => {
             try {
                 setLoadingAlumnos(true);
-                const response = await axios.get(`${API_URL}/users/students-in-charge`, {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
+                const response = await api.get('/users/students-in-charge');
                 setAlumnosDisponibles(response.data);
             } catch (err) {
                 console.error("Error al cargar alumnos encargados:", err);
@@ -174,7 +167,7 @@ const CrearClubPage = () => {
             }
         };
         fetchAlumnos();
-    }, [API_URL]);
+    }, []);
 
     const handleBuscarAlumnos = async (termino) => {
         try {
@@ -258,7 +251,7 @@ const CrearClubPage = () => {
 
         try {
             // Garantizar que todos los IDs sean estrictamente numéricos y sin duplicados
-            const response = await axios.post(`${API_URL}/clubes`, {
+            const response = await api.post('/clubes', {
                 nombre,
                 descripcion,
                 objetivo,
@@ -277,10 +270,6 @@ const CrearClubPage = () => {
                 lista_estudiantes: alumnosArray, // Añadimos esto para coincidir con el backend
                 estatus: 'esperando_firmas', // Se cambia a 'esperando_firmas' para el flujo de recolección
                 archivo_lista_estudiantes: 'pendiente.pdf' // Failsafe si la DB lo exige como NOT NULL
-            }, {
-                headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}` // Asume que guardas el token en localStorage
-                }
             });
             setSuccess('Club creado exitosamente: ' + response.data.message);
             // Opcional: Redirigir a otra página o limpiar el formulario

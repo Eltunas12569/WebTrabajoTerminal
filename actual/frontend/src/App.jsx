@@ -12,6 +12,8 @@ import PerfilPage from './pages/PerfilPage';
 import ClubChatPage from './pages/ClubChatPage';
 import ClubDetailsPage from './pages/ClubDetailsPage';
 import ClubPanelPage from './pages/ClubPanelPage';
+import VerificarCuentaPage from './pages/VerificarCuentaPage';
+import AvisoPrivacidadPage from './pages/AvisoPrivacidadPage';
 
 /**
  * Configuración de Rutas del Sistema de Gestión Deportiva - ESCOM
@@ -25,6 +27,12 @@ function App() {
           {/* --- RUTAS PÚBLICAS --- */}
           <Route path="/" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/aviso-privacidad" element={<AvisoPrivacidadPage />} />
+          <Route path="/verificar-cuenta" element={
+            <ProtectedRoute>
+              <VerificarCuentaPage />
+            </ProtectedRoute>
+          } />
           <Route path="/unauthorized" element={<h1 style={{padding: '20px'}}>No tienes permiso para estar aquí.</h1>} />
 
           {/* --- RUTAS PROTEGIDAS --- */}

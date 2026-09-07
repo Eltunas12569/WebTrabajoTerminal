@@ -45,15 +45,15 @@ const seedMasivo = async () => {
 
         // ADMIN (Marcado como verificado para no bloquearlo)
         await db.query(
-            `INSERT INTO usuarios (id, nombres, apellido_paterno, apellido_materno, correo, password, role_id, verificado) 
-             VALUES (1, 'Administración', 'ESCOM', 'IPN', 'admin@ipn.mx', ?, 1, 1)`, [hash]
+              `INSERT INTO usuarios (id, nombres, apellido_paterno, apellido_materno, correo, password, role_id, verificado, acepta_privacidad, version_aviso_privacidad, fecha_aceptacion_privacidad) 
+               VALUES (1, 'Administración', 'ESCOM', 'IPN', 'admin@ipn.mx', ?, 1, 1, 1, '1.0', NOW())`, [hash]
         );
 
         // 30 PROFESORES (Marcados como verificados)
         for (let i = 1; i <= 30; i++) {
             const [res] = await db.query(
-                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id, verificado) 
-                 VALUES (?, ?, ?, ?, ?, 3, 1)`, 
+                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id, verificado, acepta_privacidad, version_aviso_privacidad, fecha_aceptacion_privacidad) 
+                 VALUES (?, ?, ?, ?, ?, 3, 1, 1, '1.0', NOW())`, 
                 [`Profesor ${i}`, 'García', 'López', `profe${i}@ipn.mx`, hash]
             );
             const profeId = res.insertId;
@@ -75,8 +75,8 @@ const seedMasivo = async () => {
         // 150 ALUMNOS (Marcados como verificados)
         for (let i = 1; i <= 150; i++) {
             const [res] = await db.query(
-                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id, verificado) 
-                 VALUES (?, ?, ?, ?, ?, 2, 1)`, 
+                `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id, verificado, acepta_privacidad, version_aviso_privacidad, fecha_aceptacion_privacidad) 
+                 VALUES (?, ?, ?, ?, ?, 2, 1, 1, '1.0', NOW())`, 
                 [`Alumno ${i}`, 'Martínez', 'Sánchez', `alumno${i}@alumno.ipn.mx`, hash]
             );
             const alumnoId = res.insertId;

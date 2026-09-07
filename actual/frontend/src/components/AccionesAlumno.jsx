@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 const AccionesAlumno = ({ onUpdate, mostrar = 'ambos' }) => {
     const { user } = useAuth();
@@ -9,20 +9,16 @@ const AccionesAlumno = ({ onUpdate, mostrar = 'ambos' }) => {
     const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
     const [loading, setLoading] = useState(false);
     
-    const API_URL = import.meta.env.VITE_API_URL;
-
     // Solo cargar datos si el usuario autenticado es un alumno (role_id === 2)
     useEffect(() => {
         if (user?.role_id === 2) {
             fetchInvitaciones();
         }
-    }, [user, API_URL]);
+    }, [user]);
 
     const fetchInvitaciones = async () => {
         try {
-            const res = await axios.get(`${API_URL}/clubes/invitaciones/pendientes`, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
+            const res = await api.get('/clubes/invitaciones/pendientes');
             setInvitaciones(res.data);
         } catch (error) {
             console.error("Error al cargar invitaciones:", error);
@@ -37,9 +33,7 @@ const AccionesAlumno = ({ onUpdate, mostrar = 'ambos' }) => {
         setMensaje({ texto: '', tipo: '' });
         
         try {
-            const res = await axios.post(`${API_URL}/clubes/unirse`, { codigo }, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
+            const res = await api.post('/clubes/unirse', { codigo });
             setMensaje({ texto: res.data.message, tipo: 'success' });
             setCodigo('');
             
@@ -57,9 +51,7 @@ const AccionesAlumno = ({ onUpdate, mostrar = 'ambos' }) => {
 
     const responderInvitacion = async (clubId, accion) => {
         try {
-            const res = await axios.put(`${API_URL}/clubes/invitaciones/${clubId}/responder`, { accion }, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
+            const res = await api.put(`/clubes/invitaciones/${clubId}/responder`, { accion });
             setMensaje({ texto: res.data.message, tipo: 'success' });
             fetchInvitaciones(); // Actualizamos la lista automáticamente tras responder
             if (onUpdate && accion === 'aceptar') onUpdate(); // Si aceptó, refresca la lista de clubes del dashboard

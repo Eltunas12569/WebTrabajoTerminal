@@ -63,7 +63,13 @@ const registrar = async (datosRegistro) => {
     const {
         nombres, apellidoPaterno, apellidoMaterno, correo,
         contrasena, idRol, nss, boleta, carrera, numEmpleado
+        , aceptaPrivacidad
     } = datosRegistro;
+
+    if (aceptaPrivacidad !== true) throw new Error('Debes aceptar el aviso de privacidad para registrarte');
+
+    const versionAvisoPrivacidad = '1.0';
+    const fechaAceptacionPrivacidad = new Date();
 
     // --- VALIDACIONES DE FORMATO (antes de abrir la transacción) ---
     const expresionContrasena = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
@@ -115,8 +121,8 @@ const registrar = async (datosRegistro) => {
 
         // NUEVO: Se insertan también codigo_otp y expiracion_otp
         const [resultadoUsuario] = await conexion.query(
-            `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id, codigo_otp, expiracion_otp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [nombres, apellidoPaterno, apellidoMaterno, correo, hashContrasena, idRol, codigoOTP, expiracionOTP]
+            `INSERT INTO usuarios (nombres, apellido_paterno, apellido_materno, correo, password, role_id, codigo_otp, expiracion_otp, acepta_privacidad, version_aviso_privacidad, fecha_aceptacion_privacidad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [nombres, apellidoPaterno, apellidoMaterno, correo, hashContrasena, idRol, codigoOTP, expiracionOTP, true, versionAvisoPrivacidad, fechaAceptacionPrivacidad]
         );
         const idUsuarioNuevo = resultadoUsuario.insertId;
 

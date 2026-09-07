@@ -24,7 +24,7 @@ const registrar = async (req, res) => {
         const {
             nombres, apellido_paterno, apellido_materno,
             nss, boleta, correo, password: contrasena, rol_id: idRol,
-            carrera, num_empleado
+            carrera, num_empleado, acepta_privacidad: aceptaPrivacidad
         } = req.body;
 
         if (!nombres || !nombres.trim()) return res.status(400).json({ message: "Los nombres son requeridos" });
@@ -32,6 +32,7 @@ const registrar = async (req, res) => {
         if (!correo || !correo.trim()) return res.status(400).json({ message: "El correo es requerido" });
         if (!contrasena || contrasena.length < 8) return res.status(400).json({ message: "La contraseña debe tener al menos 8 caracteres" });
         if (!idRol || ![2, 3].includes(idRol)) return res.status(400).json({ message: "Rol inválido" });
+        if (aceptaPrivacidad !== true) return res.status(400).json({ message: "Debes aceptar el aviso de privacidad para registrarte" });
 
         const correoLimpio = correo.trim().toLowerCase();
 
@@ -55,7 +56,8 @@ const registrar = async (req, res) => {
             nss: idRol === 2 && nss ? nss.trim() : null,
             boleta: idRol === 2 && boleta ? boleta.trim() : null,
             carrera: idRol === 2 && carrera ? carrera.trim() : null,
-            numEmpleado: idRol === 3 && num_empleado ? num_empleado.trim() : null
+            numEmpleado: idRol === 3 && num_empleado ? num_empleado.trim() : null,
+            aceptaPrivacidad
         });
 
         res.status(201).json(resultado);

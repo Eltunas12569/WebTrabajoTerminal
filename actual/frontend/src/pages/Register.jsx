@@ -21,6 +21,7 @@ const Register = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [privacyAccepted, setPrivacyAccepted] = useState(false);
     const navigate = useNavigate();
 
     const handleChange = (e) => {
@@ -56,11 +57,19 @@ const Register = () => {
             return;
         }
 
+        if (!privacyAccepted) {
+            setError('Debes aceptar el aviso de privacidad para continuar.');
+            return;
+        }
+
         setLoading(true);
         setError('');
         
         try {
-            await register(formData);
+            await register({
+                ...formData,
+                acepta_privacidad: privacyAccepted
+            });
             alert('¡Registro exitoso! Ahora puedes entrar con tus credenciales.');
             navigate('/'); // Redirige al login
         } catch (err) {
@@ -251,8 +260,30 @@ const Register = () => {
                             {showConfirmPassword ? '👁️‍🗨️' : '◡'}
                         </button>
                     </div>
+
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '14px', color: '#333', fontSize: '0.9rem', lineHeight: '1.4', cursor: 'pointer' }}>
+                        <input
+                            type="checkbox"
+                            checked={privacyAccepted}
+                            onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                            required
+                            style={{ marginTop: '3px', accentColor: '#003366' }}
+                        />
+                        <span>
+                            He leído y acepto el{' '}
+                            <a
+                                href="/aviso-privacidad"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: '#003366', fontWeight: '700' }}
+                            >
+                                aviso de privacidad
+                            </a>{' '}
+                            y el tratamiento de mis datos personales.
+                        </span>
+                    </label>
                     
-                    <button type="submit" className="btn-register" disabled={loading}>
+                    <button type="submit" className="btn-register" disabled={loading || !privacyAccepted}>
                         {loading ? 'Procesando...' : 'Crear Cuenta'}
                     </button>
                     
