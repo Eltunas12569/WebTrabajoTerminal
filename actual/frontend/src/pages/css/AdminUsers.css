@@ -1,0 +1,241 @@
+.admin-users-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 28px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #dce4eb;
+}
+
+.admin-users-eyebrow {
+    margin: 0 0 6px;
+    color: #8a1c3a;
+    font: 700 0.75rem Arial, sans-serif;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.admin-users-header h1 {
+    margin: 0;
+    color: #003366;
+    font-size: 2rem;
+}
+
+.admin-users-header p:last-child {
+    margin: 8px 0 0;
+    color: #5c6b78;
+}
+
+.admin-users-back {
+    padding: 10px 16px;
+    border: 1px solid #003366;
+    border-radius: 6px;
+    background: #fff;
+    color: #003366;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.admin-users-toolbar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.admin-users-toolbar input,
+.admin-users-toolbar select {
+    min-height: 42px;
+    box-sizing: border-box;
+    padding: 0 12px;
+    border: 1px solid #cbd5df;
+    border-radius: 6px;
+    background: #fff;
+    color: #1d2935;
+    font-size: 0.95rem;
+}
+
+.admin-users-toolbar input {
+    flex: 1;
+    min-width: 220px;
+}
+
+.admin-users-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #dce4eb;
+    background: #fff;
+}
+
+.admin-users-table {
+    width: 100%;
+    min-width: 780px;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.admin-users-table th {
+    padding: 14px 16px;
+    background: #f3f6f8;
+    color: #4a5a67;
+    font: 700 0.78rem Arial, sans-serif;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.admin-users-table td {
+    padding: 15px 16px;
+    border-top: 1px solid #e7edf1;
+    color: #293642;
+    vertical-align: middle;
+}
+
+.admin-users-table td:first-child {
+    min-width: 180px;
+}
+
+.admin-users-table td strong,
+.admin-users-table td span:not(.user-role):not(.user-status) {
+    display: block;
+}
+
+.admin-users-table td span:not(.user-role):not(.user-status) {
+    margin-top: 4px;
+    color: #71808c;
+    font-size: 0.85rem;
+}
+
+.user-role,
+.user-status {
+    display: inline-block;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.user-role {
+    background: #e9f0f6;
+    color: #003366;
+}
+
+.user-edit-button {
+    padding: 7px 11px;
+    border: 1px solid #003366;
+    border-radius: 5px;
+    background: #fff;
+    color: #003366;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.user-edit-button:hover {
+    background: #003366;
+    color: #fff;
+}
+
+.admin-edit-form {
+    max-width: 820px;
+    padding: 26px;
+    border: 1px solid #dce4eb;
+    background: #fff;
+}
+
+.admin-edit-role {
+    margin-bottom: 22px;
+    padding: 12px 14px;
+    background: #f3f6f8;
+    color: #4a5a67;
+}
+
+.admin-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.admin-edit-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    color: #344552;
+    font-weight: 700;
+}
+
+.admin-edit-grid input {
+    min-height: 42px;
+    box-sizing: border-box;
+    padding: 0 12px;
+    border: 1px solid #cbd5df;
+    border-radius: 6px;
+    color: #1d2935;
+    font-size: 0.95rem;
+}
+
+.admin-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.admin-edit-cancel,
+.admin-edit-save {
+    padding: 11px 16px;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.admin-edit-cancel {
+    border: 1px solid #9aa8b3;
+    background: #fff;
+    color: #40515d;
+}
+
+.admin-edit-save {
+    border: 1px solid #003366;
+    background: #003366;
+    color: #fff;
+}
+
+.admin-edit-save:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.user-status.verified {
+    background: #dff2e5;
+    color: #176b35;
+}
+
+.user-status.pending {
+    background: #fff0d6;
+    color: #8a5a00;
+}
+
+.admin-users-empty {
+    padding: 32px;
+    color: #687783;
+    text-align: center;
+}
+
+@media (max-width: 700px) {
+    .admin-users-header,
+    .admin-users-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .admin-users-header h1 {
+        font-size: 1.6rem;
+    }
+
+    .admin-edit-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-edit-actions {
+        flex-direction: column-reverse;
+    }
+}
