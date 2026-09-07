@@ -1,27 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
 import { io } from 'socket.io-client';
+import api from '../services/api';
 import './css/Dashboards.css';
 
 const ClubChatPage = () => {
     const { id: clubId } = useParams();
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
     const navigate = useNavigate();
     
     const [mensajes, setMensajes] = useState([]);
     const [nuevoMensaje, setNuevoMensaje] = useState('');
     const [club, setClub] = useState(null);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [loading, setLoading] = useState(true);
 
     const socketRef = useRef(null);
     const messagesEndRef = useRef(null);
-
-    const API_URL = import.meta.env.VITE_API_URL;
-
-    const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -31,9 +26,7 @@ const ClubChatPage = () => {
     useEffect(() => {
         const fetchClubInfo = async () => {
             try {
-                const response = await axios.get(`${API_URL}/clubes/user/${user.id}`, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                });
+                const response = await api.get(`/clubes/user/${user.id}`);
                 const foundClub = response.data.find(c => String(c.id) === String(clubId));
                 
                 // Si el club existe y no está pausado/rechazado en su totalidad, permitimos acceso
@@ -49,7 +42,7 @@ const ClubChatPage = () => {
             }
         };
         if (user?.id) fetchClubInfo();
-    }, [user, clubId, API_URL, navigate]);
+    }, [user, clubId, navigate]);
 
     // Lógica del WebSocket y carga de mensajes
     useEffect(() => {
@@ -57,16 +50,14 @@ const ClubChatPage = () => {
 
         const fetchMensajes = async () => {
             try {
-                const res = await axios.get(`${API_URL}/clubes/${club.id}/chat`, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                });
+                const res = await api.get(`/clubes/${club.id}/chat`);
                 setMensajes(res.data);
                 setTimeout(scrollToBottom, 100);
-            } catch (error) { console.error("Error al obtener el chat:", error); }
+            } catch { console.error("Error al obtener el chat"); }
         };
         fetchMensajes();
 
-        const socketUrl = API_URL.replace('/api', '');
+        const socketUrl = api.defaults.baseURL.replace(/\/api\/?$/, '');
         const token = localStorage.getItem('token');
         socketRef.current = io(socketUrl, {
             auth: { token }
@@ -88,7 +79,7 @@ const ClubChatPage = () => {
         return () => {
             if (socketRef.current) socketRef.current.disconnect();
         };
-    }, [club, API_URL]);
+    }, [club]);
 
     const handleSend = (e) => {
         e.preventDefault();

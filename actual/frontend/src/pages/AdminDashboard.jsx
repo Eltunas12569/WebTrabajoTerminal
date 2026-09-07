@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import './css/Dashboards.css';
 
 const AdminDashboard = () => {
@@ -14,8 +14,6 @@ const AdminDashboard = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [showFilters, setShowFilters] = useState(false);
-
-    const API_URL = import.meta.env.VITE_API_URL;
 
     // Función para generar un color aleatorio consistente por usuario
     const getAvatarColor = (name) => {
@@ -31,13 +29,13 @@ const AdminDashboard = () => {
 
     useEffect(() => {
         fetchClubes();
-    }, [API_URL]);
+    }, []);
 
     // Función para obtener los clubes (extraída para poder ser llamada después de acciones)
     const fetchClubes = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(`${API_URL}/clubes`);
+            const response = await api.get('/clubes');
             setClubes(response.data);
         } catch (error) {
             console.error("Error al conectar:", error);

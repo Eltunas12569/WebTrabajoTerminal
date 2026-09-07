@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import api from '../services/api';
 import './css/Dashboards.css';
 
 const ClubDetailsPage = () => {
@@ -9,8 +9,6 @@ const ClubDetailsPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
-    const API_URL = import.meta.env.VITE_API_URL;
-
     // Intentamos recuperar los datos del estado de navegación para que la carga sea instantánea
     const [club, setClub] = useState(location.state?.club || null);
     const [isMember, setIsMember] = useState(location.state?.isMember || false);
@@ -22,15 +20,13 @@ const ClubDetailsPage = () => {
         if (!club) {
             const fetchData = async () => {
                 try {
-                    const response = await axios.get(`${API_URL}/clubes`);
+                    const response = await api.get('/clubes');
                     const clubEncontrado = response.data.find(c => String(c.id) === String(id));
                     if (!clubEncontrado) throw new Error('Club no encontrado');
                     setClub(clubEncontrado);
 
                     if (user?.id) {
-                        const userClubsRes = await axios.get(`${API_URL}/clubes/user/${user.id}`, {
-                            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                        });
+                        const userClubsRes = await api.get(`/clubes/user/${user.id}`);
                         setIsMember(userClubsRes.data.some(uc => String(uc.id) === String(id)));
                     }
                 } catch (err) {
@@ -41,7 +37,7 @@ const ClubDetailsPage = () => {
             };
             fetchData();
         }
-    }, [id, club, user, API_URL]);
+    }, [id, club, user]);
 
     if (loading) return <div style={{ textAlign: 'center', padding: '50px', fontSize: '1.2rem' }}>Cargando información del club...</div>;
     if (error || !club) return <div style={{ textAlign: 'center', padding: '50px', color: 'red' }}>{error || 'Club no encontrado'}</div>;

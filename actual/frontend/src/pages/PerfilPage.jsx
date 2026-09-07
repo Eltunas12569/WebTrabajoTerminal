@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import api from '../services/api';
 import './css/Dashboards.css'; // Importamos el CSS del Dashboard principal
 import './css/CrearClubPage.css'; // Reutilizamos este CSS para el contenedor de tarjeta
 
 const PerfilPage = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const API_URL = import.meta.env.VITE_API_URL;
-
     const [originalData, setOriginalData] = useState(null);
     const [formData, setFormData] = useState({
         // Pre-llenamos con la información de la sesión actual por si el backend tarda
@@ -39,9 +37,7 @@ const PerfilPage = () => {
     useEffect(() => {
         const fetchPerfil = async () => {
             try {
-                const response = await axios.get(`${API_URL}/auth/perfil`, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                });
+                const response = await api.get('/auth/perfil');
                 const data = response.data;
                 
                 // Verificamos si el backend envió datos médicos
@@ -85,7 +81,7 @@ const PerfilPage = () => {
             }
         };
         fetchPerfil();
-    }, [API_URL]);
+    }, [user]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -207,9 +203,7 @@ const PerfilPage = () => {
         setSaving(true);
         try {
             const payload = buildPayload(type);
-            const response = await axios.put(`${API_URL}/auth/perfil`, payload, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
+            const response = await api.put('/auth/perfil', payload);
             
             if (type === 'password') {
                 setPasswordSuccess(response.data.message);

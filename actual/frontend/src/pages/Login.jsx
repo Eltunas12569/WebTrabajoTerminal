@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { login } from '../services/authService';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import './css/Login.css';
 
 const Login = () => {
@@ -17,11 +17,10 @@ const Login = () => {
 
     const { loginUser } = useAuth();
     const navigate = useNavigate();
-    const API_URL = import.meta.env.VITE_API_URL;
     useEffect(() => {
         const fetchAvisos = async () => {
             try {
-                const response = await axios.get(`${API_URL}/avisos`);
+                const response = await api.get('/avisos');
                 const datosBrutos = response.data;
 
                 // 1. Filtrar: Solo mostrar los avisos que estén activos según el nuevo esquema (avisos_globales)
@@ -44,7 +43,7 @@ const Login = () => {
             }
         };
         fetchAvisos();
-    }, [API_URL]);
+    }, []);
 
     // Efecto para recuperar el error y el correo si la página se recarga inesperadamente
     useEffect(() => {
@@ -76,6 +75,10 @@ const Login = () => {
             sessionStorage.removeItem('login_correo');
 
             setTimeout(() => {
+                if (!data?.user?.verificado) {
+                    navigate('/verificar-cuenta');
+                    return;
+                }
                 const userRole = Number(data?.user?.role_id || 2);
                 if (userRole === 1) navigate('/admin');
                 else navigate('/gestion');

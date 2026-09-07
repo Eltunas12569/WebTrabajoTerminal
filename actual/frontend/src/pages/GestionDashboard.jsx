@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import './css/Dashboards.css';
 import AccionesAlumno from '../components/AccionesAlumno';
 
@@ -26,8 +26,6 @@ const GestionDashboard = () => {
     const [allActiveClubs, setAllActiveClubs] = useState([]);
     const [loadingAllClubs, setLoadingAllClubs] = useState(false);
 
-    const API_URL = import.meta.env.VITE_API_URL; // Get API_URL
-
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
     const goToProfile = () => {
@@ -45,9 +43,7 @@ const GestionDashboard = () => {
         if (user && user.id) { // Ensure user and user.id are available
             setLoadingClubs(true);
             try {
-                const response = await axios.get(`${API_URL}/clubes/user/${user.id}`, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                });
+                const response = await api.get(`/clubes/user/${user.id}`);
                 setUserClubs(response.data);
             } catch (error) {
                 console.error("Error al obtener los clubes del usuario:", error);
@@ -59,17 +55,13 @@ const GestionDashboard = () => {
 
     useEffect(() => {
         fetchUserClubs();
-    }, [user, API_URL]); // Re-run when user or API_URL changes
+    }, [user]);
 
     const fetchAvisos = async () => {
         if (user && user.id) {
             setLoadingAvisos(true);
             try {
-                const response = await axios.get(`${API_URL}/avisos/user/${user.id}`, {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
+                const response = await api.get(`/avisos/user/${user.id}`);
                 
                 const datos = response.data;
                 const pesos = { 'alta': 1, 'normal': 2, 'baja': 3 };
@@ -98,12 +90,12 @@ const GestionDashboard = () => {
     // Obtener los avisos (Globales + Clubs) del usuario
     useEffect(() => {
         fetchAvisos();
-    }, [user, API_URL]);
+    }, [user]);
 
     const fetchAllActiveClubs = async () => {
         setLoadingAllClubs(true);
         try {
-            const response = await axios.get(`${API_URL}/clubes`);
+            const response = await api.get('/clubes');
             // Filtramos solo los clubes que ya pasaron por revisión y están activos
             const activos = response.data.filter(club => club.estatus === 'activo');
             setAllActiveClubs(activos);
@@ -118,7 +110,7 @@ const GestionDashboard = () => {
         if (activeTab === 'unirse') {
             fetchAllActiveClubs();
         }
-    }, [activeTab, API_URL]);
+    }, [activeTab]);
 
     // Función para refrescar ambos paneles al aceptar/rechazar invitaciones o unirse a un club
     const handleUpdate = () => {
@@ -133,9 +125,7 @@ const GestionDashboard = () => {
         setSelectedClub(club);
         try {
             // Utilizamos el endpoint que ya preparaste en el backend para obtener el estado de las firmas
-            const response = await axios.get(`${API_URL}/clubes/${club.id}/miembros`, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
+            const response = await api.get(`/clubes/${club.id}/miembros`);
             setClubMembers(response.data);
         } catch (error) {
             console.error("Error al cargar firmas:", error);
@@ -148,9 +138,7 @@ const GestionDashboard = () => {
         if (!selectedClub) return;
         setSendingReview(true);
         try {
-            const response = await axios.put(`${API_URL}/clubes/${selectedClub.id}/enviar-revision`, {}, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
+            const response = await api.put(`/clubes/${selectedClub.id}/enviar-revision`, {});
             alert(response.data.message);
             setShowMembersModal(false);
             fetchUserClubs(); // Recargamos para actualizar el estatus en pantalla
