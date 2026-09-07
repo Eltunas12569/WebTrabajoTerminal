@@ -60,6 +60,11 @@ const AdminDashboard = () => {
         setIsSidebarOpen(false);
         navigate('/perfil');
     };
+
+    const goToUsers = () => {
+        setIsSidebarOpen(false);
+        navigate('/admin/usuarios');
+    };
     
     const filteredClubs = clubes.filter((club) => {
         const matchesName = club.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -109,6 +114,7 @@ const AdminDashboard = () => {
                             <li onClick={goToAvisos}>
                                 📢 Gestión de Avisos
                             </li>
+                            <li onClick={goToUsers}>👥 Usuarios del sistema</li>
                             <li onClick={goToProfile}>
                                 ⚙️ Configurar Perfil
                             </li>
