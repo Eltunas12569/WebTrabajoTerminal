@@ -28,3 +28,26 @@ export const register = async (userData) => {
         throw error.response?.data?.message || 'Error en el servidor';
     }
 };
+
+export const solicitarRecuperacion = async (correo) => {
+    try {
+        const response = await api.post('/auth/recuperar-password', { correo });
+        return response.data;
+    } catch (error) {
+        throw error.response?.data?.message || 'No se pudo enviar el código de recuperación';
+    }
+};
+
+export const restablecerPassword = async ({ correo, codigo, nuevaPassword, confirmarPassword }) => {
+    try {
+        const response = await api.post('/auth/restablecer-password', {
+            correo,
+            codigo,
+            nuevaPassword,
+            confirmarPassword
+        });
+        return response.data;
+    } catch (error) {
+        throw error.response?.data?.message || 'No se pudo restablecer la contraseña';
+    }
+};

@@ -125,13 +125,14 @@ const Login = () => {
     };
 
     return (
-        <div style={{ 
+        <div className="login-screen" style={{ 
             display: 'flex', 
-            position: 'absolute',
+            position: 'fixed',
             top: 0,
             left: 0,
             width: '100%', 
-            height: '100vh', 
+            height: '100dvh',
+            minHeight: '100vh',
             overflow: 'hidden', 
             backgroundColor: '#f0f2f5', 
             fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -150,6 +151,8 @@ const Login = () => {
             {/* Panel Lateral de Avisos (Diseño Web Drawer) */}
             <div style={{
                 width: isAvisosOpen ? '40%' : '0',
+                height: '100%',
+                minHeight: 0,
                 flexShrink: 0,
                 opacity: isAvisosOpen ? 1 : 0,
                 backgroundColor: '#003366',
@@ -201,14 +204,14 @@ const Login = () => {
                     ◀
                 </button>
 
-                <div style={{ padding: '30px 25px', width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div style={{ padding: '24px 20px', width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '15px' }}>
                         <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <span>📢</span> Tablero de Avisos
                         </h2>
                     </div>
 
-                    <div className="hide-scrollbar" style={{ flex: 1, overflowY: 'auto', paddingRight: '10px' }}>
+                    <div className="hide-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '10px' }}>
                         {avisos.length > 0 ? (
                             avisos.map(aviso => (
                                 <div key={aviso.id} style={{ 
@@ -240,13 +243,15 @@ const Login = () => {
             {/* Área Principal (Diseño Web Centrado) */}
             <div style={{
                 flex: 1,
+                minWidth: 0,
+                minHeight: 0,
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
                 position: 'relative',
                 transition: 'all 0.4s ease-in-out',
                 backgroundImage: 'radial-gradient(circle at 50% 0%, #ffffff 0%, #f0f2f5 100%)',
-                overflowY: 'auto'
+                overflow: 'hidden'
             }}>
                 {/* Botón flotante para mostrar avisos cuando están ocultos */}
                 {!isAvisosOpen && (
@@ -268,18 +273,19 @@ const Login = () => {
                 )}
 
                 {/* Tarjeta de Inicio de Sesión */}
-                <div style={{
+                <div className="login-access-card" style={{
                     width: '100%',
                     maxWidth: '460px',
                     background: '#ffffff',
                     borderRadius: '16px',
                     boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
-                    padding: '50px 45px',
+                    padding: 'clamp(22px, 5vh, 50px) clamp(24px, 4vw, 45px)',
                     margin: 'auto 20px',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    maxHeight: 'calc(100% - 40px)'
                 }}>
-                    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                        <div style={{ fontSize: '3.5rem', marginBottom: '15px' }}>🏆</div>
+                    <div style={{ textAlign: 'center', marginBottom: 'clamp(18px, 4vh, 40px)' }}>
+                        <div style={{ fontSize: 'clamp(2.2rem, 6vh, 3.5rem)', marginBottom: 'clamp(8px, 2vh, 15px)' }}>🏆</div>
                         <h1 style={{ margin: '0 0 10px 0', color: '#1a1a1a', fontSize: '2rem', fontWeight: '700' }}>Sistema de Clubes</h1>
                         <p style={{ margin: 0, color: '#666', fontSize: '1.1rem' }}>Gestión Deportiva - ESCOM IPN</p>
                     </div>
@@ -292,7 +298,7 @@ const Login = () => {
                                 handleSubmit(e); 
                             }
                         }}
-                        style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}
+                        style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(14px, 3vh, 25px)' }}
                     >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <label style={{ fontSize: '0.95rem', fontWeight: '600', color: '#444' }}>Correo Institucional</label>
@@ -381,6 +387,16 @@ const Login = () => {
                     )}
 
                     <div style={{ marginTop: '35px', textAlign: 'center', borderTop: '1px solid #eee', paddingTop: '25px' }}>
+                        <button 
+                            type="button" 
+                            onClick={() => navigate('/recuperar-password')} 
+                            style={{
+                                background: 'none', border: 'none', color: '#800020', fontSize: '0.95rem', fontWeight: '600',
+                                cursor: 'pointer', textDecoration: 'underline', marginBottom: '20px'
+                            }}
+                        >
+                            ¿Olvidaste tu contraseña?
+                        </button>
                         <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '0.95rem' }}>¿Eres estudiante y quieres unirte?</p>
                         <button 
                             type="button" 

@@ -10,6 +10,7 @@ const AvisosAdminPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [eliminando, setEliminando] = useState('');
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -63,6 +64,22 @@ const AvisosAdminPage = () => {
     const goToProfile = () => {
         setIsSidebarOpen(false);
         navigate('/perfil');
+    };
+
+    const eliminarAviso = async (aviso) => {
+        const avisoKey = `${aviso.tipo}-${aviso.id}`;
+        if (!window.confirm('¿Deseas eliminar este aviso? Esta acción no se puede deshacer.')) return;
+
+        setEliminando(avisoKey);
+        setError('');
+        try {
+            await api.delete(`/avisos/${aviso.tipo}/${aviso.id}`);
+            setAvisos((avisosActuales) => avisosActuales.filter((item) => `${item.tipo}-${item.id}` !== avisoKey));
+        } catch (requestError) {
+            setError(requestError.response?.data?.message || 'No se pudo eliminar el aviso.');
+        } finally {
+            setEliminando('');
+        }
     };
 
     return (
@@ -148,15 +165,26 @@ const AvisosAdminPage = () => {
                                         </span>
                                     </div>
                                     <p style={{ margin: '0 0 15px 0', color: '#333', lineHeight: '1.5' }}>{aviso.mensaje}</p>
-                                    <div style={{ fontSize: '0.9em', color: '#555', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #eee', paddingTop: '10px' }}>
+                                    <div style={{ fontSize: '0.9em', color: '#555', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', borderTop: '1px solid #eee', paddingTop: '10px', flexWrap: 'wrap' }}>
                                         <span>
                                             <strong>Publicado:</strong> {new Date(aviso.fecha_creacion || aviso.fecha_envio).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
                                         </span>
-                                        {aviso.fecha_vencimiento && (
-                                            <span>
-                                                <strong>Vence:</strong> {new Date(aviso.fecha_vencimiento).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
-                                            </span>
-                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
+                                            {aviso.fecha_vencimiento && (
+                                                <span>
+                                                    <strong>Vence:</strong> {new Date(aviso.fecha_vencimiento).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
+                                                </span>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => eliminarAviso(aviso)}
+                                                disabled={eliminando === `${aviso.tipo}-${aviso.id}`}
+                                                title="Eliminar aviso"
+                                                style={{ padding: '8px 12px', border: 'none', borderRadius: '6px', background: '#fce8e6', color: '#b42318', cursor: eliminando === `${aviso.tipo}-${aviso.id}` ? 'wait' : 'pointer', fontWeight: '700' }}
+                                            >
+                                                {eliminando === `${aviso.tipo}-${aviso.id}` ? 'Eliminando...' : '🗑️ Eliminar'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}

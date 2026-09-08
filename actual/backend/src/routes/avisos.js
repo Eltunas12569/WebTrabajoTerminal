@@ -101,4 +101,35 @@ router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) =>
     }
 });
 
+// Elimina un aviso global o de club. Solo el administrador puede realizar esta acción.
+router.delete('/:tipo/:id', verifyToken, requireVerificado, async (req, res) => {
+    const { tipo, id } = req.params;
+    const tablasPermitidas = {
+        global: 'avisos_globales',
+        club: 'avisos_club'
+    };
+    const tabla = tablasPermitidas[tipo];
+
+    if (!tabla || !/^\d+$/.test(id)) {
+        return res.status(400).json({ message: 'Tipo o identificador de aviso inválido.' });
+    }
+
+    try {
+        const [usuarios] = await db.query('SELECT role_id FROM usuarios WHERE id = ?', [req.user.id]);
+        if (!usuarios.length || Number(usuarios[0].role_id) !== 1) {
+            return res.status(403).json({ message: 'Acceso denegado. Solo para administradores.' });
+        }
+
+        const [resultado] = await db.query(`DELETE FROM ${tabla} WHERE id = ?`, [Number(id)]);
+        if (resultado.affectedRows === 0) {
+            return res.status(404).json({ message: 'El aviso no existe o ya fue eliminado.' });
+        }
+
+        res.status(200).json({ message: 'Aviso eliminado correctamente.' });
+    } catch (error) {
+        console.error('Error al eliminar aviso:', error.message);
+        res.status(500).json({ message: 'No se pudo eliminar el aviso.' });
+    }
+});
+
 module.exports = router;
