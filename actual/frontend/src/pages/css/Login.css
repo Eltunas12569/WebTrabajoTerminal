@@ -11,6 +11,49 @@
     overflow: hidden;
 }
 
+.login-brand-watermark {
+    position: absolute;
+    top: 50%;
+    right: clamp(18px, 5vw, 72px);
+    width: min(34vw, 360px);
+    aspect-ratio: 1;
+    transform: translateY(-50%);
+    opacity: 0.07;
+    pointer-events: none;
+}
+
+.login-brand-watermark img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.login-logo-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(76px, 11vh, 112px);
+    height: clamp(76px, 11vh, 112px);
+    margin: 0 auto clamp(8px, 2vh, 15px);
+    overflow: hidden;
+    border: 5px solid #fff;
+    border-radius: 50%;
+    background: #071b4d;
+    box-shadow: 0 8px 24px rgba(0, 51, 102, 0.2);
+}
+
+.login-logo-main img {
+    width: 125%;
+    height: 125%;
+    object-fit: contain;
+}
+
+.login-logo-compact {
+    width: clamp(68px, 9vh, 92px);
+    height: clamp(68px, 9vh, 92px);
+}
+
 @media (max-height: 700px) {
     .login-access-card {
         padding-top: 24px;
@@ -26,6 +69,13 @@
 }
 
 @media (max-width: 640px) {
+    .login-brand-watermark {
+        top: 16%;
+        right: -70px;
+        width: 230px;
+        opacity: 0.05;
+    }
+
     .login-access-card {
         max-height: calc(100% - 24px) !important;
         margin: auto 12px !important;
