@@ -253,6 +253,9 @@ const Login = () => {
                 backgroundImage: 'radial-gradient(circle at 50% 0%, #ffffff 0%, #f0f2f5 100%)',
                 overflow: 'hidden'
             }}>
+                <div className="login-brand-watermark" aria-hidden="true">
+                    <img src="/IMG_0999%20(1).png" alt="" />
+                </div>
                 {/* Botón flotante para mostrar avisos cuando están ocultos */}
                 {!isAvisosOpen && (
                     <button 
@@ -279,13 +282,15 @@ const Login = () => {
                     background: '#ffffff',
                     borderRadius: '16px',
                     boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
-                    padding: 'clamp(22px, 5vh, 50px) clamp(24px, 4vw, 45px)',
+                    padding: 'clamp(18px, 3.5vh, 34px) clamp(22px, 3.5vw, 38px)',
                     margin: 'auto 20px',
                     boxSizing: 'border-box',
                     maxHeight: 'calc(100% - 40px)'
                 }}>
-                    <div style={{ textAlign: 'center', marginBottom: 'clamp(18px, 4vh, 40px)' }}>
-                        <div style={{ fontSize: 'clamp(2.2rem, 6vh, 3.5rem)', marginBottom: 'clamp(8px, 2vh, 15px)' }}>🏆</div>
+                    <div style={{ textAlign: 'center', marginBottom: 'clamp(14px, 2.5vh, 26px)' }}>
+                        <div className="login-logo-main login-logo-compact">
+                            <img src="/IMG_1003-Photoroom%20(1).png" alt="Logo del Sistema de Clubes ESCOM" />
+                        </div>
                         <h1 style={{ margin: '0 0 10px 0', color: '#1a1a1a', fontSize: '2rem', fontWeight: '700' }}>Sistema de Clubes</h1>
                         <p style={{ margin: 0, color: '#666', fontSize: '1.1rem' }}>Gestión Deportiva - ESCOM IPN</p>
                     </div>
@@ -298,7 +303,7 @@ const Login = () => {
                                 handleSubmit(e); 
                             }
                         }}
-                        style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(14px, 3vh, 25px)' }}
+                        style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(10px, 1.8vh, 16px)' }}
                     >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <label style={{ fontSize: '0.95rem', fontWeight: '600', color: '#444' }}>Correo Institucional</label>
@@ -308,7 +313,7 @@ const Login = () => {
                                 value={correo}
                                 onChange={(e) => setCorreo(e.target.value)}
                                 style={{ 
-                                    padding: '14px 16px', borderRadius: '8px', border: `2px solid ${isBlocked ? '#ffc107' : '#e1e5eb'}`, 
+                                    padding: '10px 13px', borderRadius: '8px', border: `2px solid ${isBlocked ? '#ffc107' : '#e1e5eb'}`, 
                                     fontSize: '1rem', transition: 'border-color 0.2s', outline: 'none',
                                     backgroundColor: (isBlocked || loading) ? '#f8f9fa' : '#fff'
                                 }}
@@ -329,7 +334,7 @@ const Login = () => {
                                     onChange={(e) => setPassword(e.target.value)}
                                     style={{ 
                                         width: '100%', boxSizing: 'border-box',
-                                        padding: '14px 45px 14px 16px', borderRadius: '8px', border: `2px solid ${isBlocked ? '#ffc107' : '#e1e5eb'}`, 
+                                        padding: '10px 43px 10px 13px', borderRadius: '8px', border: `2px solid ${isBlocked ? '#ffc107' : '#e1e5eb'}`, 
                                         fontSize: '1rem', transition: 'border-color 0.2s', outline: 'none',
                                         backgroundColor: (isBlocked || loading) ? '#f8f9fa' : '#fff'
                                     }}
@@ -358,7 +363,7 @@ const Login = () => {
                             type="button"
                             onClick={handleSubmit}
                             style={{
-                                marginTop: '10px', padding: '16px', borderRadius: '8px', border: 'none',
+                                marginTop: '4px', padding: '12px', borderRadius: '8px', border: 'none',
                                 background: isBlocked ? '#ffc107' : (loading ? '#6c757d' : '#003366'),
                                 color: isBlocked ? '#333' : '#fff', fontSize: '1.1rem', fontWeight: 'bold',
                                 cursor: (isBlocked || loading) ? 'not-allowed' : 'pointer',
@@ -377,7 +382,7 @@ const Login = () => {
 
                     {error && (
                         <div style={{
-                            marginTop: '25px', padding: '15px', borderRadius: '8px', textAlign: 'center', fontSize: '0.95rem', fontWeight: '500',
+                            marginTop: '14px', padding: '10px 12px', borderRadius: '8px', textAlign: 'center', fontSize: '0.9rem', fontWeight: '500',
                             backgroundColor: String(error).includes('concedido') ? '#d4edda' : (isBlocked ? '#fff3cd' : '#f8d7da'),
                             color: String(error).includes('concedido') ? '#155724' : (isBlocked ? '#856404' : '#721c24'),
                             border: `1px solid ${String(error).includes('concedido') ? '#c3e6cb' : (isBlocked ? '#ffeeba' : '#f5c6cb')}`
@@ -386,7 +391,7 @@ const Login = () => {
                         </div>
                     )}
 
-                    <div style={{ marginTop: '35px', textAlign: 'center', borderTop: '1px solid #eee', paddingTop: '25px' }}>
+                    <div style={{ marginTop: '20px', textAlign: 'center', borderTop: '1px solid #eee', paddingTop: '16px' }}>
                         <button 
                             type="button" 
                             onClick={() => navigate('/recuperar-password')} 

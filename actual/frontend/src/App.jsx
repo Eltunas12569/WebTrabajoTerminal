@@ -17,6 +17,7 @@ import VerificarCuentaPage from './pages/VerificarCuentaPage';
 import AvisoPrivacidadPage from './pages/AvisoPrivacidadPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminEditUserPage from './pages/AdminEditUserPage';
+import UnauthorizedPage from './pages/UnauthorizedPage';
 
 /**
  * Configuración de Rutas del Sistema de Gestión Deportiva - ESCOM
@@ -37,7 +38,7 @@ function App() {
               <VerificarCuentaPage />
             </ProtectedRoute>
           } />
-          <Route path="/unauthorized" element={<h1 style={{padding: '20px'}}>No tienes permiso para estar aquí.</h1>} />
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
           {/* --- RUTAS PROTEGIDAS --- */}
           
