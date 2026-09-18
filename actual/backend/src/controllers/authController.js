@@ -24,7 +24,8 @@ const registrar = async (req, res) => {
         const {
             nombres, apellido_paterno, apellido_materno,
             nss, boleta, correo, password: contrasena, rol_id: idRol,
-            carrera, num_empleado, acepta_privacidad: aceptaPrivacidad
+            carrera, num_empleado, acepta_privacidad: aceptaPrivacidad,
+            version_aviso_privacidad: versionAvisoPrivacidad
         } = req.body;
 
         if (!nombres || !nombres.trim()) return res.status(400).json({ message: "Los nombres son requeridos" });
@@ -57,7 +58,8 @@ const registrar = async (req, res) => {
             boleta: idRol === 2 && boleta ? boleta.trim() : null,
             carrera: idRol === 2 && carrera ? carrera.trim() : null,
             numEmpleado: idRol === 3 && num_empleado ? num_empleado.trim() : null,
-            aceptaPrivacidad
+            aceptaPrivacidad,
+            versionAvisoPrivacidad
         });
 
         res.status(201).json(resultado);
