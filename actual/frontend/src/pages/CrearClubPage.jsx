@@ -305,7 +305,13 @@ const CrearClubPage = () => {
                                 {user?.nombres || "Cargando..."}
                             </span>
                         </span>
-                        <div className="profile-bubble" style={{ backgroundColor: getAvatarColor(user?.nombres) }}>
+                        <div
+                            className="profile-bubble"
+                            style={{ backgroundColor: getAvatarColor(user?.nombres) }}
+                            onClick={() => navigate('/perfil')}
+                            title="Configurar Perfil"
+                            role="button"
+                        >
                             {(user?.nombres || "U").charAt(0).toUpperCase()}
                         </div>
                     </div>
@@ -331,7 +337,6 @@ const CrearClubPage = () => {
                                     {user?.role_id === 3 && <li onClick={() => navigate('/crear-club')} className="special-link">➕ Crear Club</li>}
                                 </>
                             )}
-                            <li onClick={() => navigate('/perfil')}>⚙️ Configurar Perfil</li>
                         </ul>
                     </nav>
                     <button onClick={logout} className="logout-button">Cerrar Sesión</button>

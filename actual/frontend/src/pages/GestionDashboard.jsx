@@ -28,11 +28,6 @@ const GestionDashboard = () => {
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
-    const goToProfile = () => {
-        setIsSidebarOpen(false);
-        navigate('/perfil');
-    };
-
     const goToCreateClub = () => {
         setIsSidebarOpen(false);
         navigate('/crear-club');
@@ -161,7 +156,7 @@ const GestionDashboard = () => {
                 <div className="nav-right">
                     <div className="profile-container">
                         <span className="profile-greeting">Hola, {user?.nombres}</span>
-                        <div className="profile-bubble">{user?.nombres?.charAt(0).toUpperCase()}</div>
+                        <div className="profile-bubble" onClick={() => navigate('/perfil')} title="Configurar Perfil" role="button">{user?.nombres?.charAt(0).toUpperCase()}</div>
                     </div>
                 </div>
             </header>
@@ -180,9 +175,6 @@ const GestionDashboard = () => {
                             {user?.role_id === 3 && (
                                 <li onClick={goToCreateClub} className="special-link">➕ Crear Club</li>
                             )}
-                            <li onClick={goToProfile}>
-                                ⚙️ Configurar Perfil
-                            </li>
                         </ul>
                     </nav>
                     <button onClick={logout} className="logout-button">Cerrar Sesión</button>

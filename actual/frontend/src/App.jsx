@@ -10,6 +10,7 @@ import CrearClubPage from './pages/CrearClubPage';
 import ClubDetailsAdminPage from './pages/ClubDetailsAdminPage';
 import AvisosAdminPage from './pages/AvisosAdminPage';
 import PerfilPage from './pages/PerfilPage';
+import CambiarPasswordPage from './pages/CambiarPasswordPage';
 import ClubChatPage from './pages/ClubChatPage';
 import ClubDetailsPage from './pages/ClubDetailsPage';
 import ClubPanelPage from './pages/ClubPanelPage';
@@ -103,6 +104,17 @@ function App() {
           <Route path="/perfil" element={
             <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
               <PerfilPage />
+            </ProtectedRoute>
+          } />
+          {/* Cambiar Contraseña (Cualquier usuario logueado) */}
+          <Route path="/cambiar-password" element={
+            <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
+              <CambiarPasswordPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/perfil/cambiar-password" element={
+            <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
+              <CambiarPasswordPage />
             </ProtectedRoute>
           } />
           {/* Panel del club: avisos, eventos y recursos */}

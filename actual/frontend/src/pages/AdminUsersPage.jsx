@@ -56,7 +56,7 @@ const AdminUsersPage = () => {
                 <div className="nav-right">
                     <div className="profile-container">
                         <span className="profile-greeting">Hola, <strong>{user?.nombres || 'Administrador'}</strong></span>
-                        <div className="profile-bubble">{user?.nombres?.charAt(0).toUpperCase() || 'A'}</div>
+                        <div className="profile-bubble" onClick={() => navigate('/perfil')} title="Configurar Perfil" role="button">{user?.nombres?.charAt(0).toUpperCase() || 'A'}</div>
                     </div>
                 </div>
             </header>
@@ -69,7 +69,6 @@ const AdminUsersPage = () => {
                             <li onClick={() => navigate('/admin')}>📋 Lista de Clubs</li>
                             <li onClick={() => navigate('/admin/avisos')}>📢 Gestión de Avisos</li>
                             <li onClick={() => navigate('/admin/usuarios')}>👥 Usuarios del sistema</li>
-                            <li onClick={() => navigate('/perfil')}>⚙️ Configurar Perfil</li>
                         </ul>
                     </nav>
                     <button onClick={logout} className="logout-button">Cerrar Sesión</button>

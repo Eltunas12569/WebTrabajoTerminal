@@ -56,11 +56,6 @@ const AdminDashboard = () => {
         navigate('/admin/avisos');
     };
 
-    const goToProfile = () => {
-        setIsSidebarOpen(false);
-        navigate('/perfil');
-    };
-
     const goToUsers = () => {
         setIsSidebarOpen(false);
         navigate('/admin/usuarios');
@@ -97,6 +92,9 @@ const AdminDashboard = () => {
                         <div
                             className="profile-bubble"
                             style={{ backgroundColor: getAvatarColor(user?.nombres) }}
+                            onClick={() => navigate('/perfil')}
+                            title="Configurar Perfil"
+                            role="button"
                         >
                             {/* Obtenemos la inicial de forma segura */}
                             {(user?.nombres || "U").charAt(0).toUpperCase()}
@@ -115,9 +113,6 @@ const AdminDashboard = () => {
                                 📢 Gestión de Avisos
                             </li>
                             <li onClick={goToUsers}>👥 Usuarios del sistema</li>
-                            <li onClick={goToProfile}>
-                                ⚙️ Configurar Perfil
-                            </li>
                         </ul>
                     </nav>
                     <button onClick={logout} className="logout-button">Cerrar Sesión</button>
