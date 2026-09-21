@@ -73,8 +73,10 @@ const GestionDashboard = () => {
                     
                     if (pesoA !== pesoB) return pesoA - pesoB;
                     
-                    const tA = new Date(a.tiempo).getTime() || 0;
-                    const tB = new Date(b.tiempo).getTime() || 0;
+                    const fechaA = a.fecha_envio || a.tiempo || 0;
+                    const fechaB = b.fecha_envio || b.tiempo || 0;
+                    const tA = new Date(fechaA).getTime() || 0;
+                    const tB = new Date(fechaB).getTime() || 0;
                     return tB - tA; // Si empatan, el más nuevo primero
                 });
                 
@@ -235,10 +237,10 @@ const GestionDashboard = () => {
                                                         {aviso.titulo}
                                                     </h4>
                                                     <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 'bold' }}>
-                                                        {new Date(aviso.tiempo).toLocaleDateString('es-MX')}
+                                                        {new Date(aviso.fecha_envio || aviso.tiempo).toLocaleDateString('es-MX')}
                                                     </span>
                                                 </div>
-                                                <p style={{ margin: 0, color: '#333', lineHeight: '1.5' }}>{aviso.descripcion}</p>
+                                                <p style={{ margin: 0, color: '#333', lineHeight: '1.5' }}>{aviso.contenido || aviso.mensaje || aviso.descripcion}</p>
                                             </div>
                                             );
                                         })

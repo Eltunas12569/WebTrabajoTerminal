@@ -60,16 +60,18 @@ const ClubDetailsAdminPage = () => {
     const [rejectMotivo, setRejectMotivo] = useState('');
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [actionError, setActionError] = useState('');
+    const [historialEncargados, setHistorialEncargados] = useState([]);
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                // Cargar datos de clubes, profesores y alumnos al mismo tiempo
-                const [clubesRes, profRes, alumRes] = await Promise.all([
+                // Cargar datos de clubes, profesores, alumnos e historial al mismo tiempo
+                const [clubesRes, profRes, alumRes, histRes] = await Promise.all([
                     api.get('/clubes'),
                     api.get('/users/professors'),
-                    api.get('/users/students-in-charge')
+                    api.get('/users/students-in-charge'),
+                    api.get(`/clubes/${id}/historial-encargados`).catch(() => ({ data: [] }))
                 ]);
 
                 const clubEncontrado = clubesRes.data.find((clubItem) => String(clubItem.id) === String(id));
@@ -86,6 +88,7 @@ const ClubDetailsAdminPage = () => {
                 });
                 setProfesores(profRes.data);
                 setAlumnos(alumRes.data);
+                setHistorialEncargados(histRes.data || []);
             } catch (error) {
                 console.error('Error al cargar datos:', error);
                 setActionError(error.response?.data?.message || error.message || 'No se pudo conectar con el servidor. ¿Reiniciaste el backend?');
@@ -389,6 +392,47 @@ const ClubDetailsAdminPage = () => {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Tarjeta Auditoría Historial de Encargados */}
+                            <div style={{ background: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                <h3 style={{ margin: '0 0 15px 0', fontSize: '1.3rem', color: '#1c1e21', borderBottom: '1px solid #e4e6eb', paddingBottom: '10px', fontWeight: '700' }}>
+                                    📜 Historial de Encargados Anteriores (Auditoría)
+                                </h3>
+                                {historialEncargados.length === 0 ? (
+                                    <p style={{ color: '#666', margin: 0 }}>No hay encargados registrados previamente en el historial de este club.</p>
+                                ) : (
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e4e6eb' }}>
+                                            <thead>
+                                                <tr style={{ backgroundColor: '#003366', color: '#fff' }}>
+                                                    <th style={{ padding: '10px', textAlign: 'left' }}>Nombre</th>
+                                                    <th style={{ padding: '10px', textAlign: 'left' }}>Cargo</th>
+                                                    <th style={{ padding: '10px', textAlign: 'left' }}>Contacto / ID</th>
+                                                    <th style={{ padding: '10px', textAlign: 'left' }}>Período</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {historialEncargados.map((h, idx) => (
+                                                    <tr key={h.id || idx} style={{ borderBottom: '1px solid #eee', backgroundColor: idx % 2 === 0 ? '#fff' : '#f9f9f9' }}>
+                                                        <td style={{ padding: '10px', fontWeight: '600' }}>{h.nombre_completo}</td>
+                                                        <td style={{ padding: '10px' }}>
+                                                            <span style={{ fontSize: '0.85rem', padding: '3px 8px', borderRadius: '12px', background: h.rol_en_club === 'encargado_profesor' ? '#e7f3ff' : '#e6f4ea', color: h.rol_en_club === 'encargado_profesor' ? '#003366' : '#1e8449', fontWeight: 'bold' }}>
+                                                                {h.rol_en_club === 'encargado_profesor' ? 'Profesor' : 'Alumno Líder'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '10px', fontSize: '0.9rem', color: '#555' }}>
+                                                            {h.correo} {h.num_empleado ? `· EMP: ${h.num_empleado}` : h.boleta ? `· Boleta: ${h.boleta}` : ''}
+                                                        </td>
+                                                        <td style={{ padding: '10px', fontSize: '0.9rem', color: '#666' }}>
+                                                            {h.fecha_inicio ? new Date(h.fecha_inicio).toLocaleDateString('es-MX') : '—'} hasta {h.fecha_fin ? new Date(h.fecha_fin).toLocaleDateString('es-MX') : 'Actual'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

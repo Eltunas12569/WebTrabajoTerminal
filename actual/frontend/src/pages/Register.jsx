@@ -1,28 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { register } from '../services/authService';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import './css/Register.css'; // Importamos el nuevo CSS
 
 const Register = () => {
-    const [formData, setFormData] = useState({
-        nombres: '',
-        apellido_paterno: '',
-        apellido_materno: '',
-        nss: '',
-        boleta: '',
-        carrera: '',
-        num_empleado: '',
-        correo: '',
-        password: '',
-        rol_id: 2 // 2 = Alumno, 3 = Profesor
+    const [formData, setFormData] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem('register_form_draft');
+            if (saved) return JSON.parse(saved);
+        } catch (_) {}
+        return {
+            nombres: '',
+            apellido_paterno: '',
+            apellido_materno: '',
+            nss: '',
+            boleta: '',
+            carrera: '',
+            num_empleado: '',
+            correo: '',
+            password: '',
+            rol_id: 2 // 2 = Alumno, 3 = Profesor
+        };
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [privacyAccepted, setPrivacyAccepted] = useState(false);
+    const [privacyAccepted, setPrivacyAccepted] = useState(() => {
+        return sessionStorage.getItem('register_privacy_accepted') === 'true';
+    });
     const navigate = useNavigate();
+
+    // Guardar borrador del formulario para no perder datos si navega al aviso de privacidad
+    useEffect(() => {
+        try {
+            const draft = { ...formData, password: '' };
+            sessionStorage.setItem('register_form_draft', JSON.stringify(draft));
+            sessionStorage.setItem('register_privacy_accepted', String(privacyAccepted));
+        } catch (_) {}
+    }, [formData, privacyAccepted]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -35,8 +52,9 @@ const Register = () => {
             return;
         }
         if (name === 'boleta') {
-            if (value.length > 10) return;
-            setFormData({ ...formData, [name]: value.toUpperCase() }); // Permite letras (ej. PM, PE) y las hace mayúsculas
+            const onlyNums = value.replace(/\D/g, ''); // Boleta es estrictamente numérica
+            if (onlyNums.length > 10) return;
+            setFormData({ ...formData, [name]: onlyNums });
             return;
         }
         if (name === 'num_empleado') {
@@ -51,14 +69,15 @@ const Register = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
+        
+        // Validación de contraseñas coincidentes
         if (formData.password !== confirmPassword) {
             setError('Las contraseñas no coinciden.');
             return;
         }
 
         if (!privacyAccepted) {
-            setError('Debes aceptar el aviso de privacidad para continuar.');
+            setError('Debes aceptar los términos y condiciones y el aviso de privacidad para continuar.');
             return;
         }
 
@@ -66,11 +85,14 @@ const Register = () => {
         setError('');
         
         try {
-            await register({
+            const response = await register({
                 ...formData,
-                acepta_privacidad: privacyAccepted
+                acepta_privacidad: privacyAccepted,
+                version_aviso_privacidad: '1.1'
             });
-            alert('¡Registro exitoso! Ahora puedes entrar con tus credenciales.');
+            sessionStorage.removeItem('register_form_draft');
+            sessionStorage.removeItem('register_privacy_accepted');
+            alert(response?.message || '¡Registro exitoso! Revisa tu correo institucional para verificar tu cuenta.');
             navigate('/'); // Redirige al login
         } catch (err) {
             setError(err);
@@ -162,6 +184,8 @@ const Register = () => {
                             <input 
                                 name="boleta" 
                                 type="text" 
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 placeholder="Boleta (10 dígitos)" 
                                 value={formData.boleta} 
                                 onChange={handleChange} 
@@ -270,16 +294,21 @@ const Register = () => {
                             style={{ marginTop: '3px', accentColor: '#003366' }}
                         />
                         <span>
-                            He leído y acepto el{' '}
-                            <a
-                                href="/aviso-privacidad"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ color: '#003366', fontWeight: '700' }}
+                            He leído y acepto los{' '}
+                            <Link
+                                to="/terminos-condiciones"
+                                style={{ color: '#003366', fontWeight: '700', textDecoration: 'underline' }}
+                            >
+                                términos y condiciones
+                            </Link>
+                            {' '}y el{' '}
+                            <Link
+                                to="/aviso-privacidad"
+                                style={{ color: '#003366', fontWeight: '700', textDecoration: 'underline' }}
                             >
                                 aviso de privacidad
-                            </a>{' '}
-                            y el tratamiento de mis datos personales.
+                            </Link>
+                            {' '}para el tratamiento de mis datos personales.
                         </span>
                     </label>
                     
