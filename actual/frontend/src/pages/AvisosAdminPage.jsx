@@ -61,11 +61,6 @@ const AvisosAdminPage = () => {
         navigate('/admin/avisos');
     };
 
-    const goToProfile = () => {
-        setIsSidebarOpen(false);
-        navigate('/perfil');
-    };
-
     const eliminarAviso = async (aviso) => {
         const avisoKey = `${aviso.tipo}-${aviso.id}`;
         if (!window.confirm('¿Deseas eliminar este aviso? Esta acción no se puede deshacer.')) return;
@@ -98,7 +93,13 @@ const AvisosAdminPage = () => {
                             </span>
                         </span>
 
-                        <div className="profile-bubble" style={{ backgroundColor: getAvatarColor(user?.nombres) }}>
+                        <div
+                            className="profile-bubble"
+                            style={{ backgroundColor: getAvatarColor(user?.nombres) }}
+                            onClick={() => navigate('/perfil')}
+                            title="Configurar Perfil"
+                            role="button"
+                        >
                             {(user?.nombres || "U").charAt(0).toUpperCase()}
                         </div>
                     </div>
@@ -114,9 +115,6 @@ const AvisosAdminPage = () => {
                             <li onClick={goToDashboard}>📋 Lista de Clubs</li>
                             <li onClick={goToAvisos}>
                                 📢 Gestión de Avisos
-                            </li>
-                            <li onClick={goToProfile}>
-                                ⚙️ Configurar Perfil
                             </li>
                         </ul>
                     </nav>
