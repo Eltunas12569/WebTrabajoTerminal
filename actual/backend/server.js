@@ -14,7 +14,7 @@ const app = express();
 // ==========================================
 const origenesPermitidos = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(origen => origen.trim())
-    : ['http://localhost:5173'];
+    : ['http://localhost:5173']; 
 
 const opcionesCors = {
     origin: (origenSolicitante, callback) => {
@@ -30,6 +30,9 @@ const opcionesCors = {
 
 app.use(cors(opcionesCors));
 app.use(express.json({ limit: '1mb' }));
+
+
+
 
 // ==========================================
 // --- RATE LIMITING GLOBAL ---
@@ -116,10 +119,9 @@ io.on('connection', (socket) => {
         const { club_id: idClub, mensaje } = data;
         try {
             const [resultado] = await db.query(
-                `INSERT INTO chat_club (club_id, usuario_id, mensaje) VALUES (?, ?, ?)`,
+                `INSERT INTO chat_mensajes (club_id, usuario_id, tipo_sala, mensaje) VALUES (?, ?, 'club', ?)`,
                 [idClub, socket.datosUsuario.id, mensaje]
             );
-
             const nuevoMensaje = {
                 id: resultado.insertId,
                 club_id: idClub,
@@ -132,6 +134,123 @@ io.on('connection', (socket) => {
             io.to(`club_${idClub}`).emit('nuevo_mensaje', nuevoMensaje);
         } catch (error) {
             console.error('Error guardando mensaje en socket:', error);
+        }
+    });
+
+
+    socket.on('unirse_chat_directivos', async () => {
+        try {
+            if (socket.datosUsuario.rol !== 1) {
+                const [esEncargado] = await db.query(
+                    `SELECT id FROM inscripciones 
+                     WHERE usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo' LIMIT 1`,
+                    [socket.datosUsuario.id]
+                );
+                if (esEncargado.length === 0) {
+                    return socket.emit('error_socket', 'Acceso denegado: No eres encargado ni administrador');
+                }
+            }
+            socket.join('sala_directivos');
+            console.log(`Usuario ${socket.datosUsuario.id} se unió al chat de directivos`);
+        } catch (error) {
+            console.error('Error al verificar permisos de directivos:', error);
+            socket.emit('error_socket', 'Error al unirse al chat de directivos');
+        }
+    });
+
+    socket.on('enviar_mensaje_directivos', async (data) => {
+        const { mensaje } = data;
+        try {
+            // Guardar en la nueva tabla
+            const [resultado] = await db.query(
+                `INSERT INTO chat_mensajes (usuario_id, tipo_sala, mensaje) VALUES (?, 'directivos', ?)`,
+                [socket.datosUsuario.id, mensaje]
+            );
+
+            // Obtener a qué clubes representa para la etiqueta en vivo
+            const [etiquetas] = await db.query(`
+                SELECT GROUP_CONCAT(DISTINCT CONCAT(
+                    IF(i.rol_en_club = 'encargado_profesor', 'Profe Titular', 'Alumno Rep.'), 
+                    ' - ', cl.nombre
+                ) SEPARATOR ', ') AS etiqueta_encargado
+                FROM inscripciones i
+                JOIN clubes cl ON i.club_id = cl.id
+                WHERE i.usuario_id = ? AND i.rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND i.estatus = 'activo'
+            `, [socket.datosUsuario.id]);
+
+            const etiqueta = etiquetas[0]?.etiqueta_encargado || null;
+
+            // Armar el payload para los clientes
+            const nuevoMensaje = {
+                id: resultado.insertId,
+                usuario_id: socket.datosUsuario.id,
+                autor_nombre: socket.datosUsuario.nombreCompleto,
+                rol_usuario: socket.datosUsuario.rol, 
+                etiqueta_encargado: etiqueta, // NUEVO
+                mensaje,
+                fecha_envio: new Date().toISOString()
+            };
+
+            // Emitir solo a los que están en la sala
+            io.to('sala_directivos').emit('nuevo_mensaje_directivos', nuevoMensaje);
+        } catch (error) {
+            console.error('Error guardando mensaje de directivos:', error);
+        }
+    });
+
+
+    // ==========================================
+    // --- NUEVO: CHAT EXCLUSIVO DE ENCARGADOS ---
+    // ==========================================
+    socket.on('unirse_chat_encargados', async () => {
+        try {
+            const [esEncargado] = await db.query(
+                `SELECT id FROM inscripciones 
+                 WHERE usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo' LIMIT 1`,
+                [socket.datosUsuario.id]
+            );
+            if (esEncargado.length === 0) {
+                return socket.emit('error_socket', 'Acceso denegado: Exclusivo para encargados de clubes');
+            }
+            socket.join('sala_encargados');
+        } catch (error) {
+            console.error('Error al verificar permisos de encargados:', error);
+            socket.emit('error_socket', 'Error al unirse al chat de encargados');
+        }
+    });
+
+    socket.on('enviar_mensaje_encargados', async (data) => {
+        const { mensaje } = data;
+        try {
+            const [resultado] = await db.query(
+                `INSERT INTO chat_mensajes (usuario_id, tipo_sala, mensaje) VALUES (?, 'encargados', ?)`,
+                [socket.datosUsuario.id, mensaje]
+            );
+
+            // Extraer a qué club(es) representa
+            const [etiquetas] = await db.query(`
+                SELECT GROUP_CONCAT(DISTINCT CONCAT(
+                    IF(i.rol_en_club = 'encargado_profesor', 'Profe Titular', 'Alumno Rep.'), 
+                    ' - ', cl.nombre
+                ) SEPARATOR ', ') AS etiqueta_encargado
+                FROM inscripciones i
+                JOIN clubes cl ON i.club_id = cl.id
+                WHERE i.usuario_id = ? AND i.rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND i.estatus = 'activo'
+            `, [socket.datosUsuario.id]);
+
+            const nuevoMensaje = {
+                id: resultado.insertId,
+                usuario_id: socket.datosUsuario.id,
+                autor_nombre: socket.datosUsuario.nombreCompleto,
+                rol_usuario: socket.datosUsuario.rol,
+                etiqueta_encargado: etiquetas[0]?.etiqueta_encargado || null,
+                mensaje,
+                fecha_envio: new Date().toISOString()
+            };
+
+            io.to('sala_encargados').emit('nuevo_mensaje_encargados', nuevoMensaje);
+        } catch (error) {
+            console.error('Error guardando mensaje de encargados:', error);
         }
     });
 

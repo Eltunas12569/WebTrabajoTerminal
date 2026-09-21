@@ -7,9 +7,9 @@ const seedAvisos = async () => {
     try {
         console.log("📢 INICIANDO SEEDER RÁPIDO DE AVISOS GLOBALES...");
 
-        console.log("🧹 1. Limpiando avisos antiguos...");
-        // TRUNCATE vacía la tabla y reinicia el AUTO_INCREMENT en un solo paso
-        await db.query(`TRUNCATE TABLE avisos_globales`);
+        console.log("🧹 1. Limpiando avisos globales antiguos...");
+        // Como ahora es una tabla compartida, solo borramos los que son globales (club_id IS NULL)
+        await db.query(`DELETE FROM avisos WHERE club_id IS NULL`);
 
         console.log("⏳ 2. Publicando 10 avisos institucionales frescos...");
         const prioridades = ['alta', 'normal', 'baja'];
@@ -18,8 +18,8 @@ const seedAvisos = async () => {
         for (let i = 1; i <= 10; i++) {
             const categoria = getRandom(categorias);
             await db.query(
-                `INSERT INTO avisos_globales (titulo, mensaje, prioridad, autor_id, activo, fecha_vencimiento) 
-                 VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))`,
+                `INSERT INTO avisos (club_id, titulo, contenido, prioridad, usuario_id, activo, fecha_creacion, fecha_vencimiento) 
+                 VALUES (NULL, ?, ?, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY))`,
                 [
                     `[${categoria}] Comunicado Oficial #${i}`, 
                     `Este es un anuncio institucional emitido por el área de ${categoria} de la ESCOM. Se solicita a la comunidad estudiantil y docente revisar las nuevas normativas correspondientes a la semana en curso. (Prueba de interfaz móvil ${i}).`, 

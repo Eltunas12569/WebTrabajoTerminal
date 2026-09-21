@@ -24,7 +24,9 @@ const registrar = async (req, res) => {
         const {
             nombres, apellido_paterno, apellido_materno,
             nss, boleta, correo, password: contrasena, rol_id: idRol,
-            carrera, num_empleado, acepta_privacidad: aceptaPrivacidad,
+            carrera, num_empleado, 
+            tipo_sangre, condiciones_preexistentes, // <--- EXTRACCIÓN NUEVA
+            acepta_privacidad: aceptaPrivacidad,
             version_aviso_privacidad: versionAvisoPrivacidad
         } = req.body;
 
@@ -58,6 +60,8 @@ const registrar = async (req, res) => {
             boleta: idRol === 2 && boleta ? boleta.trim() : null,
             carrera: idRol === 2 && carrera ? carrera.trim() : null,
             numEmpleado: idRol === 3 && num_empleado ? num_empleado.trim() : null,
+            tipoSangre: tipo_sangre,                         
+            condicionesPreexistentes: condiciones_preexistentes, 
             aceptaPrivacidad,
             versionAvisoPrivacidad
         });
@@ -71,15 +75,11 @@ const registrar = async (req, res) => {
 
 const obtenerPerfil = async (req, res) => {
     try {
-        // Hacemos LEFT JOIN para traer boleta/carrera (si es alumno) o num_empleado (si es profesor)
         const queryUsuario = `
-            SELECT u.nombres, u.apellido_paterno, u.apellido_materno, u.correo, u.verificado, u.role_id,
-                   a.boleta, a.carrera, a.nss,
-                   p.num_empleado
-            FROM usuarios u
-            LEFT JOIN alumnos_detalles a ON u.id = a.usuario_id
-            LEFT JOIN profesores_detalles p ON u.id = p.usuario_id
-            WHERE u.id = ?
+            SELECT id, nombres, apellido_paterno, apellido_materno, correo, verificado, role_id,
+                   boleta, carrera, nss, num_empleado, tipo_sangre, condiciones_preexistentes
+            FROM usuarios
+            WHERE id = ?
         `;
         const [filasUsuario] = await db.query(queryUsuario, [req.user.id]);
         
@@ -87,14 +87,13 @@ const obtenerPerfil = async (req, res) => {
 
         const usuarioInfo = filasUsuario[0];
 
-        const [fichas] = await db.query('SELECT * FROM fichas_medicas WHERE usuario_id = ?', [req.user.id]);
+        const [contactos] = await db.query('SELECT nombre, telefono, parentesco FROM contactos_emergencia WHERE usuario_id = ? ORDER BY id ASC', [req.user.id]);
+        
         let ficha_medica = null;
-
-        if (fichas.length > 0) {
-            const [contactos] = await db.query('SELECT nombre, telefono, parentesco FROM contactos_emergencia WHERE usuario_id = ? ORDER BY id ASC', [req.user.id]);
+        if (usuarioInfo.tipo_sangre || usuarioInfo.condiciones_preexistentes || contactos.length > 0) {
             ficha_medica = {
-                tipo_sangre: fichas[0].tipo_sangre,
-                alergias: fichas[0].condiciones_preexistentes || '',
+                tipo_sangre: usuarioInfo.tipo_sangre,
+                alergias: usuarioInfo.condiciones_preexistentes || '',
                 contactos: contactos.map(contacto => ({
                     nombre: contacto.nombre,
                     telefono: contacto.telefono,
@@ -103,7 +102,6 @@ const obtenerPerfil = async (req, res) => {
             };
         }
 
-        // Construimos el objeto final dependiendo del rol
         res.status(200).json({ 
             nombres: usuarioInfo.nombres,
             apellido_paterno: usuarioInfo.apellido_paterno,
@@ -143,16 +141,13 @@ const actualizarPerfil = async (req, res) => {
             if (!contacto.telefono || !contacto.telefono.trim()) return res.status(400).json({ message: `El contacto #${indice + 1} necesita un teléfono.` });
         }
 
-        // NUEVO: Verificamos si el usuario ya está validado
         const [userCheck] = await db.query('SELECT verificado FROM usuarios WHERE id = ?', [req.user.id]);
         if (userCheck.length > 0 && userCheck[0].verificado === 1) {
-            // Si ya está verificado, anulamos cualquier intento de cambiar sus nombres en la consulta
             nombres = undefined;
             apellido_paterno = undefined;
             apellido_materno = undefined;
         }
 
-        // Solo se hace UPDATE de nombres si no fue anulado arriba
         if (nombres !== undefined && apellido_paterno !== undefined) {
              await db.query(
                 'UPDATE usuarios SET nombres = ?, apellido_paterno = ?, apellido_materno = ? WHERE id = ?',
@@ -172,12 +167,10 @@ const actualizarPerfil = async (req, res) => {
             }
         }
 
-        const [fichas] = await db.query('SELECT id FROM fichas_medicas WHERE usuario_id = ?', [req.user.id]);
-        if (fichas.length > 0) {
-            await db.query(`UPDATE fichas_medicas SET tipo_sangre = ?, condiciones_preexistentes = ? WHERE usuario_id = ?`, [tipo_sangre, alergias, req.user.id]);
-        } else {
-            await db.query(`INSERT INTO fichas_medicas (usuario_id, tipo_sangre, condiciones_preexistentes) VALUES (?, ?, ?)`, [req.user.id, tipo_sangre, alergias]);
-        }
+        await db.query(
+            'UPDATE usuarios SET tipo_sangre = ?, condiciones_preexistentes = ? WHERE id = ?', 
+            [tipo_sangre || null, alergias || null, req.user.id]
+        );
 
         await db.query('DELETE FROM contactos_emergencia WHERE usuario_id = ?', [req.user.id]);
         for (const contacto of contactos) {
@@ -191,7 +184,7 @@ const actualizarPerfil = async (req, res) => {
     }
 };
 
-// NUEVOS CONTROLADORES DE VERIFICACIÓN
+
 const verificarCuenta = async (req, res) => {
     try {
         const { codigo } = req.body;
@@ -215,7 +208,6 @@ const reenviarCodigo = async (req, res) => {
     }
 };
 
-// NUEVO: Controladores de Recuperación
 const solicitarRecuperacion = async (req, res) => {
     try {
         const { correo } = req.body;

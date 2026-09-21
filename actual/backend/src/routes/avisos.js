@@ -2,29 +2,30 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const verifyToken = require('../middlewares/authMiddleware');
-const requireVerificado = require('../middlewares/verificarCuentaMiddleware'); // NUEVO
+const requireVerificado = require('../middlewares/verificarCuentaMiddleware'); 
 
 router.get('/', async (req, res) => {
     try {
-        // 1. Apagar (poner en 0) los avisos vencidos.
-        // MAGIA AQUÍ: Si fecha_vencimiento es NULL, revisa si ya pasaron 7 días desde su creación y lo apaga.
         await db.query(`
-            UPDATE avisos_globales 
+            UPDATE avisos 
             SET activo = 0 
-            WHERE fecha_vencimiento < NOW() 
-               OR (fecha_vencimiento IS NULL AND fecha_creacion < DATE_SUB(NOW(), INTERVAL 7 DAY))
+            WHERE club_id IS NULL 
+              AND (fecha_vencimiento < NOW() OR (fecha_vencimiento IS NULL AND fecha_envio < DATE_SUB(NOW(), INTERVAL 7 DAY)))
         `);
 
-        // 2. Encender (poner en 1) los avisos que aún son vigentes o tienen menos de 7 días si son NULL
         await db.query(`
-            UPDATE avisos_globales 
+            UPDATE avisos 
             SET activo = 1 
-            WHERE fecha_vencimiento >= NOW() 
-               OR (fecha_vencimiento IS NULL AND fecha_creacion >= DATE_SUB(NOW(), INTERVAL 7 DAY))
+            WHERE club_id IS NULL 
+              AND (fecha_vencimiento >= NOW() OR (fecha_vencimiento IS NULL AND fecha_envio >= DATE_SUB(NOW(), INTERVAL 7 DAY)))
         `);
 
-        // 3. Traer solo los activos, ya limpios
-        const [rows] = await db.query('SELECT * FROM avisos_globales WHERE activo = 1');
+        const [rows] = await db.query(`
+            SELECT id, titulo, contenido AS descripcion, prioridad, fecha_envio AS tiempo, 'global' AS tipo 
+            FROM avisos 
+            WHERE activo = 1 AND club_id IS NULL
+            ORDER BY fecha_envio DESC
+        `);
         
         res.status(200).json(rows);
     } catch (error) {
@@ -33,32 +34,27 @@ router.get('/', async (req, res) => {
     }
 });
 
-// NUEVA RUTA: Avisos combinados para un usuario (Globales + Clubs inscritos)
 router.get('/user/:userId', verifyToken, requireVerificado, async (req, res) => {
     const { userId } = req.params;
     try {
-        // 1. Avisos globales
         const [globales] = await db.query(`
-            SELECT id, titulo, mensaje AS descripcion, prioridad, fecha_creacion AS tiempo, 'global' AS tipo 
-            FROM avisos_globales 
-            WHERE activo = 1
+            SELECT id, titulo, contenido AS mensaje, prioridad, fecha_envio, 'global' AS tipo 
+            FROM avisos 
+            WHERE activo = 1 AND club_id IS NULL
         `);
 
-        // 2. Avisos de los clubes del usuario
         const [clubes] = await db.query(`
-            SELECT ac.id, CONCAT('Aviso de ', c.nombre) AS titulo, ac.contenido AS descripcion, 'normal' AS prioridad, ac.fecha_envio AS tiempo, 'club' AS tipo
-            FROM avisos_club ac
-            JOIN clubes c ON ac.club_id = c.id
+            SELECT a.id, CONCAT('Aviso de ', c.nombre) AS titulo, a.contenido AS mensaje, 'normal' AS prioridad, a.fecha_envio, 'club' AS tipo
+            FROM avisos a
+            JOIN clubes c ON a.club_id = c.id
             JOIN inscripciones i ON c.id = i.club_id
-            WHERE ac.activo = 1 AND i.usuario_id = ? AND i.estatus = 'activo'
+            WHERE a.activo = 1 AND a.club_id IS NOT NULL AND i.usuario_id = ? AND i.estatus = 'activo'
         `, [userId]);
 
-        // 3. Unir y ordenar por fecha (más recientes primero)
-        const todos = [...globales, ...clubes].sort((a, b) => new Date(b.tiempo) - new Date(a.tiempo));
-
+        const todos = [...globales, ...clubes].sort((a, b) => new Date(b.fecha_envio) - new Date(a.fecha_envio));
         res.status(200).json(todos);
     } catch (error) {
-        console.error("Error al obtener avisos mixtos:", error.message);
+        console.error("Error al cargar los avisos:", error.message);
         res.status(500).json({ message: "Error al cargar los avisos" });
     }
 });
@@ -66,33 +62,30 @@ router.get('/user/:userId', verifyToken, requireVerificado, async (req, res) => 
 // NUEVA RUTA: Para que el admin vea TODOS los avisos (globales y de club)
 router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) => {
     try {
-        // Verificación infalible: Consultamos el rol directamente en la BD
-        // usando el ID del usuario validado por el token.
         const [users] = await db.query('SELECT role_id FROM usuarios WHERE id = ?', [req.user.id]);
         
         if (!users.length || Number(users[0].role_id) !== 1) {
             return res.status(403).json({ message: 'Acceso denegado. Solo para administradores.' });
         }
 
-        // 1. Todos los avisos globales (activos e inactivos)
         const [globales] = await db.query(`
             SELECT 
-                id, titulo, mensaje, prioridad, activo, 
-                fecha_creacion, fecha_vencimiento, 'global' as tipo
-            FROM avisos_globales
+                id, titulo, contenido AS mensaje, prioridad, activo, 
+                fecha_envio, fecha_vencimiento, 'global' AS tipo
+            FROM avisos
+            WHERE club_id IS NULL
         `);
 
-        // 2. Todos los avisos de club
         const [clubes] = await db.query(`
             SELECT 
-                ac.id, c.nombre as nombre_club, ac.contenido as mensaje, 
-                ac.activo, ac.fecha_envio, 'club' as tipo
-            FROM avisos_club ac
-            JOIN clubes c ON ac.club_id = c.id
+                a.id, c.nombre AS nombre_club, a.contenido AS mensaje, 
+                a.activo, a.fecha_envio, 'club' AS tipo
+            FROM avisos a
+            JOIN clubes c ON a.club_id = c.id
+            WHERE a.club_id IS NOT NULL
         `);
 
-        // 3. Unir y ordenar por fecha (más recientes primero)
-        const todos = [...globales, ...clubes].sort((a, b) => new Date(b.fecha_creacion || b.fecha_envio) - new Date(a.fecha_creacion || a.fecha_envio));
+        const todos = [...globales, ...clubes].sort((a, b) => new Date(b.fecha_envio) - new Date(a.fecha_envio));
 
         res.status(200).json(todos);
     } catch (error) {
@@ -101,18 +94,10 @@ router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) =>
     }
 });
 
-// Elimina un aviso global o de club. Solo el administrador puede realizar esta acción.
 router.delete('/:tipo/:id', verifyToken, requireVerificado, async (req, res) => {
     const { tipo, id } = req.params;
-    const tablasPermitidas = {
-        global: 'avisos_globales',
-        club: 'avisos_club'
-    };
-    const tabla = tablasPermitidas[tipo];
 
-    if (!tabla || !/^\d+$/.test(id)) {
-        return res.status(400).json({ message: 'Tipo o identificador de aviso inválido.' });
-    }
+    if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Identificador de aviso inválido.' });
 
     try {
         const [usuarios] = await db.query('SELECT role_id FROM usuarios WHERE id = ?', [req.user.id]);
@@ -120,14 +105,11 @@ router.delete('/:tipo/:id', verifyToken, requireVerificado, async (req, res) => 
             return res.status(403).json({ message: 'Acceso denegado. Solo para administradores.' });
         }
 
-        const [resultado] = await db.query(`DELETE FROM ${tabla} WHERE id = ?`, [Number(id)]);
-        if (resultado.affectedRows === 0) {
-            return res.status(404).json({ message: 'El aviso no existe o ya fue eliminado.' });
-        }
+        const [resultado] = await db.query(`DELETE FROM avisos WHERE id = ?`, [Number(id)]);
+        if (resultado.affectedRows === 0) return res.status(404).json({ message: 'El aviso no existe o ya fue eliminado.' });
 
         res.status(200).json({ message: 'Aviso eliminado correctamente.' });
     } catch (error) {
-        console.error('Error al eliminar aviso:', error.message);
         res.status(500).json({ message: 'No se pudo eliminar el aviso.' });
     }
 });
