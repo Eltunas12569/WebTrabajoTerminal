@@ -4,8 +4,7 @@ const db = require('../config/db');
 const verificarToken = require('../middlewares/authMiddleware');
 const requireVerificado = require('../middlewares/verificarCuentaMiddleware'); // NUEVO
 
-// Convierte cualquier valor de fecha recibido del cliente a formato DATETIME de MySQL.
-// Devuelve null si el valor no es una fecha válida, para que el endpoint pueda rechazarla.
+
 function convertirAFechaMySQL(valor) {
     const fecha = new Date(valor);
     if (isNaN(fecha.getTime())) return null;
@@ -60,8 +59,8 @@ router.get('/:id/chat', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [mensajes] = await db.query(`
             SELECT c.id, c.club_id, c.usuario_id, c.mensaje, c.fecha_envio, CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre
-            FROM chat_club c JOIN usuarios u ON c.usuario_id = u.id
-            WHERE c.club_id = ? ORDER BY c.fecha_envio ASC
+            FROM chat_mensajes c JOIN usuarios u ON c.usuario_id = u.id
+            WHERE c.club_id = ? AND c.tipo_sala = 'club' ORDER BY c.fecha_envio ASC
         `, [req.params.id]);
         res.status(200).json(mensajes);
     } catch (error) { res.status(500).json({ message: "Error al cargar chat" }); }
@@ -71,7 +70,7 @@ router.get('/:id/avisos', verificarToken, requireVerificado, async (req, res) =>
     try {
         const [avisos] = await db.query(`
             SELECT a.*, CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre
-            FROM avisos_club a JOIN usuarios u ON a.usuario_id = u.id
+            FROM avisos a JOIN usuarios u ON a.usuario_id = u.id
             WHERE a.club_id = ? AND a.activo = 1 ORDER BY a.fecha_envio DESC
         `, [req.params.id]);
         res.status(200).json(avisos);
@@ -81,10 +80,8 @@ router.get('/:id/avisos', verificarToken, requireVerificado, async (req, res) =>
 router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) => {
     const { contenido } = req.body;
     try {
-        await db.query(`INSERT INTO avisos_club (club_id, usuario_id, contenido) VALUES (?, ?, ?)`, [req.params.id, req.user.id, contenido]);
+        await db.query(`INSERT INTO avisos (club_id, usuario_id, contenido, fecha_envio) VALUES (?, ?, ?, NOW())`, [req.params.id, req.user.id, contenido]);
 
-        // Se emite desde un endpoint REST ya protegido por verificarToken, no desde un
-        // socket sin autenticar, así que no requiere ajustes tras proteger el handshake.
         const io = req.app.get('socketio');
         io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso' });
 
@@ -140,39 +137,110 @@ router.post('/:id/eventos/:idEvento/asistencia', verificarToken, requireVerifica
     } catch (error) { res.status(500).json({ message: "Error al registrar asistencia" }); }
 });
 
-router.post('/:id/recursos', verificarToken, requireVerificado, async (req, res) => {
-    const { tipo_club, tipo_recurso, nombre_recurso, cantidad, unidad, especificaciones, opciones_marcas, motivo } = req.body;
+
+
+// ==========================================
+// --- CHAT GLOBAL DE DIRECTIVOS (ADMIN Y ENCARGADOS) ---
+// ==========================================
+router.get('/chat-directivos/historial', verificarToken, requireVerificado, async (req, res) => {
+    const idUsuario = req.user.id;
+    const rolUsuario = req.user.rol; // Asumiendo que tu token inyecta el rol en req.user
+
     try {
-        await db.query(
-            `INSERT INTO solicitudes_recursos (club_id, usuario_id, tipo_club, tipo_recurso, nombre_recurso, cantidad, unidad, especificaciones, opciones_marcas, motivo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [req.params.id, req.user.id, tipo_club, tipo_recurso, nombre_recurso, cantidad, unidad, especificaciones, opciones_marcas, motivo]
-        );
-        res.status(201).json({ message: "Solicitud enviada a revisión." });
-    } catch (error) { res.status(500).json({ message: "Error al solicitar recurso" }); }
+        // Barrera de seguridad: Verificar si tiene privilegios para ver esto
+        if (rolUsuario !== 1) {
+            const [esEncargado] = await db.query(
+                `SELECT id FROM inscripciones WHERE usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo' LIMIT 1`,
+                [idUsuario]
+            );
+            if (esEncargado.length === 0) {
+                return res.status(403).json({ message: "Acceso denegado. Exclusivo para administradores y encargados." });
+            }
+        }
+
+        const [mensajes] = await db.query(`
+            SELECT c.id, c.usuario_id, c.mensaje, c.fecha_envio, 
+                   CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre,
+                   u.role_id AS autor_rol,
+                   (
+                       SELECT GROUP_CONCAT(DISTINCT CONCAT(
+                           IF(i.rol_en_club = 'encargado_profesor', 'Profe Titular', 'Alumno Rep.'), ' - ', cl.nombre
+                       ) SEPARATOR ', ')
+                       FROM inscripciones i JOIN clubes cl ON i.club_id = cl.id
+                       WHERE i.usuario_id = c.usuario_id AND i.rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND i.estatus = 'activo'
+                   ) AS etiqueta_encargado
+            FROM chat_mensajes c 
+            JOIN usuarios u ON c.usuario_id = u.id 
+            WHERE c.tipo_sala = 'directivos'
+            ORDER BY c.fecha_envio ASC
+        `);
+        res.status(200).json(mensajes);
+    } catch (error) { 
+        console.error("Error al cargar chat directivos:", error);
+        res.status(500).json({ message: "Error interno al cargar el chat directivo" }); 
+    }
 });
+
+// ==========================================
+// --- CHAT EXCLUSIVO ENTRE ENCARGADOS ---
+// ==========================================
+router.get('/chat-encargados/historial', verificarToken, requireVerificado, async (req, res) => {
+    const idUsuario = req.user.id;
+    try {
+        const [esEncargado] = await db.query(
+            `SELECT id FROM inscripciones WHERE usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo' LIMIT 1`,
+            [idUsuario]
+        );
+        if (esEncargado.length === 0) {
+            return res.status(403).json({ message: "Acceso denegado. Exclusivo para encargados." });
+        }
+
+        const [mensajes] = await db.query(`
+            SELECT c.id, c.usuario_id, c.mensaje, c.fecha_envio, 
+                   CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre,
+                   u.role_id AS autor_rol,
+                   (
+                       SELECT GROUP_CONCAT(DISTINCT CONCAT(
+                           IF(i.rol_en_club = 'encargado_profesor', 'Profe Titular', 'Alumno Rep.'), ' - ', cl.nombre
+                       ) SEPARATOR ', ')
+                       FROM inscripciones i JOIN clubes cl ON i.club_id = cl.id
+                       WHERE i.usuario_id = c.usuario_id AND i.rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND i.estatus = 'activo'
+                   ) AS etiqueta_encargado
+            FROM chat_mensajes c 
+            JOIN usuarios u ON c.usuario_id = u.id 
+            WHERE c.tipo_sala = 'encargados'
+            ORDER BY c.fecha_envio ASC
+        `);
+        res.status(200).json(mensajes);
+    } catch (error) { 
+        res.status(500).json({ message: "Error interno" }); 
+    }
+});
+
 
 // ==========================================
 // --- OBTENER CLUBES GLOBALES ---
 // ==========================================
+
 router.get('/', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [filas] = await db.query(`
             SELECT c.*,
                 p.id AS profesor_encargado_id, p.nombres AS profesor_nombres, CONCAT(p.apellido_paterno, ' ', IFNULL(p.apellido_materno, '')) AS profesor_apellidos,
-                p.correo AS profesor_correo, pd.num_empleado AS profesor_num_empleado,
+                p.correo AS profesor_correo, p.num_empleado AS profesor_num_empleado,
                 a.id AS alumno_encargado_id, a.nombres AS alumno_nombres, CONCAT(a.apellido_paterno, ' ', IFNULL(a.apellido_materno, '')) AS alumno_apellidos,
-                a.correo AS alumno_correo, ad.boleta AS alumno_boleta
+                a.correo AS alumno_correo, a.boleta AS alumno_boleta
             FROM clubes c
             LEFT JOIN inscripciones ip ON c.id = ip.club_id AND ip.rol_en_club = 'encargado_profesor' AND ip.estatus = 'activo'
             LEFT JOIN usuarios p ON ip.usuario_id = p.id
-            LEFT JOIN profesores_detalles pd ON p.id = pd.usuario_id
             LEFT JOIN inscripciones ia ON c.id = ia.club_id AND ia.rol_en_club = 'encargado_alumno' AND ia.estatus = 'activo'
             LEFT JOIN usuarios a ON ia.usuario_id = a.id
-            LEFT JOIN alumnos_detalles ad ON a.id = ad.usuario_id
         `);
         const clubesTratados = filas.map(club => ({ ...club, cronograma: club.cronograma ? JSON.stringify(club.cronograma) : null }));
         res.status(200).json(clubesTratados);
-    } catch (error) { res.status(500).json({ message: "Error interno" }); }
+    } catch (error) { 
+        res.status(500).json({ message: "Error interno" }); 
+    }
 });
 
 router.get('/user/:idUsuario', verificarToken, requireVerificado, async (req, res) => {
@@ -181,25 +249,50 @@ router.get('/user/:idUsuario', verificarToken, requireVerificado, async (req, re
         const [filas] = await db.query(`
             SELECT c.*,
                 p.id AS profesor_encargado_id, p.nombres AS profesor_nombres, CONCAT(p.apellido_paterno, ' ', IFNULL(p.apellido_materno, '')) AS profesor_apellidos,
-                p.correo AS profesor_correo, pd.num_empleado AS profesor_num_empleado,
+                p.correo AS profesor_correo, p.num_empleado AS profesor_num_empleado,
                 a.id AS alumno_encargado_id, a.nombres AS alumno_nombres, CONCAT(a.apellido_paterno, ' ', IFNULL(a.apellido_materno, '')) AS alumno_apellidos,
-                a.correo AS alumno_correo, ad.boleta AS alumno_boleta,
+                a.correo AS alumno_correo, a.boleta AS alumno_boleta,
                 i.estatus AS inscripcion_estatus, i.fecha_inscripcion, i.rol_en_club AS mi_rol_interno,
                 (SELECT COUNT(*) FROM inscripciones WHERE club_id = c.id AND estatus = 'activo' AND rol_en_club != 'encargado_profesor') AS aceptados_count
             FROM clubes c
             JOIN inscripciones i ON c.id = i.club_id AND i.usuario_id = ?
             LEFT JOIN inscripciones ip ON c.id = ip.club_id AND ip.rol_en_club = 'encargado_profesor' AND ip.estatus = 'activo'
             LEFT JOIN usuarios p ON ip.usuario_id = p.id
-            LEFT JOIN profesores_detalles pd ON p.id = pd.usuario_id
             LEFT JOIN inscripciones ia ON c.id = ia.club_id AND ia.rol_en_club = 'encargado_alumno' AND ia.estatus = 'activo'
             LEFT JOIN usuarios a ON ia.usuario_id = a.id
-            LEFT JOIN alumnos_detalles ad ON a.id = ad.usuario_id
         `, [idUsuario]);
 
         const clubesTratados = filas.map(club => ({ ...club, cronograma: club.cronograma ? JSON.stringify(club.cronograma) : null }));
         res.status(200).json(clubesTratados);
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
+
+// ==========================================
+// --- AUDITORÍA DE HISTORIAL DE ENCARGADOS ---
+// ==========================================
+router.get('/:id/historial-encargados', verificarToken, requireVerificado, async (req, res) => {
+    if (req.user.rol !== 1) {
+        return res.status(403).json({ message: "Acceso exclusivo para administradores" });
+    }
+    
+    try {
+        const [historial] = await db.query(`
+            SELECT h.id, h.rol_desempenado AS rol_en_club, h.fecha_inicio, h.fecha_fin,
+                   CONCAT(u.nombres, ' ', u.apellido_paterno) AS nombre_completo,
+                   u.correo, u.num_empleado, u.boleta
+            FROM historial_encargados h
+            JOIN usuarios u ON h.usuario_id = u.id
+            WHERE h.club_id = ?
+            ORDER BY h.fecha_fin DESC
+        `, [req.params.id]);
+        
+        res.status(200).json(historial);
+    } catch (error) {
+        console.error("Error historial:", error);
+        res.status(500).json({ message: "Error al obtener historial" });
+    }
+});
+
 
 // ==========================================
 // --- CREACIÓN, EDICIÓN Y ACCIONES DE ADMIN ---
@@ -237,9 +330,15 @@ router.post('/', verificarToken, requireVerificado, async (req, res) => {
 router.put('/:id', verificarToken, requireVerificado, async (req, res) => {
     const { id } = req.params;
     const { nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, nuevo_profesor_id, nuevo_alumno_id } = req.body;
+    
     try {
         await db.query(
-            `UPDATE clubes SET nombre = ?, descripcion = ?, objetivo = ?, cronograma = ?, detalle_actividades = ?, espacios_tiempos = ?, impacto = ?, estatus = 'en_revision', motivo_rechazo = NULL WHERE id = ?`,
+            `UPDATE clubes 
+             SET nombre = ?, descripcion = ?, objetivo = ?, cronograma = ?, 
+                 detalle_actividades = ?, espacios_tiempos = ?, impacto = ?, 
+                 estatus = IF(estatus = 'rechazado', 'en_revision', estatus), 
+                 motivo_rechazo = IF(estatus = 'rechazado', NULL, motivo_rechazo) 
+             WHERE id = ?`,
             [nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, id]
         );
 
@@ -249,13 +348,17 @@ router.put('/:id', verificarToken, requireVerificado, async (req, res) => {
         const idProfesorAnterior = profesoresActuales.length > 0 ? profesoresActuales[0].usuario_id : null;
         const idAlumnoAnterior = alumnosActuales.length > 0 ? alumnosActuales[0].usuario_id : null;
 
-        if (idProfesorAnterior && idProfesorAnterior !== nuevo_profesor_id) await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, idProfesorAnterior]);
-        if (idAlumnoAnterior && idAlumnoAnterior !== nuevo_alumno_id) await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, idAlumnoAnterior]);
+        if (idProfesorAnterior && idProfesorAnterior !== nuevo_profesor_id) {
+            await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, idProfesorAnterior]);
+        }
+        if (idAlumnoAnterior && idAlumnoAnterior !== nuevo_alumno_id) {
+            await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, idAlumnoAnterior]);
+        }
 
         await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_profesor', estatus = 'activo'`, [nuevo_profesor_id, id]);
         await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_alumno', estatus = 'activo'`, [nuevo_alumno_id, id]);
-
-        res.status(200).json({ message: "Editado y reenviado a revisión correctamente" });
+       
+        res.status(200).json({ message: "Editado y actualizado correctamente" });
     } catch (error) {
         console.error("Error al editar club:", error);
         res.status(500).json({ message: "Error interno al editar" });
@@ -322,10 +425,9 @@ router.get('/:id/miembros', verificarToken, requireVerificado, async (req, res) 
     try {
         const [miembros] = await db.query(`
             SELECT u.id, u.nombres, CONCAT(u.apellido_paterno, ' ', IFNULL(u.apellido_materno, '')) AS apellidos,
-                   ad.boleta, i.rol_en_club, i.estatus
+                   u.boleta, i.rol_en_club, i.estatus
             FROM inscripciones i
             JOIN usuarios u ON i.usuario_id = u.id
-            LEFT JOIN alumnos_detalles ad ON u.id = ad.usuario_id
             WHERE i.club_id = ? AND i.rol_en_club != 'encargado_profesor'
             ORDER BY i.estatus DESC, u.nombres ASC
         `, [req.params.id]);

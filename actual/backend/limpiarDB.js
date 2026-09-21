@@ -4,24 +4,17 @@ const limpiarBaseDeDatos = async () => {
     try {
         console.log("🧹 INICIANDO LIMPIEZA TOTAL DE LA BASE DE DATOS...");
         
-        // Apagamos la revisión de llaves foráneas para poder vaciar sin importar el orden
         await db.query('SET FOREIGN_KEY_CHECKS = 0;');
 
-        // 👇 SE AGREGÓ LA NUEVA TABLA: 'contactos_emergencia' 👇
         const tablas = [
             'roles', 
             'usuarios', 
-            'profesores_detalles', 
-            'alumnos_detalles', 
-            'fichas_medicas',
             'contactos_emergencia', 
             'clubes', 
             'inscripciones', 
             'historial_encargados', 
-            'avisos_club', 
-            'chat_club', 
-            'solicitudes_recursos', 
-            'avisos_globales',
+            'avisos',
+            'chat_mensajes',
             'eventos_club',
             'asistencias_eventos'
         ];
@@ -31,7 +24,6 @@ const limpiarBaseDeDatos = async () => {
             console.log(`✅ Tabla '${tabla}' vaciada y reiniciada a ID 1.`);
         }
 
-        // Volvemos a encender la seguridad de la base de datos
         await db.query('SET FOREIGN_KEY_CHECKS = 1;');
         
         console.log("🚀 Limpieza terminada. Tu base de datos está en blanco y lista.");
