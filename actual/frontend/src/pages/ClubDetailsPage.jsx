@@ -14,30 +14,57 @@ const ClubDetailsPage = () => {
     const [isMember, setIsMember] = useState(location.state?.isMember || false);
     const [loading, setLoading] = useState(!location.state?.club);
     const [error, setError] = useState('');
+    const [copied, setCopied] = useState(false);
+    const [joining, setJoining] = useState(false);
+    const [joinMessage, setJoinMessage] = useState({ text: '', type: '' });
 
-    // Si el usuario recargó la página directamente (F5), los buscamos en la API
+    // Siempre refrescamos los datos para garantizar el código de acceso y estatus más reciente
     useEffect(() => {
-        if (!club) {
-            const fetchData = async () => {
-                try {
-                    const response = await api.get('/clubes');
-                    const clubEncontrado = response.data.find(c => String(c.id) === String(id));
-                    if (!clubEncontrado) throw new Error('Club no encontrado');
-                    setClub(clubEncontrado);
+        const fetchData = async () => {
+            try {
+                const response = await api.get('/clubes');
+                const clubEncontrado = response.data.find(c => String(c.id) === String(id));
+                if (!clubEncontrado) throw new Error('Club no encontrado');
+                setClub(clubEncontrado);
 
-                    if (user?.id) {
-                        const userClubsRes = await api.get(`/clubes/user/${user.id}`);
-                        setIsMember(userClubsRes.data.some(uc => String(uc.id) === String(id)));
-                    }
-                } catch (err) {
-                    setError('Error al cargar la información del club.');
-                } finally {
-                    setLoading(false);
+                if (user?.id) {
+                    const userClubsRes = await api.get(`/clubes/user/${user.id}`);
+                    setIsMember(userClubsRes.data.some(uc => String(uc.id) === String(id)));
                 }
-            };
-            fetchData();
+            } catch (err) {
+                if (!club) setError('Error al cargar la información del club.');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [id, user]);
+
+    const handleCopyCode = () => {
+        if (club?.codigo_union) {
+            navigator.clipboard.writeText(club.codigo_union);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2500);
         }
-    }, [id, club, user]);
+    };
+
+    const handleUnirseDirecto = async () => {
+        if (!club?.codigo_union) return;
+        setJoining(true);
+        setJoinMessage({ text: '', type: '' });
+        try {
+            const res = await api.post('/clubes/unirse', { codigo: club.codigo_union });
+            setJoinMessage({ text: res.data.message || '¡Te has unido exitosamente al club!', type: 'success' });
+            setIsMember(true);
+        } catch (err) {
+            setJoinMessage({
+                text: err.response?.data?.message || 'Error al unirte al club con este código.',
+                type: 'error'
+            });
+        } finally {
+            setJoining(false);
+        }
+    };
 
     if (loading) return <div style={{ textAlign: 'center', padding: '50px', fontSize: '1.2rem' }}>Cargando información del club...</div>;
     if (error || !club) return <div style={{ textAlign: 'center', padding: '50px', color: 'red' }}>{error || 'Club no encontrado'}</div>;
@@ -65,19 +92,50 @@ const ClubDetailsPage = () => {
                             {club.estatus.replace('_', ' ')}
                         </span>
                         
-                        <div style={{ marginTop: '10px' }}>
+                        <div style={{ marginTop: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
                             {isMember ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                                    <span style={{ fontSize: '1rem', background: '#d4edda', color: '#155724', padding: '8px 16px', borderRadius: '20px', fontWeight: 'bold' }}>✓ Ya eres miembro de este club</span>
-                                    <button
-                                        onClick={() => navigate(`/club/${id}/panel`)}
-                                        style={{ padding: '10px 20px', background: '#003366', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-                                    >
-                                        📋 Ir al panel del club
-                                    </button>
+                                    <span style={{ fontSize: '1rem', background: '#d4edda', color: '#155724', padding: '8px 18px', borderRadius: '20px', fontWeight: 'bold' }}>
+                                        ✓ Ya eres miembro activo de este club
+                                    </span>
+                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                        <button
+                                            onClick={() => navigate(`/club/${id}/panel`)}
+                                            style={{ padding: '10px 22px', background: '#003366', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                                        >
+                                            📋 Ir al panel del club
+                                        </button>
+                                        <button
+                                            onClick={() => navigate(`/chat/${id}`)}
+                                            style={{ padding: '10px 22px', background: '#1877f2', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                                        >
+                                            💬 Chat del club
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
-                                <p style={{ color: '#666', fontSize: '1rem', margin: 0 }}>Para unirte, solicita el <b>Código de Unión</b> al Profesor o Alumno Líder e ingrésalo en la sección "Unirse a un Club".</p>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                    <p style={{ color: '#555', fontSize: '1rem', margin: 0 }}>
+                                        ¿Deseas unirte a este club? Consulta el <strong>Código de Acceso</strong> al final de esta página.
+                                    </p>
+                                    <a
+                                        href="#seccion-codigo-acceso"
+                                        style={{
+                                            color: '#003366',
+                                            fontWeight: 'bold',
+                                            fontSize: '0.9rem',
+                                            textDecoration: 'none',
+                                            background: '#e7f3ff',
+                                            padding: '6px 14px',
+                                            borderRadius: '15px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}
+                                    >
+                                        👇 Ir al Código de Acceso
+                                    </a>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -135,6 +193,125 @@ const ClubDetailsPage = () => {
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Tarjeta de Código de Acceso al Club (al final de la página) */}
+                        <div
+                            id="seccion-codigo-acceso"
+                            style={{
+                                background: '#fff',
+                                padding: '30px',
+                                borderRadius: '10px',
+                                boxShadow: '0 2px 8px rgba(0, 51, 102, 0.08)',
+                                border: '2px dashed #003366',
+                                textAlign: 'center'
+                            }}
+                        >
+                            <h3 style={{ margin: '0 0 10px 0', color: '#003366', fontSize: '1.4rem', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                🔑 Código de Acceso al Club
+                            </h3>
+                            <p style={{ margin: '0 0 20px 0', fontSize: '0.95rem', color: '#555', lineHeight: '1.5' }}>
+                                {isMember
+                                    ? 'Este es el código de acceso oficial de tu club. Puedes compartirlo con otros alumnos para que se unan:'
+                                    : 'Utiliza este código para unirte a las actividades, eventos y avisos oficiales de este club:'}
+                            </p>
+
+                            {club.codigo_union ? (
+                                <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '12px',
+                                        marginBottom: '18px',
+                                        flexWrap: 'wrap'
+                                    }}>
+                                        <span style={{
+                                            fontSize: '2.2rem',
+                                            fontWeight: '900',
+                                            letterSpacing: '5px',
+                                            color: '#003366',
+                                            fontFamily: 'monospace',
+                                            background: '#f8fafc',
+                                            padding: '10px 28px',
+                                            borderRadius: '10px',
+                                            border: '2px solid #003366',
+                                            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)'
+                                        }}>
+                                            {club.codigo_union}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={handleCopyCode}
+                                            style={{
+                                                padding: '12px 20px',
+                                                borderRadius: '8px',
+                                                border: 'none',
+                                                background: copied ? '#28a745' : '#003366',
+                                                color: '#fff',
+                                                fontWeight: 'bold',
+                                                cursor: 'pointer',
+                                                fontSize: '0.95rem',
+                                                transition: 'all 0.2s',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                            }}
+                                        >
+                                            {copied ? '✓ ¡Copiado!' : '📋 Copiar Código'}
+                                        </button>
+                                    </div>
+
+                                    {!isMember ? (
+                                        <button
+                                            type="button"
+                                            onClick={handleUnirseDirecto}
+                                            disabled={joining}
+                                            style={{
+                                                width: '100%',
+                                                padding: '14px',
+                                                background: '#28a745',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                fontWeight: 'bold',
+                                                fontSize: '1.05rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '8px',
+                                                boxShadow: '0 4px 12px rgba(40,167,69,0.3)',
+                                                transition: 'background 0.2s'
+                                            }}
+                                        >
+                                            {joining ? '⏳ Uniéndote al club...' : '🚀 Unirme a este Club Ahora'}
+                                        </button>
+                                    ) : (
+                                        <span style={{ fontSize: '0.95rem', background: '#d4edda', color: '#155724', padding: '8px 18px', borderRadius: '20px', fontWeight: 'bold', display: 'inline-block' }}>
+                                            ✓ Ya eres miembro activo de este club
+                                        </span>
+                                    )}
+
+                                    {joinMessage.text && (
+                                        <div style={{
+                                            marginTop: '15px',
+                                            padding: '12px',
+                                            borderRadius: '8px',
+                                            fontSize: '0.95rem',
+                                            fontWeight: 'bold',
+                                            background: joinMessage.type === 'success' ? '#d4edda' : '#f8d7da',
+                                            color: joinMessage.type === 'success' ? '#155724' : '#721c24'
+                                        }}>
+                                            {joinMessage.text}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div style={{ padding: '14px', background: '#fff3cd', color: '#856404', borderRadius: '8px', fontSize: '0.95rem', maxWidth: '450px', margin: '0 auto' }}>
+                                    ⚠️ Este club no cuenta con un código de unión activo en este momento.
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

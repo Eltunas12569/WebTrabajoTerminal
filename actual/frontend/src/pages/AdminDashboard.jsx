@@ -13,7 +13,6 @@ const AdminDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
-    const [showFilters, setShowFilters] = useState(false);
 
     // Función para generar un color aleatorio consistente por usuario
     const getAvatarColor = (name) => {
@@ -67,6 +66,24 @@ const AdminDashboard = () => {
         return matchesName && matchesStatus;
     });
 
+    const statusOptions = [
+        { value: 'all', label: 'Todos' },
+        { value: 'esperando_firmas', label: 'Esperando firmas' },
+        { value: 'en_revision', label: 'En revisión' },
+        { value: 'activo', label: 'Activos' },
+        { value: 'rechazado', label: 'Rechazados' },
+        { value: 'inactivo', label: 'Inactivos' }
+    ];
+
+    const counts = {
+        all: clubes.length,
+        esperando_firmas: clubes.filter(c => c.estatus === 'esperando_firmas').length,
+        en_revision: clubes.filter(c => c.estatus === 'en_revision').length,
+        activo: clubes.filter(c => c.estatus === 'activo').length,
+        rechazado: clubes.filter(c => c.estatus === 'rechazado').length,
+        inactivo: clubes.filter(c => c.estatus === 'inactivo').length
+    };
+
     const noClubsMessage = loading
         ? 'Buscando clubes en la base de datos...'
         : clubes.length === 0
@@ -113,77 +130,117 @@ const AdminDashboard = () => {
                                 📢 Gestión de Avisos
                             </li>
                             <li onClick={goToUsers}>👥 Usuarios del sistema</li>
+                            <li onClick={() => navigate('/chat-directivos')}>🏛️ Chat de Directivos</li>
                         </ul>
                     </nav>
                     <button onClick={logout} className="logout-button">Cerrar Sesión</button>
                 </aside>
 
                 <main className="admin-main-scroll">
-                    <div className="page-header" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
-                        <div>
-                            <h2 style={{ margin: 0 }}>Gestión de Clubes</h2>
-                            <hr style={{ marginTop: '12px', borderColor: '#d1d5db' }} />
+                    <div style={{ marginBottom: '24px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                            <h2 style={{ margin: 0, color: '#003366', fontSize: '1.6rem', fontWeight: '700' }}>Gestión de Clubes</h2>
+                            <span style={{ fontSize: '0.9rem', color: '#003366', background: '#e7f3ff', padding: '4px 12px', borderRadius: '15px', fontWeight: '600' }}>
+                                Total: {clubes.length} {clubes.length === 1 ? 'club' : 'clubes'}
+                            </span>
                         </div>
-                        <div style={{ position: 'relative' }}>
-                            <button
-                                onClick={() => setShowFilters(!showFilters)}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '10px 14px',
-                                    borderRadius: '999px',
-                                    border: '1px solid #d1d5db',
-                                    backgroundColor: '#fff',
-                                    cursor: 'pointer',
-                                    fontWeight: '600',
-                                    color: '#1c1e21'
-                                }}
-                            >
-                                <span>🔍</span>
-                                <span>Filtros</span>
-                            </button>
-                            {showFilters && (
-                                <div style={{
-                                    position: 'absolute',
-                                    top: 'calc(100% + 12px)',
-                                    right: 0,
-                                    width: '320px',
-                                    background: '#fff',
-                                    border: '1px solid #e5e7eb',
-                                    borderRadius: '16px',
-                                    boxShadow: '0 18px 50px rgba(15, 23, 42, 0.12)',
-                                    padding: '16px',
-                                    zIndex: 20
-                                }}>
-                                    <div style={{ marginBottom: '14px', fontWeight: '700', color: '#111' }}>Opciones de filtro</div>
-                                    <div style={{ marginBottom: '14px' }}>
-                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>Nombre</label>
-                                        <input
-                                            type="text"
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                            placeholder="Busca un club..."
-                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #d1d5db', background: '#fff', outline: 'none' }}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>Estado</label>
-                                        <select
-                                            value={statusFilter}
-                                            onChange={(e) => setStatusFilter(e.target.value)}
-                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+                        <hr style={{ margin: '0 0 18px 0', borderColor: '#d1d5db' }} />
+
+                        {/* Barra de Búsqueda y Filtros de Estado como Botones */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            flexWrap: 'wrap',
+                            background: '#fff',
+                            padding: '12px 16px',
+                            borderRadius: '10px',
+                            boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                            border: '1px solid #e4e6eb'
+                        }}>
+                            {/* Búsqueda por nombre */}
+                            <div style={{ position: 'relative', minWidth: '220px', maxWidth: '300px', flex: '1 1 220px' }}>
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="🔍 Buscar por nombre..."
+                                    style={{
+                                        width: '100%',
+                                        padding: '9px 32px 9px 12px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #d1d5db',
+                                        background: '#f9fafb',
+                                        outline: 'none',
+                                        fontSize: '0.9rem',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                                {searchTerm && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchTerm('')}
+                                        style={{
+                                            position: 'absolute',
+                                            right: '10px',
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: '#888',
+                                            fontSize: '0.85rem'
+                                        }}
+                                        title="Limpiar búsqueda"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Separador vertical */}
+                            <div style={{ width: '1px', height: '28px', background: '#e5e7eb' }} />
+
+                            {/* Botones de filtro por estado */}
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                {statusOptions.map((opt) => {
+                                    const isSelected = statusFilter === opt.value;
+                                    const count = counts[opt.value] || 0;
+                                    return (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => setStatusFilter(opt.value)}
+                                            style={{
+                                                padding: '7px 14px',
+                                                borderRadius: '20px',
+                                                border: isSelected ? '1px solid #003366' : '1px solid #d1d5db',
+                                                background: isSelected ? '#003366' : '#fff',
+                                                color: isSelected ? '#fff' : '#4b5563',
+                                                fontWeight: isSelected ? '700' : '500',
+                                                fontSize: '0.85rem',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                transition: 'all 0.15s ease'
+                                            }}
                                         >
-                                            <option value="all">Todos los estados</option>
-                                            <option value="esperando_firmas">Esperando firmas</option>
-                                            <option value="en_revision">En revisión</option>
-                                            <option value="activo">Activo</option>
-                                            <option value="rechazado">Rechazado</option>
-                                            <option value="inactivo">Inactivo</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            )}
+                                            <span>{opt.label}</span>
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                padding: '1px 6px',
+                                                borderRadius: '10px',
+                                                background: isSelected ? 'rgba(255,255,255,0.25)' : '#e5e7eb',
+                                                color: isSelected ? '#fff' : '#374151',
+                                                fontWeight: 'bold'
+                                            }}>
+                                                {count}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
 

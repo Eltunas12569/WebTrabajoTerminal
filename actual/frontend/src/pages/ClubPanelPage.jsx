@@ -19,6 +19,46 @@ const ClubPanelPage = () => {
     const [avisos, setAvisos] = useState([]);
     const [loadingAvisos, setLoadingAvisos] = useState(false);
     const [nuevoAviso, setNuevoAviso] = useState('');
+    const [descartadosAvisos, setDescartadosAvisos] = useState([]);
+
+    useEffect(() => {
+        if (user?.id) {
+            try {
+                const guardados = localStorage.getItem(`avisos_descartados_${user.id}`);
+                if (guardados) setDescartadosAvisos(JSON.parse(guardados));
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    }, [user]);
+
+    const handleDescartarAviso = (avisoId, e) => {
+        if (e) e.stopPropagation();
+        if (!user?.id) return;
+        try {
+            const key = `club-${avisoId}`;
+            const nuevos = [...descartadosAvisos, key];
+            setDescartadosAvisos(nuevos);
+            localStorage.setItem(`avisos_descartados_${user.id}`, JSON.stringify(nuevos));
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleRestaurarAvisos = () => {
+        if (!user?.id) return;
+        try {
+            const guardados = localStorage.getItem(`avisos_descartados_${user.id}`);
+            if (guardados) {
+                const parsed = JSON.parse(guardados);
+                const filtrados = parsed.filter(k => !avisos.some(a => `club-${a.id}` === k));
+                localStorage.setItem(`avisos_descartados_${user.id}`, JSON.stringify(filtrados));
+                setDescartadosAvisos(filtrados);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     const [eventos, setEventos] = useState([]);
     const [loadingEventos, setLoadingEventos] = useState(false);
@@ -28,6 +68,9 @@ const ClubPanelPage = () => {
         fecha_evento: '',
         lugar: ''
     });
+
+    const [miembros, setMiembros] = useState([]);
+    const [loadingMiembros, setLoadingMiembros] = useState(false);
 
     const canManage = club && ['encargado_profesor', 'encargado_alumno'].includes(club.mi_rol_interno);
     const canAccess = club && !['en_revision', 'esperando_firmas', 'inactivo', 'rechazado'].includes(club.estatus);
@@ -80,10 +123,23 @@ const ClubPanelPage = () => {
         }
     };
 
+    const fetchMiembros = async () => {
+        setLoadingMiembros(true);
+        try {
+            const response = await api.get(`/clubes/${clubId}/miembros`);
+            setMiembros(response.data || []);
+        } catch (err) {
+            console.error('Error al cargar miembros:', err);
+        } finally {
+            setLoadingMiembros(false);
+        }
+    };
+
     useEffect(() => {
         if (!club || !canAccess) return;
         if (activeTab === 'avisos') fetchAvisos();
         if (activeTab === 'eventos') fetchEventos();
+        if (activeTab === 'miembros') fetchMiembros();
     }, [club, activeTab, clubId, canAccess]);
 
     // WebSocket: Escuchar actualizaciones en tiempo real de avisos y eventos
@@ -190,7 +246,7 @@ const ClubPanelPage = () => {
                     ) : (
                         <>
                             <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                                {['avisos', 'eventos'].map((tab) => (
+                                {['avisos', 'eventos', 'miembros'].map((tab) => (
                                     <button
                                         key={tab}
                                         onClick={() => { setActiveTab(tab); setError(''); setSuccess(''); }}
@@ -206,6 +262,7 @@ const ClubPanelPage = () => {
                                     >
                                         {tab === 'avisos' && '📢 Avisos'}
                                         {tab === 'eventos' && '📅 Eventos'}
+                                        {tab === 'miembros' && '👥 Miembros'}
                                     </button>
                                 ))}
                             </div>
@@ -226,20 +283,71 @@ const ClubPanelPage = () => {
                                             <button type="submit" className="btn-review-club" style={{ marginTop: '12px' }}>Publicar aviso</button>
                                         </form>
                                     )}
-                                    <h3 style={{ color: '#003366' }}>Avisos del club</h3>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                                        <h3 style={{ color: '#003366', margin: 0 }}>Avisos del club</h3>
+                                        {avisos.some(a => descartadosAvisos.includes(`club-${a.id}`)) && (
+                                            <button
+                                                onClick={handleRestaurarAvisos}
+                                                style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: '#003366',
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: 'bold',
+                                                    cursor: 'pointer',
+                                                    textDecoration: 'underline'
+                                                }}
+                                            >
+                                                ↺ Restaurar avisos descartados
+                                            </button>
+                                        )}
+                                    </div>
                                     {loadingAvisos ? (
                                         <p>Cargando avisos...</p>
-                                    ) : avisos.length > 0 ? (
-                                        avisos.map((aviso) => (
+                                    ) : avisos.filter(a => !descartadosAvisos.includes(`club-${a.id}`)).length > 0 ? (
+                                        avisos.filter(a => !descartadosAvisos.includes(`club-${a.id}`)).map((aviso) => (
                                             <div key={aviso.id} style={{ borderLeft: '4px solid #17a2b8', padding: '14px', marginBottom: '12px', background: '#f8f9fa', borderRadius: '6px' }}>
-                                                <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '6px' }}>
-                                                    {aviso.autor_nombre} · {new Date(aviso.fecha_envio).toLocaleString('es-MX')}
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                    <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                                                        {aviso.autor_nombre} · {new Date(aviso.fecha_envio).toLocaleString('es-MX')}
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => handleDescartarAviso(aviso.id, e)}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            color: '#888',
+                                                            cursor: 'pointer',
+                                                            fontSize: '0.95rem',
+                                                            fontWeight: 'bold',
+                                                            lineHeight: 1,
+                                                            padding: '3px 6px',
+                                                            borderRadius: '50%',
+                                                            transition: 'all 0.2s ease'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            e.currentTarget.style.color = '#dc3545';
+                                                            e.currentTarget.style.backgroundColor = 'rgba(220, 53, 69, 0.12)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.color = '#888';
+                                                            e.currentTarget.style.backgroundColor = 'transparent';
+                                                        }}
+                                                        title="Eliminar este aviso de mi vista"
+                                                        aria-label="Eliminar aviso de mi vista"
+                                                    >
+                                                        ✕
+                                                    </button>
                                                 </div>
                                                 <p style={{ margin: 0, lineHeight: 1.5 }}>{aviso.contenido}</p>
                                             </div>
                                         ))
                                     ) : (
-                                        <p style={{ color: '#666' }}>No hay avisos publicados.</p>
+                                        <p style={{ color: '#666' }}>
+                                            {avisos.length > 0 
+                                                ? 'Has descartado todos los avisos de este club.' 
+                                                : 'No hay avisos publicados.'}
+                                        </p>
                                     )}
                                 </div>
                             )}
@@ -288,6 +396,60 @@ const ClubPanelPage = () => {
                                         ))
                                     ) : (
                                         <p style={{ color: '#666' }}>No hay eventos programados.</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeTab === 'miembros' && (
+                                <div style={{ background: '#fff', padding: '24px', borderRadius: '10px', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+                                        <h3 style={{ margin: 0, color: '#003366' }}>👥 Miembros e Integrantes del Club</h3>
+                                        <span style={{ fontSize: '0.9rem', background: '#e7f3ff', color: '#003366', padding: '6px 14px', borderRadius: '20px', fontWeight: 'bold' }}>
+                                            Total: {miembros.length} miembros
+                                        </span>
+                                    </div>
+                                    {loadingMiembros ? (
+                                        <p>Cargando integrantes del club...</p>
+                                    ) : miembros.length > 0 ? (
+                                        <div style={{ overflowX: 'auto' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e4e6eb' }}>
+                                                <thead>
+                                                    <tr style={{ backgroundColor: '#003366', color: '#fff' }}>
+                                                        <th style={{ padding: '12px', textAlign: 'left' }}>Nombre</th>
+                                                        <th style={{ padding: '12px', textAlign: 'left' }}>Boleta</th>
+                                                        <th style={{ padding: '12px', textAlign: 'left' }}>Rol en el Club</th>
+                                                        <th style={{ padding: '12px', textAlign: 'center' }}>Estado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {miembros.map((m, idx) => (
+                                                        <tr key={m.id || idx} style={{ borderBottom: '1px solid #eee', backgroundColor: idx % 2 === 0 ? '#fff' : '#f9f9f9' }}>
+                                                            <td style={{ padding: '12px', fontWeight: '600', color: '#333' }}>{m.nombres} {m.apellidos}</td>
+                                                            <td style={{ padding: '12px', color: '#666', fontFamily: 'monospace' }}>{m.boleta || '—'}</td>
+                                                            <td style={{ padding: '12px' }}>
+                                                                <span style={{
+                                                                    fontSize: '0.85rem', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold',
+                                                                    background: m.rol_en_club === 'encargado_profesor' ? '#e7f3ff' : m.rol_en_club === 'encargado_alumno' ? '#e6f4ea' : '#f0f2f5',
+                                                                    color: m.rol_en_club === 'encargado_profesor' ? '#003366' : m.rol_en_club === 'encargado_alumno' ? '#1e8449' : '#555'
+                                                                }}>
+                                                                    {m.rol_en_club === 'encargado_profesor' ? '👨‍🏫 Profesor Encargado' : m.rol_en_club === 'encargado_alumno' ? '🎓 Alumno Encargado' : '🏃 Miembro Atleta'}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                                                                <span style={{
+                                                                    fontSize: '0.8rem', padding: '3px 8px', borderRadius: '10px', fontWeight: 'bold',
+                                                                    background: m.estatus === 'activo' ? '#d4edda' : '#fff3cd', color: m.estatus === 'activo' ? '#155724' : '#856404'
+                                                                }}>
+                                                                    {m.estatus === 'activo' ? '✓ Activo' : '⏳ Pendiente'}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ) : (
+                                        <p style={{ color: '#666' }}>No hay miembros inscritos actualmente.</p>
                                     )}
                                 </div>
                             )}

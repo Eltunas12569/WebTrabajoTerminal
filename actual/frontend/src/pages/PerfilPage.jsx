@@ -17,7 +17,16 @@ const PerfilPage = () => {
         correo: user?.correo || '',
         tipo_sangre: '',
         alergias: '',
-        contactos: [{ nombre: '', telefono: '' }, { nombre: '', telefono: '' }] // Mínimo 2 contactos
+        contactos: [{ nombre: '', telefono: '', parentesco: '' }, { nombre: '', telefono: '', parentesco: '' }] // Mínimo 2 contactos
+    });
+
+    const [institutionalInfo, setInstitutionalInfo] = useState({
+        boleta: '',
+        carrera: '',
+        nss: '',
+        num_empleado: '',
+        verificado: false,
+        role_id: null
     });
 
     const [loading, setLoading] = useState(true);
@@ -35,6 +44,16 @@ const PerfilPage = () => {
                 const response = await api.get('/auth/perfil');
                 const data = response.data;
                 
+                // Guardar datos institucionales recibidos del backend
+                setInstitutionalInfo({
+                    boleta: data.boleta || '',
+                    carrera: data.carrera || '',
+                    nss: data.nss || '',
+                    num_empleado: data.num_empleado || '',
+                    verificado: Boolean(data.verificado),
+                    role_id: data.role_id
+                });
+
                 // Verificamos si el backend envió datos médicos
                 if (data.ficha_medica) {
                     setTieneFicha(true);
@@ -48,8 +67,12 @@ const PerfilPage = () => {
                     tipo_sangre: data.ficha_medica?.tipo_sangre || '',
                     alergias: data.ficha_medica?.alergias || '',
                     contactos: data.ficha_medica?.contactos?.length > 0 
-                        ? data.ficha_medica.contactos.map(c => ({ nombre: c.nombre || '', telefono: c.telefono || '' }))
-                        : [{ nombre: '', telefono: '' }, { nombre: '', telefono: '' }]
+                        ? data.ficha_medica.contactos.map(c => ({
+                            nombre: c.nombre || '',
+                            telefono: c.telefono || '',
+                            parentesco: c.parentesco || ''
+                        }))
+                        : [{ nombre: '', telefono: '', parentesco: '' }, { nombre: '', telefono: '', parentesco: '' }]
                 };
                 setFormData(JSON.parse(JSON.stringify(loadedData)));
                 setOriginalData(JSON.parse(JSON.stringify(loadedData))); // Guardamos la "foto" original profunda
@@ -63,7 +86,7 @@ const PerfilPage = () => {
                     correo: user?.correo || '',
                     tipo_sangre: '',
                     alergias: '',
-                    contactos: [{ nombre: '', telefono: '' }, { nombre: '', telefono: '' }]
+                    contactos: [{ nombre: '', telefono: '', parentesco: '' }, { nombre: '', telefono: '', parentesco: '' }]
                 };
                 setFormData(JSON.parse(JSON.stringify(fallbackData)));
                 setOriginalData(JSON.parse(JSON.stringify(fallbackData))); // Guardamos la "foto" original profunda
@@ -95,7 +118,7 @@ const PerfilPage = () => {
     const addContact = () => {
         setFormData(prev => ({
             ...prev,
-            contactos: [...prev.contactos.map(c => ({ ...c })), { nombre: '', telefono: '' }]
+            contactos: [...prev.contactos.map(c => ({ ...c })), { nombre: '', telefono: '', parentesco: '' }]
         }));
     };
 
@@ -117,7 +140,11 @@ const PerfilPage = () => {
                 apellido_materno: formData.apellido_materno,
                 tipo_sangre: base.tipo_sangre,
                 alergias: base.alergias,
-                contactos: base.contactos
+                contactos: (base.contactos || []).map(c => ({
+                    nombre: c.nombre?.trim() || '',
+                    telefono: c.telefono?.trim() || '',
+                    parentesco: c.parentesco?.trim() || null
+                }))
             };
         }
         return {
@@ -126,7 +153,11 @@ const PerfilPage = () => {
             apellido_materno: base.apellido_materno,
             tipo_sangre: formData.tipo_sangre,
             alergias: formData.alergias,
-            contactos: formData.contactos
+            contactos: (formData.contactos || []).map(c => ({
+                nombre: c.nombre?.trim() || '',
+                telefono: c.telefono?.trim() || '',
+                parentesco: c.parentesco?.trim() || null
+            }))
         };
     };
 
@@ -281,16 +312,79 @@ const PerfilPage = () => {
                             <h1 className="crear-club-title">⚙️ Configuración de Perfil</h1>
                             <p className="crear-club-subtitle">Actualiza tu información personal y datos médicos.</p>
 
+                            {/* Tarjeta de Identidad Institucional IPN / ESCOM */}
+                            {(institutionalInfo.boleta || institutionalInfo.num_empleado || institutionalInfo.carrera || institutionalInfo.nss) && (
+                                <div style={{
+                                    background: 'linear-gradient(135deg, #003366 0%, #002244 100%)',
+                                    color: '#fff',
+                                    padding: '20px',
+                                    borderRadius: '10px',
+                                    marginBottom: '25px',
+                                    boxShadow: '0 4px 12px rgba(0,51,102,0.15)'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <span style={{ fontSize: '1.5rem' }}>🏛️</span>
+                                            <div>
+                                                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#fff', fontWeight: 'bold' }}>Identidad Institucional Politécnica</h3>
+                                                <p style={{ margin: 0, fontSize: '0.85rem', color: '#e0e6ed' }}>Información oficial vinculada a tu expediente IPN - ESCOM</p>
+                                            </div>
+                                        </div>
+                                        {institutionalInfo.verificado ? (
+                                            <span style={{ background: '#28a745', color: '#fff', padding: '5px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                                ✓ Cuenta Verificada
+                                            </span>
+                                        ) : (
+                                            <span style={{ background: '#ffc107', color: '#333', padding: '5px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                                ⏳ Verificación Pendiente
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', background: 'rgba(255,255,255,0.08)', padding: '15px', borderRadius: '8px' }}>
+                                        {institutionalInfo.boleta && (
+                                            <div>
+                                                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#a0c4ff' }}>Número de Boleta</span>
+                                                <p style={{ margin: '4px 0 0 0', fontSize: '1.05rem', fontWeight: 'bold', fontFamily: 'monospace' }}>{institutionalInfo.boleta}</p>
+                                            </div>
+                                        )}
+                                        {institutionalInfo.num_empleado && (
+                                            <div>
+                                                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#a0c4ff' }}>Número de Empleado</span>
+                                                <p style={{ margin: '4px 0 0 0', fontSize: '1.05rem', fontWeight: 'bold', fontFamily: 'monospace' }}>{institutionalInfo.num_empleado}</p>
+                                            </div>
+                                        )}
+                                        {institutionalInfo.carrera && (
+                                            <div>
+                                                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#a0c4ff' }}>Programa Académico / Carrera</span>
+                                                <p style={{ margin: '4px 0 0 0', fontSize: '1rem', fontWeight: '600' }}>{institutionalInfo.carrera}</p>
+                                            </div>
+                                        )}
+                                        {institutionalInfo.nss && (
+                                            <div>
+                                                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#a0c4ff' }}>NSS (Seguro Facultativo)</span>
+                                                <p style={{ margin: '4px 0 0 0', fontSize: '1.05rem', fontWeight: 'bold', fontFamily: 'monospace' }}>{institutionalInfo.nss}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="crear-club-form">
                                 <div style={{ display: 'flex', gap: '30px' }}>
                                     {/* Columna Izquierda: Información Personal */}
                                     <div style={{ flex: 1 }}>
                                         <form onSubmit={(e) => submitData(e, 'personal')}>
                                             <h3 style={{ marginBottom: '15px', color: '#003366', fontSize: '1.1rem' }}>Datos Personales</h3>
-                                            <div className="form-group"><label>Nombres</label><input type="text" name="nombres" value={formData.nombres || ''} onChange={handleChange} required /></div>
+                                            {institutionalInfo.verificado && (
+                                                <div style={{ background: '#e6f4ea', color: '#1e8449', padding: '8px 12px', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '12px', fontWeight: '500' }}>
+                                                    🔒 Tus datos de nombre e identidad están verificados institucionalmente.
+                                                </div>
+                                            )}
+                                            <div className="form-group"><label>Nombres</label><input type="text" name="nombres" value={formData.nombres || ''} onChange={handleChange} required disabled={institutionalInfo.verificado} /></div>
                                             <div style={{ display: 'flex', gap: '10px' }}>
-                                                <div className="form-group" style={{ flex: 1 }}><label>Apellido Paterno</label><input type="text" name="apellido_paterno" value={formData.apellido_paterno || ''} onChange={handleChange} required /></div>
-                                                <div className="form-group" style={{ flex: 1 }}><label>Apellido Materno</label><input type="text" name="apellido_materno" value={formData.apellido_materno || ''} onChange={handleChange} /></div>
+                                                <div className="form-group" style={{ flex: 1 }}><label>Apellido Paterno</label><input type="text" name="apellido_paterno" value={formData.apellido_paterno || ''} onChange={handleChange} required disabled={institutionalInfo.verificado} /></div>
+                                                <div className="form-group" style={{ flex: 1 }}><label>Apellido Materno</label><input type="text" name="apellido_materno" value={formData.apellido_materno || ''} onChange={handleChange} disabled={institutionalInfo.verificado} /></div>
                                             </div>
                                             <div className="form-group"><label>Correo Electrónico</label><input type="email" name="correo" value={formData.correo || ''} disabled title="El correo institucional no puede modificarse" /></div>
                                             
@@ -379,17 +473,21 @@ const PerfilPage = () => {
                                 </div>
 
                                 {formData.contactos.map((contacto, index) => (
-                                    <div key={index} style={{ display: 'flex', gap: '15px', alignItems: 'center', marginTop: '15px', padding: '15px', border: '1px solid #e1e5eb', borderRadius: '8px' }}>
-                                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                                    <div key={index} style={{ display: 'flex', gap: '15px', alignItems: 'center', marginTop: '15px', padding: '15px', border: '1px solid #e1e5eb', borderRadius: '8px', flexWrap: 'wrap' }}>
+                                        <div className="form-group" style={{ flex: '1 1 200px', margin: 0 }}>
                                             <label>Contacto de Emergencia #{index + 1} (Nombre)</label>
-                                            <input type="text" value={contacto.nombre} onChange={(e) => handleContactChange(index, 'nombre', e.target.value)} required />
+                                            <input type="text" value={contacto.nombre} onChange={(e) => handleContactChange(index, 'nombre', e.target.value)} required placeholder="Nombre completo" />
                                         </div>
-                                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                                        <div className="form-group" style={{ flex: '1 1 180px', margin: 0 }}>
                                             <label>Contacto de Emergencia #{index + 1} (Teléfono)</label>
-                                            <input type="text" value={contacto.telefono} onChange={(e) => handleContactChange(index, 'telefono', e.target.value)} required />
+                                            <input type="text" value={contacto.telefono} onChange={(e) => handleContactChange(index, 'telefono', e.target.value)} required placeholder="10 dígitos" />
+                                        </div>
+                                        <div className="form-group" style={{ flex: '1 1 160px', margin: 0 }}>
+                                            <label>Parentesco / Relación</label>
+                                            <input type="text" value={contacto.parentesco || ''} onChange={(e) => handleContactChange(index, 'parentesco', e.target.value)} placeholder="Ej. Padre, Madre, Tutor..." />
                                         </div>
                                         {formData.contactos.length > 2 && (
-                                            <button type="button" onClick={() => removeContact(index)} style={{ padding: '10px', background: '#fce8e6', color: '#e53935', border: 'none', borderRadius: '5px', cursor: 'pointer', alignSelf: 'flex-end', marginBottom: '5px' }} title="Eliminar contacto">
+                                            <button type="button" onClick={() => removeContact(index)} style={{ padding: '10px 14px', background: '#fce8e6', color: '#e53935', border: 'none', borderRadius: '5px', cursor: 'pointer', alignSelf: 'flex-end', marginBottom: '5px' }} title="Eliminar contacto">
                                                 ✖
                                             </button>
                                         )}
