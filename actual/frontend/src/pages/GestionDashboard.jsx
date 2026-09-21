@@ -89,6 +89,49 @@ const GestionDashboard = () => {
         fetchAvisos();
     }, [user]);
 
+    // Gestión de avisos descartados por el usuario actual (almacenamiento local)
+    const [descartadosAvisos, setDescartadosAvisos] = useState([]);
+
+    useEffect(() => {
+        if (user && user.id) {
+            try {
+                const guardados = localStorage.getItem(`avisos_descartados_${user.id}`);
+                if (guardados) {
+                    setDescartadosAvisos(JSON.parse(guardados));
+                }
+            } catch (e) {
+                console.error("Error al cargar avisos descartados:", e);
+            }
+        }
+    }, [user]);
+
+    const handleDescartarAviso = (avisoKey, e) => {
+        if (e) e.stopPropagation();
+        if (!user || !user.id) return;
+        try {
+            const nuevos = [...descartadosAvisos, String(avisoKey)];
+            setDescartadosAvisos(nuevos);
+            localStorage.setItem(`avisos_descartados_${user.id}`, JSON.stringify(nuevos));
+        } catch (err) {
+            console.error("Error al guardar aviso descartado:", err);
+        }
+    };
+
+    const handleRestaurarAvisos = () => {
+        if (!user || !user.id) return;
+        try {
+            localStorage.removeItem(`avisos_descartados_${user.id}`);
+            setDescartadosAvisos([]);
+        } catch (err) {
+            console.error("Error al restaurar avisos:", err);
+        }
+    };
+
+    const avisosVisibles = avisos.filter(aviso => {
+        const key = `${aviso.tipo || 'aviso'}-${aviso.id}`;
+        return !descartadosAvisos.includes(key);
+    });
+
     const fetchAllActiveClubs = async () => {
         setLoadingAllClubs(true);
         try {
@@ -146,6 +189,11 @@ const GestionDashboard = () => {
         }
     };
 
+    const esEncargado = userClubs.some(c => 
+        ['encargado_profesor', 'encargado_alumno'].includes(c.mi_rol_interno) 
+        && c.inscripcion_estatus === 'activo'
+    );
+
     return (
         <div className="web-dashboard">
             <header className="admin-navbar-fixed">
@@ -175,6 +223,14 @@ const GestionDashboard = () => {
                             {user?.role_id === 3 && (
                                 <li onClick={goToCreateClub} className="special-link">➕ Crear Club</li>
                             )}
+
+                            {/* Canales de Chat Institucionales para Encargados */}
+                            {esEncargado && (
+                                <>
+                                    <li onClick={() => { setIsSidebarOpen(false); navigate('/chat-directivos'); }}>🏛️ Chat Directivos</li>
+                                    <li onClick={() => { setIsSidebarOpen(false); navigate('/chat-encargados'); }}>🤝 Chat Encargados</li>
+                                </>
+                            )}
                         </ul>
                     </nav>
                     <button onClick={logout} className="logout-button">Cerrar Sesión</button>
@@ -187,7 +243,7 @@ const GestionDashboard = () => {
                                 className={`folder-btn ${activeTab === 'avisos' ? 'active-avisos' : ''}`}
                                 onClick={() => setActiveTab('avisos')}
                             >
-                                📁 🔔 Avisos <span className="tab-badge">{avisos.length}</span>
+                                📁 🔔 Avisos <span className="tab-badge">{avisosVisibles.length}</span>
                             </button>
                             <button 
                                 className={`folder-btn ${activeTab === 'clubs' ? 'active-clubs' : ''}`}
@@ -203,10 +259,44 @@ const GestionDashboard = () => {
                                     {/* Panel de Invitaciones (Renderizado como avisos urgentes) */}
                                     <AccionesAlumno onUpdate={handleUpdate} mostrar="invitaciones" />
 
+                                    {descartadosAvisos.length > 0 && (
+                                        <div style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            padding: '8px 14px',
+                                            marginBottom: '15px',
+                                            backgroundColor: '#eef2f7',
+                                            borderRadius: '8px',
+                                            fontSize: '0.85rem',
+                                            color: '#555',
+                                            flexWrap: 'wrap',
+                                            gap: '8px'
+                                        }}>
+                                            <span>🗑️ Has descartado {descartadosAvisos.length} aviso(s) para tu cuenta.</span>
+                                            <button
+                                                onClick={handleRestaurarAvisos}
+                                                style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: '#003366',
+                                                    fontWeight: 'bold',
+                                                    cursor: 'pointer',
+                                                    textDecoration: 'underline',
+                                                    padding: 0,
+                                                    fontSize: '0.85rem'
+                                                }}
+                                            >
+                                                ↺ Restaurar todos los avisos
+                                            </button>
+                                        </div>
+                                    )}
+
                                     {loadingAvisos ? (
                                         <p style={{ padding: '20px' }}>Cargando avisos...</p>
-                                    ) : avisos.length > 0 ? (
-                                        avisos.map(aviso => {
+                                    ) : avisosVisibles.length > 0 ? (
+                                        avisosVisibles.map(aviso => {
+                                            const avisoKey = `${aviso.tipo || 'aviso'}-${aviso.id}`;
                                             const prioridadStr = aviso.prioridad ? String(aviso.prioridad).toLowerCase().trim() : 'normal';
                                             let borderColor = '#003366';
                                             let bgColor = '#f8f9fa';
@@ -222,22 +312,58 @@ const GestionDashboard = () => {
                                                 bgColor = 'rgba(40, 167, 69, 0.05)';
                                             }
                                             return (
-                                            <div key={`${aviso.tipo}-${aviso.id}`} className="aviso-item" style={{ borderLeft: `5px solid ${borderColor}`, backgroundColor: bgColor, padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
+                                            <div key={avisoKey} className="aviso-item" style={{ borderLeft: `5px solid ${borderColor}`, backgroundColor: bgColor, padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
                                                 <div className="aviso-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                                     <h4 style={{ margin: 0, color: borderColor }}>
                                                         {aviso.tipo === 'global' ? '🌍 ' : '🛡️ '} 
                                                         {aviso.titulo}
                                                     </h4>
-                                                    <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 'bold' }}>
-                                                        {new Date(aviso.fecha_envio || aviso.tiempo).toLocaleDateString('es-MX')}
-                                                    </span>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                        <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 'bold' }}>
+                                                            {new Date(aviso.fecha_envio || aviso.tiempo).toLocaleDateString('es-MX')}
+                                                        </span>
+                                                        <button
+                                                            onClick={(e) => handleDescartarAviso(avisoKey, e)}
+                                                            style={{
+                                                                background: 'none',
+                                                                border: 'none',
+                                                                color: '#888',
+                                                                cursor: 'pointer',
+                                                                fontSize: '1rem',
+                                                                fontWeight: 'bold',
+                                                                lineHeight: 1,
+                                                                padding: '4px 8px',
+                                                                borderRadius: '50%',
+                                                                transition: 'all 0.2s ease',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center'
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                e.currentTarget.style.color = '#dc3545';
+                                                                e.currentTarget.style.backgroundColor = 'rgba(220, 53, 69, 0.12)';
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                e.currentTarget.style.color = '#888';
+                                                                e.currentTarget.style.backgroundColor = 'transparent';
+                                                            }}
+                                                            title="Eliminar este aviso de mi vista"
+                                                            aria-label="Eliminar aviso de mi vista"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <p style={{ margin: 0, color: '#333', lineHeight: '1.5' }}>{aviso.contenido || aviso.mensaje || aviso.descripcion}</p>
                                             </div>
                                             );
                                         })
                                     ) : (
-                                        <p style={{ padding: '20px' }}>No hay avisos nuevos por el momento.</p>
+                                        <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                                            {avisos.length > 0 
+                                                ? 'Has descartado todos los avisos recibidos.' 
+                                                : 'No hay avisos nuevos por el momento.'}
+                                        </p>
                                     )}
                                 </div>
                             ) : activeTab === 'unirse' ? (
@@ -282,64 +408,105 @@ const GestionDashboard = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-                                    <div className="clubs-list-simple">
-                                        {loadingClubs ? (
-                                            <p>Cargando tus clubes...</p>
-                                        ) : userClubs.length > 0 ? (
-                                            userClubs.map(club => {
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    <h3 style={{ margin: '0 0 10px 0', color: '#003366', borderBottom: '2px solid #e1e5eb', paddingBottom: '10px' }}>
+                                        🏆 Mis Clubs Inscritos
+                                    </h3>
+                                    {loadingClubs ? (
+                                        <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>Cargando tus clubes...</p>
+                                    ) : userClubs.length > 0 ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                            {userClubs.map(club => {
                                                 const canEnterChat = club.estatus !== 'en_revision' && club.estatus !== 'esperando_firmas';
                                                 return (
-                                                <div 
-                                                    key={club.id} 
-                                                    className="club-row"
-                                                    style={{ 
-                                                        borderLeft: canEnterChat ? '4px solid #1877f2' : 'none'
-                                                    }}
-                                                >
-                                                    <div className="club-row-info">
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <h4 style={{ margin: '0 0 5px 0' }}>{club.nombre}</h4>
+                                                    <div 
+                                                        key={club.id} 
+                                                        onClick={() => {
+                                                            if (canEnterChat) {
+                                                                navigate(`/chat/${club.id}`);
+                                                            } else {
+                                                                navigate(`/club/${club.id}/panel`);
+                                                            }
+                                                        }}
+                                                        style={{ 
+                                                            background: '#ffffff',
+                                                            border: '1px solid #e1e5eb',
+                                                            borderLeft: '5px solid #003366',
+                                                            borderRadius: '12px',
+                                                            padding: '20px 24px',
+                                                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: '12px'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            e.currentTarget.style.transform = 'translateY(-2px)';
+                                                            e.currentTarget.style.boxShadow = '0 6px 18px rgba(0, 51, 102, 0.12)';
+                                                            e.currentTarget.style.borderColor = '#003366';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.transform = 'translateY(0)';
+                                                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)';
+                                                            e.currentTarget.style.borderColor = '#e1e5eb';
+                                                        }}
+                                                        title={club.nombre}
+                                                    >
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                                                <h4 style={{ margin: 0, color: '#003366', fontSize: '1.2rem', fontWeight: '700' }}>
+                                                                    🏆 {club.nombre}
+                                                                </h4>
+                                                                {club.mi_rol_interno && (
+                                                                    <span style={{
+                                                                        fontSize: '0.78rem',
+                                                                        padding: '3px 10px',
+                                                                        borderRadius: '12px',
+                                                                        background: club.mi_rol_interno === 'encargado_profesor' ? '#e7f3ff' : club.mi_rol_interno === 'encargado_alumno' ? '#e6f4ea' : '#f0f2f5',
+                                                                        color: club.mi_rol_interno === 'encargado_profesor' ? '#003366' : club.mi_rol_interno === 'encargado_alumno' ? '#1e8449' : '#555',
+                                                                        fontWeight: 'bold'
+                                                                    }}>
+                                                                        {club.mi_rol_interno === 'encargado_profesor' ? '👨‍🏫 Profesor Titular' : club.mi_rol_interno === 'encargado_alumno' ? '🎓 Alumno Encargado' : '🏃 Miembro'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                <span className={`club-tag tag-${club.estatus?.toLowerCase()}`} style={{ margin: 0 }}>
+                                                                    {club.estatus?.replace('_', ' ')}
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                        <p>Encargado: {club.profesor_nombres} {club.profesor_apellidos}</p>
-                                                        <p>Estatus del club: {club.estatus}</p>
 
-                                                        {canEnterChat && (
-                                                            <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
-                                                                <button
-                                                                    onClick={() => navigate(`/club/${club.id}/panel`)}
+                                                        <div style={{ fontSize: '0.92rem', color: '#555', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                            <p style={{ margin: 0 }}>
+                                                                👨‍🏫 <strong>Encargado:</strong> {club.profesor_nombres} {club.profesor_apellidos}
+                                                            </p>
+                                                            {club.descripcion && (
+                                                                <p style={{ margin: 0, color: '#666', fontSize: '0.88rem' }}>
+                                                                    {club.descripcion}
+                                                                </p>
+                                                            )}
+                                                        </div>
+
+                                                        {club.mi_rol_interno === 'encargado_profesor' && club.estatus === 'esperando_firmas' && (
+                                                            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f0f2f5', paddingTop: '12px', marginTop: '4px' }}>
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); openMembersModal(club); }}
                                                                     className="btn-review-club"
+                                                                    style={{ padding: '7px 14px', fontSize: '0.85rem' }}
                                                                 >
-                                                                    📋 Panel del club
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => navigate(`/chat/${club.id}`)}
-                                                                    style={{ padding: '8px 14px', background: '#1877f2', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-                                                                >
-                                                                    💬 Chat
+                                                                    📋 Ver Detalles y Firmas
                                                                 </button>
                                                             </div>
                                                         )}
-                                                        
-                                                        {/* Botón exclusivo para los Profesores Titulares en etapa de recolección de firmas */}
-                                                        {club.mi_rol_interno === 'encargado_profesor' && club.estatus === 'esperando_firmas' && (
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); openMembersModal(club); }}
-                                                                className="btn-review-club"
-                                                                style={{ marginTop: '12px' }}
-                                                            >
-                                                                📋 Ver Detalles y Firmas
-                                                            </button>
-                                                        )}
                                                     </div>
-                                                </div>
                                                 );
-                                            })
-                                        ) : (
-                                            <p>No estás inscrito en ningún club activo.</p>
-                                        )}
-                                    </div>
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>No estás inscrito en ningún club activo.</p>
+                                    )}
                                 </div>
                             )}
                         </div>

@@ -101,17 +101,69 @@ const ClubChatPage = () => {
                 <div className="nav-left">
                     <span className="nav-title">🏆 Chat del Club</span>
                 </div>
-                <div className="nav-right">
+                <div className="nav-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <button
+                        onClick={() => navigate(`/club/${club.id}/panel`)}
+                        style={{
+                            background: '#28a745',
+                            border: 'none',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '0.88rem',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                            transition: 'background 0.2s'
+                        }}
+                        title="Ir al panel del club para ver avisos, eventos y miembros"
+                    >
+                        📋 Panel del Club
+                    </button>
                     <button onClick={() => navigate('/gestion')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', cursor: 'pointer', padding: '8px 15px', borderRadius: '5px', fontWeight: 'bold' }}>🔙 Volver a Mis Actividades</button>
                 </div>
             </header>
 
             <div style={{ marginTop: '65px', height: 'calc(100vh - 65px)', backgroundColor: '#e5ddd5', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '15px 25px', backgroundColor: '#002244', color: '#fff', display: 'flex', alignItems: 'center', gap: '15px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
+                <div style={{
+                    padding: '12px 25px',
+                    backgroundColor: '#002244',
+                    color: '#fff',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '15px',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                    flexWrap: 'wrap'
+                }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{club.nombre}</h3>
-                        <span style={{ fontSize: '0.85rem', color: '#d4edda' }}>🟢 Conversación en vivo protegida</span>
+                        <h3 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            🏆 {club.nombre}
+                        </h3>
+                        <span style={{ fontSize: '0.85rem', color: '#d4edda' }}>🟢 Conversación en vivo del club</span>
                     </div>
+                    <button
+                        onClick={() => navigate(`/club/${club.id}/panel`)}
+                        style={{
+                            background: '#00509e',
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            padding: '7px 15px',
+                            borderRadius: '6px',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '0.85rem',
+                            transition: 'background 0.2s'
+                        }}
+                    >
+                        📋 Ver Avisos y Eventos del Club →
+                    </button>
                 </div>
                 
                 <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>

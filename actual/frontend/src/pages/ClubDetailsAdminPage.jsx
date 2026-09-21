@@ -61,17 +61,19 @@ const ClubDetailsAdminPage = () => {
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [actionError, setActionError] = useState('');
     const [historialEncargados, setHistorialEncargados] = useState([]);
+    const [miembros, setMiembros] = useState([]);
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                // Cargar datos de clubes, profesores, alumnos e historial al mismo tiempo
-                const [clubesRes, profRes, alumRes, histRes] = await Promise.all([
+                // Cargar datos de clubes, profesores, alumnos, historial y miembros al mismo tiempo
+                const [clubesRes, profRes, alumRes, histRes, miembrosRes] = await Promise.all([
                     api.get('/clubes'),
                     api.get('/users/professors'),
                     api.get('/users/students-in-charge'),
-                    api.get(`/clubes/${id}/historial-encargados`).catch(() => ({ data: [] }))
+                    api.get(`/clubes/${id}/historial-encargados`).catch(() => ({ data: [] })),
+                    api.get(`/clubes/${id}/miembros`).catch(() => ({ data: [] }))
                 ]);
 
                 const clubEncontrado = clubesRes.data.find((clubItem) => String(clubItem.id) === String(id));
@@ -89,6 +91,7 @@ const ClubDetailsAdminPage = () => {
                 setProfesores(profRes.data);
                 setAlumnos(alumRes.data);
                 setHistorialEncargados(histRes.data || []);
+                setMiembros(miembrosRes.data || []);
             } catch (error) {
                 console.error('Error al cargar datos:', error);
                 setActionError(error.response?.data?.message || error.message || 'No se pudo conectar con el servidor. ¿Reiniciaste el backend?');
@@ -426,6 +429,64 @@ const ClubDetailsAdminPage = () => {
                                                         </td>
                                                         <td style={{ padding: '10px', fontSize: '0.9rem', color: '#666' }}>
                                                             {h.fecha_inicio ? new Date(h.fecha_inicio).toLocaleDateString('es-MX') : '—'} hasta {h.fecha_fin ? new Date(h.fecha_fin).toLocaleDateString('es-MX') : 'Actual'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Tarjeta Auditoría Miembros del Club */}
+                            <div style={{ background: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e4e6eb', paddingBottom: '10px', marginBottom: '15px' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.3rem', color: '#1c1e21', fontWeight: '700' }}>
+                                        👥 Miembros Inscritos en el Club
+                                    </h3>
+                                    <span style={{ fontSize: '0.85rem', background: '#e7f3ff', color: '#003366', padding: '4px 12px', borderRadius: '15px', fontWeight: 'bold' }}>
+                                        Total: {miembros.length}
+                                    </span>
+                                </div>
+                                {miembros.length === 0 ? (
+                                    <p style={{ color: '#666', margin: 0 }}>No hay miembros inscritos actualmente en este club.</p>
+                                ) : (
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e4e6eb' }}>
+                                            <thead>
+                                                <tr style={{ backgroundColor: '#003366', color: '#fff' }}>
+                                                    <th style={{ padding: '10px', textAlign: 'left' }}>Nombre</th>
+                                                    <th style={{ padding: '10px', textAlign: 'left' }}>Boleta</th>
+                                                    <th style={{ padding: '10px', textAlign: 'left' }}>Rol en Club</th>
+                                                    <th style={{ padding: '10px', textAlign: 'center' }}>Estatus</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {miembros.map((m, idx) => (
+                                                    <tr key={m.id || idx} style={{ borderBottom: '1px solid #eee', backgroundColor: idx % 2 === 0 ? '#fff' : '#f9f9f9' }}>
+                                                        <td style={{ padding: '10px', fontWeight: '600', color: '#333' }}>
+                                                            {m.nombres} {m.apellidos}
+                                                        </td>
+                                                        <td style={{ padding: '10px', color: '#666', fontFamily: 'monospace' }}>
+                                                            {m.boleta || '—'}
+                                                        </td>
+                                                        <td style={{ padding: '10px' }}>
+                                                            <span style={{
+                                                                fontSize: '0.8rem', padding: '3px 8px', borderRadius: '12px', fontWeight: 'bold',
+                                                                background: m.rol_en_club === 'encargado_profesor' ? '#e7f3ff' : m.rol_en_club === 'encargado_alumno' ? '#e6f4ea' : '#f0f2f5',
+                                                                color: m.rol_en_club === 'encargado_profesor' ? '#003366' : m.rol_en_club === 'encargado_alumno' ? '#1e8449' : '#555'
+                                                            }}>
+                                                                {m.rol_en_club === 'encargado_profesor' ? 'Profesor Encargado' : m.rol_en_club === 'encargado_alumno' ? 'Alumno Encargado' : 'Miembro'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '10px', textAlign: 'center' }}>
+                                                            <span style={{
+                                                                fontSize: '0.8rem', padding: '3px 8px', borderRadius: '10px', fontWeight: 'bold',
+                                                                background: m.estatus === 'activo' ? '#d4edda' : '#fff3cd',
+                                                                color: m.estatus === 'activo' ? '#155724' : '#856404'
+                                                            }}>
+                                                                {m.estatus === 'activo' ? '✓ Activo' : '⏳ Pendiente'}
+                                                            </span>
                                                         </td>
                                                     </tr>
                                                 ))}

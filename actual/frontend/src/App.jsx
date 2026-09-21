@@ -19,6 +19,7 @@ import AvisoPrivacidadPage from './pages/AvisoPrivacidadPage';
 import TerminosCondicionesPage from './pages/TerminosCondicionesPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminEditUserPage from './pages/AdminEditUserPage';
+import CanalesChatPage from './pages/CanalesChatPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
 /**
@@ -131,6 +132,22 @@ function App() {
               </ProtectedRoute>
           } />
 
+          {/* Canales de Chat Institucionales (Directivos y Encargados) */}
+          <Route path="/chat-directivos" element={
+            <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
+              <CanalesChatPage canalInicial="directivos" />
+            </ProtectedRoute>
+          } />
+          <Route path="/chat-encargados" element={
+            <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
+              <CanalesChatPage canalInicial="encargados" />
+            </ProtectedRoute>
+          } />
+          <Route path="/canales-chat" element={
+            <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
+              <CanalesChatPage />
+            </ProtectedRoute>
+          } />
 
           {/* Manejo de errores 404 */}
           <Route path="*" element={<div style={{ padding: '20px' }}><h1>404 - Página no encontrada</h1></div>} />
