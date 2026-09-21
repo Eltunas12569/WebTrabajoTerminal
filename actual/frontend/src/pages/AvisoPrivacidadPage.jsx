@@ -4,9 +4,12 @@ import './css/AvisoPrivacidad.css';
 const AvisoPrivacidadPage = () => {
     const navigate = useNavigate();
 
-    const cerrarAviso = () => {
-        window.close();
-        if (!window.closed) navigate('/register');
+    const volverAtras = () => {
+        if (window.history.length > 1) {
+            navigate(-1);
+        } else {
+            navigate('/');
+        }
     };
 
     return (
@@ -18,8 +21,8 @@ const AvisoPrivacidadPage = () => {
                         <h1>Aviso de Privacidad</h1>
                         <p className="privacy-version">Versión 1.1 · 7 de septiembre de 2026</p>
                     </div>
-                    <button type="button" className="privacy-close" onClick={cerrarAviso}>
-                        Volver al registro
+                    <button type="button" className="privacy-close" onClick={volverAtras}>
+                        ← Volver
                     </button>
                 </header>
 

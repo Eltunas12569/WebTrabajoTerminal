@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { io } from 'socket.io-client';
 import api from '../services/api';
 import './css/Dashboards.css';
 
@@ -27,18 +28,6 @@ const ClubPanelPage = () => {
         fecha_evento: '',
         lugar: ''
     });
-
-    const [recursoForm, setRecursoForm] = useState({
-        tipo_club: '',
-        tipo_recurso: '',
-        nombre_recurso: '',
-        cantidad: '',
-        unidad: '',
-        especificaciones: '',
-        opciones_marcas: '',
-        motivo: ''
-    });
-    const [solicitudesEnviadas, setSolicitudesEnviadas] = useState([]);
 
     const canManage = club && ['encargado_profesor', 'encargado_alumno'].includes(club.mi_rol_interno);
     const canAccess = club && !['en_revision', 'esperando_firmas', 'inactivo', 'rechazado'].includes(club.estatus);
@@ -97,6 +86,30 @@ const ClubPanelPage = () => {
         if (activeTab === 'eventos') fetchEventos();
     }, [club, activeTab, clubId, canAccess]);
 
+    // WebSocket: Escuchar actualizaciones en tiempo real de avisos y eventos
+    useEffect(() => {
+        if (!club || !canAccess || !clubId) return;
+
+        const socketUrl = api.defaults.baseURL.replace(/\/api\/?$/, '');
+        const token = localStorage.getItem('token');
+        const socket = io(socketUrl, {
+            auth: { token }
+        });
+
+        socket.on('connect', () => {
+            socket.emit('unirse_club', Number(clubId));
+        });
+
+        socket.on('notificacion_interna', (data) => {
+            if (data?.tipo === 'aviso') fetchAvisos();
+            if (data?.tipo === 'evento') fetchEventos();
+        });
+
+        return () => {
+            socket.disconnect();
+        };
+    }, [club, canAccess, clubId]);
+
     const handlePublicarAviso = async (e) => {
         e.preventDefault();
         setError('');
@@ -133,35 +146,6 @@ const ClubPanelPage = () => {
             fetchEventos();
         } catch (err) {
             setError(err.response?.data?.message || 'Error al registrar asistencia.');
-        }
-    };
-
-    const handleSolicitarRecurso = async (e) => {
-        e.preventDefault();
-        setError('');
-        setSuccess('');
-        try {
-            await api.post(`/clubes/${clubId}/recursos`, {
-                ...recursoForm,
-                cantidad: Number(recursoForm.cantidad) || 0
-            });
-            setSolicitudesEnviadas((prev) => [
-                { ...recursoForm, fecha: new Date().toISOString() },
-                ...prev
-            ]);
-            setRecursoForm({
-                tipo_club: '',
-                tipo_recurso: '',
-                nombre_recurso: '',
-                cantidad: '',
-                unidad: '',
-                especificaciones: '',
-                opciones_marcas: '',
-                motivo: ''
-            });
-            setSuccess('Solicitud de recurso enviada a revisión.');
-        } catch (err) {
-            setError(err.response?.data?.message || 'Error al solicitar recurso.');
         }
     };
 
@@ -206,7 +190,7 @@ const ClubPanelPage = () => {
                     ) : (
                         <>
                             <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                                {['avisos', 'eventos', 'recursos'].map((tab) => (
+                                {['avisos', 'eventos'].map((tab) => (
                                     <button
                                         key={tab}
                                         onClick={() => { setActiveTab(tab); setError(''); setSuccess(''); }}
@@ -222,7 +206,6 @@ const ClubPanelPage = () => {
                                     >
                                         {tab === 'avisos' && '📢 Avisos'}
                                         {tab === 'eventos' && '📅 Eventos'}
-                                        {tab === 'recursos' && '📦 Recursos'}
                                     </button>
                                 ))}
                             </div>
@@ -305,37 +288,6 @@ const ClubPanelPage = () => {
                                         ))
                                     ) : (
                                         <p style={{ color: '#666' }}>No hay eventos programados.</p>
-                                    )}
-                                </div>
-                            )}
-
-                            {activeTab === 'recursos' && (
-                                <div style={{ background: '#fff', padding: '24px', borderRadius: '10px', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>
-                                    <form onSubmit={handleSolicitarRecurso} style={{ display: 'grid', gap: '12px' }}>
-                                        <h3 style={{ margin: 0, color: '#003366' }}>Solicitar recurso</h3>
-                                        <input type="text" placeholder="Tipo de club" value={recursoForm.tipo_club} onChange={(e) => setRecursoForm({ ...recursoForm, tipo_club: e.target.value })} required style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} />
-                                        <input type="text" placeholder="Tipo de recurso" value={recursoForm.tipo_recurso} onChange={(e) => setRecursoForm({ ...recursoForm, tipo_recurso: e.target.value })} required style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} />
-                                        <input type="text" placeholder="Nombre del recurso" value={recursoForm.nombre_recurso} onChange={(e) => setRecursoForm({ ...recursoForm, nombre_recurso: e.target.value })} required style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} />
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                            <input type="number" min="1" placeholder="Cantidad" value={recursoForm.cantidad} onChange={(e) => setRecursoForm({ ...recursoForm, cantidad: e.target.value })} required style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} />
-                                            <input type="text" placeholder="Unidad (ej. piezas)" value={recursoForm.unidad} onChange={(e) => setRecursoForm({ ...recursoForm, unidad: e.target.value })} required style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} />
-                                        </div>
-                                        <textarea rows="2" placeholder="Especificaciones" value={recursoForm.especificaciones} onChange={(e) => setRecursoForm({ ...recursoForm, especificaciones: e.target.value })} style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} />
-                                        <input type="text" placeholder="Opciones de marcas" value={recursoForm.opciones_marcas} onChange={(e) => setRecursoForm({ ...recursoForm, opciones_marcas: e.target.value })} style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} />
-                                        <textarea rows="2" placeholder="Motivo de la solicitud" value={recursoForm.motivo} onChange={(e) => setRecursoForm({ ...recursoForm, motivo: e.target.value })} required style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }} />
-                                        <button type="submit" className="btn-review-club" style={{ justifySelf: 'start' }}>Enviar solicitud</button>
-                                    </form>
-
-                                    {solicitudesEnviadas.length > 0 && (
-                                        <div style={{ marginTop: '28px' }}>
-                                            <h3 style={{ color: '#003366' }}>Solicitudes enviadas en esta sesión</h3>
-                                            {solicitudesEnviadas.map((sol, idx) => (
-                                                <div key={idx} style={{ padding: '12px', border: '1px solid #e4e6eb', borderRadius: '8px', marginBottom: '10px', background: '#f8f9fa' }}>
-                                                    <strong>{sol.nombre_recurso}</strong> ({sol.cantidad} {sol.unidad}) · {sol.tipo_recurso}
-                                                    <p style={{ margin: '6px 0 0', fontSize: '0.9rem', color: '#555' }}>{sol.motivo}</p>
-                                                </div>
-                                            ))}
-                                        </div>
                                     )}
                                 </div>
                             )}

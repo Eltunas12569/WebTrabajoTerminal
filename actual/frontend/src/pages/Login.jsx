@@ -14,27 +14,63 @@ const Login = () => {
     const [avisos, setAvisos] = useState([]);
     const [isAvisosOpen, setIsAvisosOpen] = useState(false); // Controla la visibilidad del panel de avisos
     const [showPassword, setShowPassword] = useState(false); // Controla si se muestra la contraseña
+    const [avisoSeleccionado, setAvisoSeleccionado] = useState(null); // Aviso seleccionado para ventana flotante
 
     const { loginUser } = useAuth();
     const navigate = useNavigate();
+
+    // Cerrar modal flotante con tecla Escape
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                setAvisoSeleccionado(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
     useEffect(() => {
         const fetchAvisos = async () => {
             try {
                 const response = await api.get('/avisos');
-                const datosBrutos = response.data;
+                const datosBrutos = Array.isArray(response.data) ? response.data : [];
 
-                // 1. Filtrar: Solo mostrar los avisos que estén activos según el nuevo esquema (avisos_globales)
-                const vigentes = datosBrutos.filter(aviso => aviso.activo === 1 || aviso.activo === true);
+                // 1. Filtrar: mantener activos si viene el campo activo o los ya filtrados por el backend
+                const vigentes = datosBrutos.filter(aviso => aviso.activo === undefined || aviso.activo === 1 || aviso.activo === true);
 
-                // 2. Ordenar por prioridad (alta > normal > baja)
-                const pesos = { 'alta': 1, 'normal': 2, 'baja': 3 };
+                // 2. Normalizar campos para compatibilidad (backend envía descripcion y tiempo)
+                const normalizados = vigentes.map(aviso => ({
+                    ...aviso,
+                    mensaje: aviso.contenido || aviso.descripcion || aviso.mensaje || 'Sin descripción',
+                    prioridad: (aviso.prioridad || 'normal').toLowerCase().trim(),
+                    tiempo: aviso.fecha_envio || aviso.tiempo || null
+                }));
 
-                const ordenados = vigentes.sort((a, b) => {
-                    const pesoA = pesos[a.prioridad.toLowerCase()] || 4;
-                    const pesoB = pesos[b.prioridad.toLowerCase()] || 4;
+                // 3. Ordenar estrictamente por prioridad (alta > normal > baja) y luego por fecha/id
+                const pesosPrioridad = {
+                    alta: 1,
+                    urgente: 1,
+                    normal: 2,
+                    media: 2,
+                    baja: 3,
+                    informativo: 3,
+                    informativa: 3
+                };
+
+                const ordenados = [...normalizados].sort((a, b) => {
+                    const prioridadA = String(a.prioridad || '').toLowerCase().trim();
+                    const prioridadB = String(b.prioridad || '').toLowerCase().trim();
+
+                    const pesoA = pesosPrioridad[prioridadA] ?? 2;
+                    const pesoB = pesosPrioridad[prioridadB] ?? 2;
 
                     if (pesoA !== pesoB) return pesoA - pesoB;
-                    return b.id - a.id; // Más nuevo primero si empatan en prioridad
+
+                    const tA = a.tiempo ? new Date(a.tiempo).getTime() : 0;
+                    const tB = b.tiempo ? new Date(b.tiempo).getTime() : 0;
+                    if (tA !== tB) return tB - tA;
+
+                    return (Number(b.id) || 0) - (Number(a.id) || 0); // Más nuevo primero si empatan
                 });
 
                 setAvisos(ordenados);
@@ -146,11 +182,18 @@ const Login = () => {
                     -ms-overflow-style: none;
                     scrollbar-width: none;
                 }
+                @keyframes modalFadeIn {
+                    from { opacity: 0; transform: scale(0.95); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+                .aviso-modal-anim {
+                    animation: modalFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                }
             `}</style>
             
             {/* Panel Lateral de Avisos (Diseño Web Drawer) */}
             <div style={{
-                width: isAvisosOpen ? '40%' : '0',
+                width: isAvisosOpen ? 'clamp(320px, 35vw, 480px)' : '0',
                 height: '100%',
                 minHeight: 0,
                 flexShrink: 0,
@@ -159,7 +202,7 @@ const Login = () => {
                 color: '#ffffff',
                 transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)',
                 overflow: 'hidden',
-                boxShadow: isAvisosOpen ? '4px 0 25px rgba(0,0,0,0.15)' : 'none',
+                boxShadow: isAvisosOpen ? '4px 0 25px rgba(0,0,0,0.2)' : 'none',
                 display: 'flex',
                 flexDirection: 'column',
                 zIndex: 20,
@@ -205,29 +248,121 @@ const Login = () => {
                 </button>
 
                 <div style={{ padding: '24px 20px', width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '15px' }}>
-                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '15px' }}>
+                        <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <span>📢</span> Tablero de Avisos
                         </h2>
+                        <button
+                            onClick={() => setIsAvisosOpen(false)}
+                            style={{
+                                background: 'rgba(255,255,255,0.12)',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                color: '#ffffff',
+                                borderRadius: '6px',
+                                padding: '6px 12px',
+                                cursor: 'pointer',
+                                fontSize: '0.82rem',
+                                fontWeight: '600',
+                                transition: 'all 0.2s ease'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'}
+                            onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)'}
+                        >
+                            ✕ Cerrar
+                        </button>
                     </div>
 
-                    <div className="hide-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '10px' }}>
+                    <div className="hide-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '5px' }}>
                         {avisos.length > 0 ? (
                             avisos.map(aviso => (
-                                <div key={aviso.id} style={{ 
-                                    backgroundColor: 'rgba(255,255,255,0.06)', 
-                                    borderRadius: '10px', 
-                                    padding: '20px', 
-                                    marginBottom: '15px',
-                                    borderLeft: `4px solid ${aviso.prioridad === 'alta' ? '#ff4d4f' : (aviso.prioridad === 'normal' ? '#1890ff' : '#52c41a')}`,
-                                    transition: 'transform 0.2s ease',
-                                    cursor: 'default'
-                                }}
-                                onMouseOver={(e) => e.currentTarget.style.transform = 'translateX(5px)'}
-                                onMouseOut={(e) => e.currentTarget.style.transform = 'translateX(0)'}
+                                <div 
+                                    key={aviso.id} 
+                                    onClick={() => setAvisoSeleccionado(aviso)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            setAvisoSeleccionado(aviso);
+                                        }
+                                    }}
+                                    style={{ 
+                                        backgroundColor: 'rgba(255,255,255,0.08)', 
+                                        borderRadius: '10px', 
+                                        padding: '16px 18px', 
+                                        marginBottom: '14px',
+                                        borderLeft: `4px solid ${
+                                            aviso.prioridad === 'alta' || aviso.prioridad === 'urgente'
+                                                ? '#ff4d4f'
+                                                : (aviso.prioridad === 'normal' || aviso.prioridad === 'media' ? '#1890ff' : '#52c41a')
+                                        }`,
+                                        transition: 'all 0.2s ease',
+                                        cursor: 'pointer',
+                                        position: 'relative',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-2px) translateX(3px)';
+                                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.14)';
+                                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0) translateX(0)';
+                                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)';
+                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                                    }}
+                                    title="Haz clic para ver el aviso completo"
                                 >
-                                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: '#fff' }}>{aviso.titulo}</h3>
-                                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.85)', lineHeight: '1.5', fontSize: '0.95rem' }}>{aviso.mensaje}</p>
+                                    <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span 
+                                            style={{
+                                                width: '8px',
+                                                height: '8px',
+                                                borderRadius: '50%',
+                                                backgroundColor: aviso.prioridad === 'alta' || aviso.prioridad === 'urgente'
+                                                    ? '#ff4d4f'
+                                                    : (aviso.prioridad === 'normal' || aviso.prioridad === 'media' ? '#1890ff' : '#52c41a'),
+                                                display: 'inline-block',
+                                                flexShrink: 0
+                                            }}
+                                        />
+                                        <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#fff', fontWeight: '600', lineHeight: '1.3' }}>
+                                            {aviso.titulo}
+                                        </h3>
+                                    </div>
+                                    <p style={{ 
+                                        margin: '0 0 10px 0', 
+                                        color: 'rgba(255,255,255,0.85)', 
+                                        lineHeight: '1.5', 
+                                        fontSize: '0.9rem', 
+                                        wordBreak: 'break-word',
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 3,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden'
+                                    }}>
+                                        {aviso.mensaje}
+                                    </p>
+                                    <div style={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        alignItems: 'center', 
+                                        fontSize: '0.78rem', 
+                                        color: 'rgba(255,255,255,0.6)',
+                                        borderTop: '1px solid rgba(255,255,255,0.1)',
+                                        paddingTop: '8px',
+                                        marginTop: '4px'
+                                    }}>
+                                        {aviso.tiempo ? (
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                <span>📅</span>
+                                                <span>{new Date(aviso.tiempo).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                                            </span>
+                                        ) : <span />}
+                                        <span style={{ color: '#91d5ff', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                            Ver completo ↗
+                                        </span>
+                                    </div>
                                 </div>
                             ))
                         ) : (
@@ -292,7 +427,7 @@ const Login = () => {
                             <img src="/IMG_1003-Photoroom%20(1).png" alt="Logo del Sistema de Clubes ESCOM" />
                         </div>
                         <h1 style={{ margin: '0 0 10px 0', color: '#1a1a1a', fontSize: '2rem', fontWeight: '700' }}>Sistema de Clubes</h1>
-                        <p style={{ margin: 0, color: '#666', fontSize: '1.1rem' }}>Gestión Deportiva - ESCOM IPN</p>
+                        <p style={{ margin: 0, color: '#666', fontSize: '1.1rem' }}>Gestión de clubs</p>
                     </div>
 
                     <div 
@@ -415,9 +550,213 @@ const Login = () => {
                         >
                             Crear una cuenta de atleta
                         </button>
+
+                        <div style={{ 
+                            marginTop: '18px', 
+                            paddingTop: '12px', 
+                            borderTop: '1px solid #f0f0f0', 
+                            display: 'flex', 
+                            justifyContent: 'center', 
+                            alignItems: 'center', 
+                            gap: '12px', 
+                            fontSize: '0.82rem', 
+                            color: '#888' 
+                        }}>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/terminos-condiciones')}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#555',
+                                    fontSize: '0.82rem',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    textDecoration: 'none'
+                                }}
+                                onMouseOver={(e) => { e.target.style.color = '#003366'; e.target.style.textDecoration = 'underline'; }}
+                                onMouseOut={(e) => { e.target.style.color = '#555'; e.target.style.textDecoration = 'none'; }}
+                            >
+                                Términos y Condiciones
+                            </button>
+                            <span>·</span>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/aviso-privacidad')}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#555',
+                                    fontSize: '0.82rem',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    textDecoration: 'none'
+                                }}
+                                onMouseOver={(e) => { e.target.style.color = '#003366'; e.target.style.textDecoration = 'underline'; }}
+                                onMouseOut={(e) => { e.target.style.color = '#555'; e.target.style.textDecoration = 'none'; }}
+                            >
+                                Aviso de Privacidad
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            {/* Modal Flotante de Aviso Detallado */}
+            {avisoSeleccionado && (
+                <div 
+                    onClick={() => setAvisoSeleccionado(null)}
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100vw',
+                        height: '100vh',
+                        backgroundColor: 'rgba(4, 18, 38, 0.7)',
+                        backdropFilter: 'blur(6px)',
+                        WebkitBackdropFilter: 'blur(6px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 9999,
+                        padding: '16px',
+                        boxSizing: 'border-box'
+                    }}
+                >
+                    <div 
+                        className="aviso-modal-anim"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            backgroundColor: '#ffffff',
+                            borderRadius: '16px',
+                            width: '100%',
+                            maxWidth: '620px',
+                            maxHeight: '85vh',
+                            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.35)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden',
+                            position: 'relative'
+                        }}
+                    >
+                        {/* Cabecera */}
+                        <div style={{
+                            padding: '18px 24px',
+                            backgroundColor: '#003366',
+                            color: '#ffffff',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            gap: '16px'
+                        }}>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                    <span style={{ fontSize: '1.2rem' }}>📢</span>
+                                    <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'rgba(255,255,255,0.75)', fontWeight: '600' }}>
+                                        Aviso de la Comunidad ESCOM
+                                    </span>
+                                </div>
+                                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', lineHeight: '1.35', color: '#ffffff' }}>
+                                    {avisoSeleccionado.titulo}
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => setAvisoSeleccionado(null)}
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.15)',
+                                    border: 'none',
+                                    color: '#ffffff',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '50%',
+                                    cursor: 'pointer',
+                                    fontSize: '1rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'background-color 0.2s',
+                                    flexShrink: 0
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)'}
+                                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
+                                title="Cerrar ventana"
+                                aria-label="Cerrar"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Fecha */}
+                        {avisoSeleccionado.tiempo && (
+                            <div style={{
+                                padding: '12px 24px 0 24px',
+                                fontSize: '0.85rem',
+                                color: '#64748b',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}>
+                                <span>📅 Publicado el:</span>
+                                <span style={{ fontWeight: '500' }}>
+                                    {new Date(avisoSeleccionado.tiempo).toLocaleDateString('es-MX', {
+                                        weekday: 'long',
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Contenido / Cuerpo con scroll */}
+                        <div 
+                            style={{
+                                padding: '16px 24px 24px 24px',
+                                overflowY: 'auto',
+                                flex: 1,
+                                fontSize: '1rem',
+                                lineHeight: '1.7',
+                                color: '#1e293b',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word'
+                            }}
+                        >
+                            {avisoSeleccionado.mensaje}
+                        </div>
+
+                        {/* Pie de modal */}
+                        <div style={{
+                            padding: '12px 24px',
+                            borderTop: '1px solid #e2e8f0',
+                            backgroundColor: '#f8fafc',
+                            display: 'flex',
+                            justifyContent: 'flex-end'
+                        }}>
+                            <button
+                                onClick={() => setAvisoSeleccionado(null)}
+                                style={{
+                                    padding: '8px 20px',
+                                    backgroundColor: '#003366',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontWeight: '600',
+                                    fontSize: '0.92rem',
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.2s',
+                                    boxShadow: '0 2px 6px rgba(0, 51, 102, 0.2)'
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#002244'}
+                                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#003366'}
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

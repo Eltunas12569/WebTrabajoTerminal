@@ -9,9 +9,9 @@ const AccionesAlumno = ({ onUpdate, mostrar = 'ambos' }) => {
     const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
     const [loading, setLoading] = useState(false);
     
-    // Solo cargar datos si el usuario autenticado es un alumno (role_id === 2)
+    // Cargar datos si el usuario autenticado es alumno (role_id 2 o 4)
     useEffect(() => {
-        if (user?.role_id === 2) {
+        if ([2, 4].includes(Number(user?.role_id))) {
             fetchInvitaciones();
         }
     }, [user]);
@@ -63,8 +63,8 @@ const AccionesAlumno = ({ onUpdate, mostrar = 'ambos' }) => {
         }
     };
 
-    // Si no es un alumno, este componente se oculta (no devuelve nada)
-    if (user?.role_id !== 2) return null;
+    // Si no es un alumno (2 o 4), este componente se oculta (no devuelve nada)
+    if (![2, 4].includes(Number(user?.role_id))) return null;
 
     return (
         <>

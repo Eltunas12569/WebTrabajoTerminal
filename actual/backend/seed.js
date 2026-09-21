@@ -14,7 +14,7 @@ const seedMasivo = async () => {
         await db.query('SET FOREIGN_KEY_CHECKS = 0;');
         const tablas = [
             'roles', 'usuarios', 'contactos_emergencia', 'clubes', 'inscripciones', 
-            'historial_encargados', 'avisos', 'chat_mensajes', 'solicitudes_recursos', 
+            'historial_encargados', 'avisos', 'chat_mensajes', 
             'eventos_club', 'asistencias_eventos'
         ];
         for (const tabla of tablas) {
@@ -28,7 +28,8 @@ const seedMasivo = async () => {
         const rolesBase = [ 
             { id: 1, nombre: 'administrador' }, 
             { id: 2, nombre: 'alumno' }, 
-            { id: 3, nombre: 'profesor' }
+            { id: 3, nombre: 'profesor' },
+            { id: 4, nombre: 'alumno_representante' }
         ];
         for (const rol of rolesBase) {
             await db.query(`INSERT INTO roles (id, nombre) VALUES (?, ?)`, [rol.id, rol.nombre]);
@@ -139,9 +140,11 @@ const seedMasivo = async () => {
             }
 
   
-            await db.query(`INSERT INTO avisos (club_id, usuario_id, contenido, fecha_envio) VALUES (?, ?, ?, NOW())`, [clubId, pEncargado, `¡Bienvenidos al club ${nombre}! Empezamos la próxima semana.`]);
+            await db.query(`INSERT INTO avisos (club_id, usuario_id, titulo, contenido, fecha_envio) VALUES (?, ?, ?, ?, NOW())`, [clubId, pEncargado, `Bienvenida - ${nombre}`, `¡Bienvenidos al club ${nombre}! Empezamos la próxima semana.`]);
             
             await db.query(`INSERT INTO chat_mensajes (club_id, usuario_id, tipo_sala, mensaje) VALUES (?, ?, 'club', ?)`, [clubId, pEncargado, 'Hola a todos, este es el chat oficial.']);
+            await db.query(`INSERT INTO chat_mensajes (usuario_id, tipo_sala, mensaje) VALUES (?, 'directivos', ?)`, [pEncargado, `Buen día directivos, el club ${nombre} ya tiene planificada su primera sesión.`]);
+            await db.query(`INSERT INTO chat_mensajes (usuario_id, tipo_sala, mensaje) VALUES (?, 'encargados', ?)`, [aEncargado, `Hola a todos los representantes, coordinando espacios para ${nombre}.`]);
 
             const [eventoRes] = await db.query(`INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar) VALUES (?, ?, ?, ?, ?, ?)`, [clubId, aEncargado, 'Reunión de Integración', 'Primer encuentro oficial.', '2026-08-21 14:00:00', 'Salón Múltiple']);
             for (const asisId of getRandomMultiple(integrantes, 12)) {

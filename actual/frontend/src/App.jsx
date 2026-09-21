@@ -15,6 +15,7 @@ import ClubDetailsPage from './pages/ClubDetailsPage';
 import ClubPanelPage from './pages/ClubPanelPage';
 import VerificarCuentaPage from './pages/VerificarCuentaPage';
 import AvisoPrivacidadPage from './pages/AvisoPrivacidadPage';
+import TerminosCondicionesPage from './pages/TerminosCondicionesPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminEditUserPage from './pages/AdminEditUserPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
@@ -33,6 +34,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/recuperar-password" element={<RecuperarPasswordPage />} />
           <Route path="/aviso-privacidad" element={<AvisoPrivacidadPage />} />
+          <Route path="/terminos-condiciones" element={<TerminosCondicionesPage />} />
           <Route path="/verificar-cuenta" element={
             <ProtectedRoute>
               <VerificarCuentaPage />
