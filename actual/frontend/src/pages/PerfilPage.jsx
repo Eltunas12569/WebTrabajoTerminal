@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import './css/Dashboards.css'; // Importamos el CSS del Dashboard principal
 import './css/CrearClubPage.css'; // Reutilizamos este CSS para el contenedor de tarjeta
+import Sidebar from '../components/Sidebar';
 
 const PerfilPage = () => {
     const { user, logout } = useAuth();
@@ -278,28 +279,10 @@ const PerfilPage = () => {
 
             {/* LAYOUT CON SIDEBAR Y CONTENIDO */}
             <div className="dashboard-layout">
-                <aside className={`admin-sidebar-fixed ${isSidebarOpen ? 'active' : ''}`}>
-                    <nav className="sidebar-links">
-                        <ul>
-                            {user?.role_id === 1 ? (
-                                <>
-                                    <li onClick={() => navigate('/admin')}>🏠 Inicio</li>
-                                    <li onClick={() => navigate('/admin')}>📋 Lista de Clubs</li>
-                                    <li onClick={() => navigate('/admin/avisos')}>📢 Gestión de Avisos</li>
-                                </>
-                            ) : (
-                                <>
-                                    <li onClick={() => navigate('/gestion')}>🏠 Inicio</li>
-                                    <li onClick={() => navigate('/gestion')}>📅 Mis Actividades</li>
-                                    {user?.role_id === 2 && <li onClick={() => navigate('/gestion')}>📋 Pasar Lista</li>}
-                                    {user?.role_id === 3 && <li onClick={() => navigate('/crear-club')} className="special-link">➕ Crear Club</li>}
-                                </>
-                            )}
-                            <li onClick={() => navigate('/cambiar-password')}>🔑 Cambiar Contraseña</li>
-                        </ul>
-                    </nav>
-                    <button onClick={logout} className="logout-button">Cerrar Sesión</button>
-                </aside>
+                <Sidebar 
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                />
 
                 <main className="admin-main-scroll" style={{ backgroundColor: '#f4f6f8', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     {loading ? (

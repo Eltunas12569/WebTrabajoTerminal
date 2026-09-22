@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import './css/Dashboards.css';
+import Sidebar from '../components/Sidebar';
 
 const AdminDashboard = () => {
     // Extraemos logout y user del Contexto corregido
@@ -121,20 +122,10 @@ const AdminDashboard = () => {
             </header>
 
             <div className="dashboard-layout">
-                <aside className={`admin-sidebar-fixed ${isSidebarOpen ? 'active' : ''}`}>
-                    <nav className="sidebar-links">
-                        <ul>
-                            <li onClick={toggleSidebar}>🏠 Inicio</li>
-                            <li onClick={toggleSidebar}>📋 Lista de Clubs</li>
-                            <li onClick={goToAvisos}>
-                                📢 Gestión de Avisos
-                            </li>
-                            <li onClick={goToUsers}>👥 Usuarios del sistema</li>
-                            <li onClick={() => navigate('/chat-directivos')}>🏛️ Chat de Directivos</li>
-                        </ul>
-                    </nav>
-                    <button onClick={logout} className="logout-button">Cerrar Sesión</button>
-                </aside>
+                <Sidebar 
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                />
 
                 <main className="admin-main-scroll">
                     <div style={{ marginBottom: '24px' }}>

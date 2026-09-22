@@ -19,6 +19,7 @@ import AvisoPrivacidadPage from './pages/AvisoPrivacidadPage';
 import TerminosCondicionesPage from './pages/TerminosCondicionesPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminEditUserPage from './pages/AdminEditUserPage';
+import AdminCalendarioPage from './pages/AdminCalendarioPage';
 import CanalesChatPage from './pages/CanalesChatPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -101,6 +102,13 @@ function App() {
             </ProtectedRoute>
           } />
 
+          {/* Calendario Institucional de Eventos (Administrador) */}
+          <Route path="/admin/calendario" element={
+            <ProtectedRoute rolesPermitidos={[1]}>
+              <AdminCalendarioPage />
+            </ProtectedRoute>
+          } />
+
           {/* Configuración de Perfil (Cualquier usuario logueado) */}
           <Route path="/perfil" element={
             <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
@@ -125,9 +133,9 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* Chat del Club (Profesores y Alumnos Encargados y alumnos) */}
+          {/* Chat del Club (Administrador, Profesores, Alumnos Encargados y Alumnos) */}
           <Route path="/chat/:id" element={
-              <ProtectedRoute rolesPermitidos={[2, 3, 4]}>
+              <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
                   <ClubChatPage />
               </ProtectedRoute>
           } />

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import './css/CrearClubPage.css'; // Importa el CSS para esta página
 import './css/Dashboards.css'; // Importa el CSS del Dashboard principal
+import Sidebar from '../components/Sidebar';
 
 // Componente interno para selector con búsqueda (Autocomplete)
 const SearchableSelect = ({ options, value, onChange, placeholder }) => {
@@ -320,27 +321,10 @@ const CrearClubPage = () => {
 
             {/* LAYOUT CON SIDEBAR Y CONTENIDO */}
             <div className="dashboard-layout">
-                <aside className={`admin-sidebar-fixed ${isSidebarOpen ? 'active' : ''}`}>
-                    <nav className="sidebar-links">
-                        <ul>
-                            {user?.role_id === 1 ? (
-                                <>
-                                    <li onClick={() => navigate('/admin')}>🏠 Inicio</li>
-                                    <li onClick={() => navigate('/admin')}>📋 Lista de Clubs</li>
-                                    <li onClick={() => navigate('/admin/avisos')}>📢 Gestión de Avisos</li>
-                                </>
-                            ) : (
-                                <>
-                                    <li onClick={() => navigate('/gestion')}>🏠 Inicio</li>
-                                    <li onClick={() => navigate('/gestion')}>📅 Mis Actividades</li>
-                                    {user?.role_id === 2 && <li onClick={() => navigate('/gestion')}>📋 Pasar Lista</li>}
-                                    {user?.role_id === 3 && <li onClick={() => navigate('/crear-club')} className="special-link">➕ Crear Club</li>}
-                                </>
-                            )}
-                        </ul>
-                    </nav>
-                    <button onClick={logout} className="logout-button">Cerrar Sesión</button>
-                </aside>
+                <Sidebar 
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                />
 
                 <main className="admin-main-scroll" style={{ backgroundColor: '#f4f6f8', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <div style={{ maxWidth: '900px', width: '100%', marginTop: '20px', display: 'flex', alignItems: 'flex-start', gap: '20px', padding: '0 20px' }}>
