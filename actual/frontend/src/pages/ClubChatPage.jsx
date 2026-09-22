@@ -14,6 +14,7 @@ const ClubChatPage = () => {
     const [nuevoMensaje, setNuevoMensaje] = useState('');
     const [club, setClub] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [errorAcceso, setErrorAcceso] = useState('');
 
     const socketRef = useRef(null);
     const messagesEndRef = useRef(null);
@@ -25,28 +26,52 @@ const ClubChatPage = () => {
     // Obtener la información del club y verificar permisos
     useEffect(() => {
         const fetchClubInfo = async () => {
+            if (!user?.id) return;
+            const esAdmin = Number(user.role_id) === 1 || user.rol === 1;
+
             try {
-                const response = await api.get(`/clubes/user/${user.id}`);
-                const foundClub = response.data.find(c => String(c.id) === String(clubId));
-                
-                // Si el club existe y no está pausado/rechazado en su totalidad, permitimos acceso
-                if (foundClub && foundClub.estatus !== 'en_revision' && foundClub.estatus !== 'esperando_firmas') {
-                    setClub(foundClub);
+                let foundClub = null;
+
+                if (esAdmin) {
+                    const response = await api.get('/clubes');
+                    foundClub = response.data.find(c => String(c.id) === String(clubId));
                 } else {
-                    navigate('/gestion'); // Redirige si no tiene permiso
+                    const response = await api.get(`/clubes/user/${user.id}`);
+                    foundClub = response.data.find(c => String(c.id) === String(clubId));
                 }
+                
+                if (!foundClub) {
+                    setErrorAcceso('No perteneces a este club o el club especificado no existe.');
+                    return;
+                }
+
+                // Si no es administrador, verificar membresía activa y estatus del club
+                if (!esAdmin) {
+                    if (foundClub.inscripcion_estatus !== 'activo') {
+                        setErrorAcceso('Tu solicitud de inscripción a este club aún no ha sido aprobada o está inactiva.');
+                        return;
+                    }
+                    if (['en_revision', 'esperando_firmas', 'inactivo', 'rechazado'].includes(foundClub.estatus)) {
+                        setErrorAcceso(`El chat no está disponible. Estatus actual del club: ${foundClub.estatus.replace('_', ' ')}.`);
+                        return;
+                    }
+                }
+
+                setClub(foundClub);
             } catch (error) {
-                navigate('/gestion');
+                console.error("Error al validar acceso al club:", error);
+                setErrorAcceso('No fue posible validar tus permisos de acceso a este club.');
             } finally {
                 setLoading(false);
             }
         };
-        if (user?.id) fetchClubInfo();
-    }, [user, clubId, navigate]);
+
+        fetchClubInfo();
+    }, [user, clubId]);
 
     // Lógica del WebSocket y carga de mensajes
     useEffect(() => {
-        if (!club) return;
+        if (!club || errorAcceso) return;
 
         const fetchMensajes = async () => {
             try {
@@ -76,10 +101,15 @@ const ClubChatPage = () => {
             setTimeout(scrollToBottom, 100);
         });
 
+        socketRef.current.on('error_socket', (errMsg) => {
+            console.error('Error de socket en chat del club:', errMsg);
+            setErrorAcceso(typeof errMsg === 'string' ? errMsg : 'No perteneces a este club o no tienes permiso para acceder al chat.');
+        });
+
         return () => {
             if (socketRef.current) socketRef.current.disconnect();
         };
-    }, [club]);
+    }, [club, errorAcceso]);
 
     const handleSend = (e) => {
         e.preventDefault();
@@ -93,7 +123,42 @@ const ClubChatPage = () => {
     };
 
     if (loading) return <div className="web-dashboard"><div className="loading-state">Cargando chat...</div></div>;
-    if (!club) return null; // Previene renderizado fantasma antes de la redirección
+
+    if (errorAcceso) {
+        return (
+            <div className="web-dashboard">
+                <header className="admin-navbar-fixed" style={{ backgroundColor: '#003366', color: '#fff' }}>
+                    <div className="nav-left">
+                        <span className="nav-title">🏆 Chat del Club</span>
+                    </div>
+                    <div className="nav-right">
+                        <button
+                            onClick={() => navigate(user?.role_id === 1 ? '/admin' : '/gestion')}
+                            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', cursor: 'pointer', padding: '8px 15px', borderRadius: '5px', fontWeight: 'bold' }}
+                        >
+                            🔙 Volver
+                        </button>
+                    </div>
+                </header>
+                <div style={{ marginTop: '90px', padding: '20px', display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ maxWidth: '550px', width: '100%', background: '#fff', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+                        <span style={{ fontSize: '3rem' }}>🚫</span>
+                        <h2 style={{ color: '#c53030', marginTop: '15px' }}>Acceso Denegado</h2>
+                        <p style={{ color: '#555', lineHeight: '1.6', margin: '15px 0' }}>{errorAcceso}</p>
+                        <button
+                            onClick={() => navigate(user?.role_id === 1 ? '/admin' : '/gestion')}
+                            className="btn-crear-club"
+                            style={{ marginTop: '10px' }}
+                        >
+                            ← Volver
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!club) return null;
 
     return (
         <div className="web-dashboard">
@@ -102,28 +167,46 @@ const ClubChatPage = () => {
                     <span className="nav-title">🏆 Chat del Club</span>
                 </div>
                 <div className="nav-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <button
-                        onClick={() => navigate(`/club/${club.id}/panel`)}
-                        style={{
-                            background: '#28a745',
-                            border: 'none',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            padding: '8px 16px',
-                            borderRadius: '6px',
-                            fontWeight: 'bold',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            fontSize: '0.88rem',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                            transition: 'background 0.2s'
-                        }}
-                        title="Ir al panel del club para ver avisos, eventos y miembros"
-                    >
-                        📋 Panel del Club
-                    </button>
-                    <button onClick={() => navigate('/gestion')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', cursor: 'pointer', padding: '8px 15px', borderRadius: '5px', fontWeight: 'bold' }}>🔙 Volver a Mis Actividades</button>
+                    {user?.role_id === 1 ? (
+                        <button
+                            onClick={() => navigate(`/admin/club/${club.id}`)}
+                            style={{
+                                background: '#28a745',
+                                border: 'none',
+                                color: '#fff',
+                                cursor: 'pointer',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                fontWeight: 'bold',
+                                fontSize: '0.88rem'
+                            }}
+                        >
+                            📋 Panel Admin
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => navigate(`/club/${club.id}/panel`)}
+                            style={{
+                                background: '#28a745',
+                                border: 'none',
+                                color: '#fff',
+                                cursor: 'pointer',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                fontWeight: 'bold',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontSize: '0.88rem',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                transition: 'background 0.2s'
+                            }}
+                            title="Ir al panel del club para ver avisos, eventos y miembros"
+                        >
+                            📋 Panel del Club
+                        </button>
+                    )}
+                    <button onClick={() => navigate(user?.role_id === 1 ? '/admin' : '/gestion')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', cursor: 'pointer', padding: '8px 15px', borderRadius: '5px', fontWeight: 'bold' }}>🔙 Volver</button>
                 </div>
             </header>
 

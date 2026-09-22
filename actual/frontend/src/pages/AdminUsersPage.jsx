@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import './css/Dashboards.css';
 import './css/AdminUsers.css';
+import Sidebar from '../components/Sidebar';
 
 const roleNames = {
     1: 'Administrador',
@@ -62,17 +63,10 @@ const AdminUsersPage = () => {
             </header>
 
             <div className="dashboard-layout">
-                <aside className={`admin-sidebar-fixed ${isSidebarOpen ? 'active' : ''}`}>
-                    <nav className="sidebar-links">
-                        <ul>
-                            <li onClick={() => navigate('/admin')}>🏠 Inicio</li>
-                            <li onClick={() => navigate('/admin')}>📋 Lista de Clubs</li>
-                            <li onClick={() => navigate('/admin/avisos')}>📢 Gestión de Avisos</li>
-                            <li onClick={() => navigate('/admin/usuarios')}>👥 Usuarios del sistema</li>
-                        </ul>
-                    </nav>
-                    <button onClick={logout} className="logout-button">Cerrar Sesión</button>
-                </aside>
+                <Sidebar 
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                />
 
                 <main className="admin-main-scroll">
                     <div className="admin-users-header">

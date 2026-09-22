@@ -45,21 +45,6 @@ const ClubPanelPage = () => {
         }
     };
 
-    const handleRestaurarAvisos = () => {
-        if (!user?.id) return;
-        try {
-            const guardados = localStorage.getItem(`avisos_descartados_${user.id}`);
-            if (guardados) {
-                const parsed = JSON.parse(guardados);
-                const filtrados = parsed.filter(k => !avisos.some(a => `club-${a.id}` === k));
-                localStorage.setItem(`avisos_descartados_${user.id}`, JSON.stringify(filtrados));
-                setDescartadosAvisos(filtrados);
-            }
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
     const [eventos, setEventos] = useState([]);
     const [loadingEventos, setLoadingEventos] = useState(false);
     const [eventoForm, setEventoForm] = useState({
@@ -72,8 +57,8 @@ const ClubPanelPage = () => {
     const [miembros, setMiembros] = useState([]);
     const [loadingMiembros, setLoadingMiembros] = useState(false);
 
-    const canManage = club && ['encargado_profesor', 'encargado_alumno'].includes(club.mi_rol_interno);
-    const canAccess = club && !['en_revision', 'esperando_firmas', 'inactivo', 'rechazado'].includes(club.estatus);
+    const canManage = club && ['encargado_profesor', 'encargado_alumno'].includes(club.mi_rol_interno) && club.inscripcion_estatus === 'activo';
+    const canAccess = club && !['en_revision', 'esperando_firmas', 'inactivo', 'rechazado'].includes(club.estatus) && club.inscripcion_estatus === 'activo';
 
     useEffect(() => {
         const fetchClub = async () => {
@@ -82,6 +67,11 @@ const ClubPanelPage = () => {
                 const found = response.data.find((c) => String(c.id) === String(clubId));
                 if (!found) {
                     setError('No perteneces a este club o no existe.');
+                    return;
+                }
+                if (found.inscripcion_estatus !== 'activo') {
+                    setError('Tu inscripción a este club aún no está activa o ha sido revocada.');
+                    setClub(found);
                     return;
                 }
                 if (['en_revision', 'esperando_firmas', 'inactivo', 'rechazado'].includes(found.estatus)) {
@@ -197,6 +187,23 @@ const ClubPanelPage = () => {
 
     const handleAsistencia = async (idEvento, asistira) => {
         setError('');
+        // Solo alumnos y profesores pueden confirmar asistencia (roles 2, 3, 4)
+        const esAlumnoOProfesor = user && [2, 3, 4].includes(Number(user.role_id));
+        if (!esAlumnoOProfesor) {
+            setError('Solo los alumnos y profesores pueden confirmar asistencia a los eventos.');
+            return;
+        }
+
+        // Solo eventos que aún no hayan pasado
+        const ev = eventos.find(e => e.id === idEvento);
+        if (ev && ev.fecha_evento) {
+            const fechaObj = new Date(String(ev.fecha_evento).replace(' ', 'T'));
+            if (!isNaN(fechaObj.getTime()) && fechaObj.getTime() < Date.now()) {
+                setError('No se puede registrar asistencia en un evento que ya ha finalizado.');
+                return;
+            }
+        }
+
         try {
             await api.post(`/clubes/${clubId}/eventos/${idEvento}/asistencia`, { asistira });
             fetchEventos();
@@ -285,22 +292,6 @@ const ClubPanelPage = () => {
                                     )}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
                                         <h3 style={{ color: '#003366', margin: 0 }}>Avisos del club</h3>
-                                        {avisos.some(a => descartadosAvisos.includes(`club-${a.id}`)) && (
-                                            <button
-                                                onClick={handleRestaurarAvisos}
-                                                style={{
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    color: '#003366',
-                                                    fontSize: '0.85rem',
-                                                    fontWeight: 'bold',
-                                                    cursor: 'pointer',
-                                                    textDecoration: 'underline'
-                                                }}
-                                            >
-                                                ↺ Restaurar avisos descartados
-                                            </button>
-                                        )}
                                     </div>
                                     {loadingAvisos ? (
                                         <p>Cargando avisos...</p>
@@ -378,20 +369,46 @@ const ClubPanelPage = () => {
                                                 <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem' }}>
                                                     <strong>Asistentes confirmados:</strong> {evento.total_asistentes || 0}
                                                 </p>
-                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                                    <button
-                                                        onClick={() => handleAsistencia(evento.id, 1)}
-                                                        style={{ padding: '8px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', background: Number(evento.mi_respuesta) === 1 ? '#28a745' : '#e4e6eb', color: Number(evento.mi_respuesta) === 1 ? '#fff' : '#333' }}
-                                                    >
-                                                        ✓ Asistiré
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAsistencia(evento.id, 0)}
-                                                        style={{ padding: '8px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', background: Number(evento.mi_respuesta) === 0 ? '#dc3545' : '#e4e6eb', color: Number(evento.mi_respuesta) === 0 ? '#fff' : '#333' }}
-                                                    >
-                                                        ✗ No asistiré
-                                                    </button>
-                                                </div>
+                                                {(() => {
+                                                    const esAlumnoOProfesor = user && [2, 3, 4].includes(Number(user.role_id));
+                                                    const fechaObj = new Date(String(evento.fecha_evento).replace(' ', 'T'));
+                                                    const eventoYaPaso = !isNaN(fechaObj.getTime()) && fechaObj.getTime() < Date.now();
+
+                                                    if (!esAlumnoOProfesor) {
+                                                        return null;
+                                                    }
+
+                                                    if (eventoYaPaso) {
+                                                        return (
+                                                            <div style={{ fontSize: '0.85rem', color: '#666', background: '#f0f2f5', padding: '6px 12px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                                <span>🕒 Evento finalizado. Registro de asistencia cerrado.</span>
+                                                                {Number(evento.mi_respuesta) === 1 && (
+                                                                    <strong style={{ color: '#28a745' }}>✓ Asististe</strong>
+                                                                )}
+                                                                {Number(evento.mi_respuesta) === 0 && (
+                                                                    <strong style={{ color: '#dc3545' }}>✗ No asististe</strong>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    return (
+                                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                            <button
+                                                                onClick={() => handleAsistencia(evento.id, 1)}
+                                                                style={{ padding: '8px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', background: Number(evento.mi_respuesta) === 1 ? '#28a745' : '#e4e6eb', color: Number(evento.mi_respuesta) === 1 ? '#fff' : '#333' }}
+                                                            >
+                                                                ✓ {Number(evento.mi_respuesta) === 1 ? 'Asistencia confirmada' : 'Asistiré'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleAsistencia(evento.id, 0)}
+                                                                style={{ padding: '8px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', background: Number(evento.mi_respuesta) === 0 ? '#dc3545' : '#e4e6eb', color: Number(evento.mi_respuesta) === 0 ? '#fff' : '#333' }}
+                                                            >
+                                                                ✗ {Number(evento.mi_respuesta) === 0 ? 'No asistirás' : 'No asistiré'}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                         ))
                                     ) : (

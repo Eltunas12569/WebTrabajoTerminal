@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
 import './css/Dashboards.css'; // Reutilizar estilos existentes
+import Sidebar from '../components/Sidebar';
 
 const AvisosAdminPage = () => {
     const { user, logout } = useAuth();
@@ -108,18 +108,10 @@ const AvisosAdminPage = () => {
 
             {/* LAYOUT CON SIDEBAR Y CONTENIDO */}
             <div className="dashboard-layout">
-                <aside className={`admin-sidebar-fixed ${isSidebarOpen ? 'active' : ''}`}>
-                    <nav className="sidebar-links">
-                        <ul>
-                            <li onClick={goToDashboard}>🏠 Inicio</li>
-                            <li onClick={goToDashboard}>📋 Lista de Clubs</li>
-                            <li onClick={goToAvisos}>
-                                📢 Gestión de Avisos
-                            </li>
-                        </ul>
-                    </nav>
-                    <button onClick={logout} className="logout-button">Cerrar Sesión</button>
-                </aside>
+                <Sidebar 
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                />
 
                 <main className="admin-main-scroll" style={{ backgroundColor: '#f4f6f8' }}>
                     <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

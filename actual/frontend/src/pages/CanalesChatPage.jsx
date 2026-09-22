@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 import api from '../services/api';
 import './css/Dashboards.css';
+import Sidebar from '../components/Sidebar';
 
 const CanalesChatPage = ({ canalInicial }) => {
     const { user, logout } = useAuth();
@@ -33,6 +34,16 @@ const CanalesChatPage = ({ canalInicial }) => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
+    const handleSelectCanal = (nuevoCanal) => {
+        if (nuevoCanal === 'encargados' && !permisos.esEncargado) {
+            setErrorAcceso('Acceso restringido: La sala de Encargados es exclusiva para encargados oficiales de clubes.');
+            return;
+        }
+        setErrorAcceso('');
+        setCanalActivo(nuevoCanal);
+        navigate(nuevoCanal === 'directivos' ? '/chat-directivos' : '/chat-encargados');
+    };
+
     // 1. Verificar los roles y membresías de clubes para validar acceso
     useEffect(() => {
         const verificarPermisos = async () => {
@@ -58,6 +69,7 @@ const CanalesChatPage = ({ canalInicial }) => {
                 // Si el canal activo es 'encargados' y es admin puro (no encargado), cambiar a directivos
                 if (canalActivo === 'encargados' && esAdmin && !esEncargado) {
                     setCanalActivo('directivos');
+                    navigate('/chat-directivos', { replace: true });
                 }
 
                 // Si no tiene ningún permiso para este tipo de chats
@@ -77,7 +89,7 @@ const CanalesChatPage = ({ canalInicial }) => {
         };
 
         verificarPermisos();
-    }, [user, canalActivo]);
+    }, [user, canalActivo, navigate]);
 
     // 2. Cargar historial y conectar WebSocket según el canal activo
     useEffect(() => {
@@ -136,6 +148,7 @@ const CanalesChatPage = ({ canalInicial }) => {
 
         socket.on('error_socket', (msg) => {
             console.error('Error en sala de socket:', msg);
+            setErrorAcceso(typeof msg === 'string' ? msg : 'Acceso denegado a este canal de chat.');
         });
 
         return () => {
@@ -219,48 +232,13 @@ const CanalesChatPage = ({ canalInicial }) => {
 
             {/* LAYOUT CON SIDEBAR Y CONTENIDO */}
             <div className="dashboard-layout">
-                <aside className={`admin-sidebar-fixed ${isSidebarOpen ? 'active' : ''}`}>
-                    <nav className="sidebar-links">
-                        <ul>
-                            {permisos.esAdmin ? (
-                                <>
-                                    <li onClick={() => navigate('/admin')}>🏠 Inicio</li>
-                                    <li onClick={() => navigate('/admin')}>📋 Lista de Clubs</li>
-                                    <li onClick={() => navigate('/admin/avisos')}>📢 Gestión de Avisos</li>
-                                    <li onClick={() => navigate('/admin/usuarios')}>👥 Usuarios del sistema</li>
-                                    <li 
-                                        onClick={() => { setCanalActivo('directivos'); setIsSidebarOpen(false); }}
-                                        style={canalActivo === 'directivos' ? { backgroundColor: 'rgba(255,255,255,0.15)', fontWeight: 'bold' } : {}}
-                                    >
-                                        🏛️ Chat Directivos
-                                    </li>
-                                </>
-                            ) : (
-                                <>
-                                    <li onClick={() => navigate('/gestion')}>🏠 Inicio</li>
-                                    <li onClick={() => navigate('/gestion')}>📅 Mis Clubs</li>
-                                    {permisos.esEncargado && (
-                                        <>
-                                            <li 
-                                                onClick={() => { setCanalActivo('directivos'); setIsSidebarOpen(false); }}
-                                                style={canalActivo === 'directivos' ? { backgroundColor: 'rgba(255,255,255,0.15)', fontWeight: 'bold' } : {}}
-                                            >
-                                                🏛️ Chat Directivos
-                                            </li>
-                                            <li 
-                                                onClick={() => { setCanalActivo('encargados'); setIsSidebarOpen(false); }}
-                                                style={canalActivo === 'encargados' ? { backgroundColor: 'rgba(255,255,255,0.15)', fontWeight: 'bold' } : {}}
-                                            >
-                                                🤝 Chat Encargados
-                                            </li>
-                                        </>
-                                    )}
-                                </>
-                            )}
-                        </ul>
-                    </nav>
-                    <button onClick={logout} className="logout-button">Cerrar Sesión</button>
-                </aside>
+                <Sidebar 
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                    canalActivo={canalActivo}
+                    onSelectCanal={handleSelectCanal}
+                    esEncargado={permisos.esEncargado}
+                />
 
                 <main className="admin-main-scroll" style={{ padding: 0, height: 'calc(100vh - 65px)', marginTop: '65px', display: 'flex', flexDirection: 'column' }}>
                     {loading ? (
@@ -296,7 +274,7 @@ const CanalesChatPage = ({ canalInicial }) => {
                                     <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.1)', padding: '4px', borderRadius: '8px' }}>
                                         <button
                                             type="button"
-                                            onClick={() => setCanalActivo('directivos')}
+                                            onClick={() => handleSelectCanal('directivos')}
                                             style={{
                                                 padding: '6px 14px',
                                                 borderRadius: '6px',
@@ -312,7 +290,7 @@ const CanalesChatPage = ({ canalInicial }) => {
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setCanalActivo('encargados')}
+                                            onClick={() => handleSelectCanal('encargados')}
                                             style={{
                                                 padding: '6px 14px',
                                                 borderRadius: '6px',

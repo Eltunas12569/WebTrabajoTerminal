@@ -29,7 +29,7 @@ const ClubDetailsPage = () => {
 
                 if (user?.id) {
                     const userClubsRes = await api.get(`/clubes/user/${user.id}`);
-                    setIsMember(userClubsRes.data.some(uc => String(uc.id) === String(id)));
+                    setIsMember(userClubsRes.data.some(uc => String(uc.id) === String(id) && uc.inscripcion_estatus === 'activo'));
                 }
             } catch (err) {
                 if (!club) setError('Error al cargar la información del club.');

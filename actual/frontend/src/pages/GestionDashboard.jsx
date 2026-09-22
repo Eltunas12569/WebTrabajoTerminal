@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import './css/Dashboards.css';
 import AccionesAlumno from '../components/AccionesAlumno';
+import CalendarioEventos from '../components/CalendarioEventos';
+import Sidebar from '../components/Sidebar';
 
 const GestionDashboard = () => {
     const { user, logout } = useAuth();
@@ -117,16 +119,6 @@ const GestionDashboard = () => {
         }
     };
 
-    const handleRestaurarAvisos = () => {
-        if (!user || !user.id) return;
-        try {
-            localStorage.removeItem(`avisos_descartados_${user.id}`);
-            setDescartadosAvisos([]);
-        } catch (err) {
-            console.error("Error al restaurar avisos:", err);
-        }
-    };
-
     const avisosVisibles = avisos.filter(aviso => {
         const key = `${aviso.tipo || 'aviso'}-${aviso.id}`;
         return !descartadosAvisos.includes(key);
@@ -152,10 +144,122 @@ const GestionDashboard = () => {
         }
     }, [activeTab]);
 
-    // Función para refrescar ambos paneles al aceptar/rechazar invitaciones o unirse a un club
+    // Estados y lógica para el Calendario de Eventos (clubes inscritos e invitaciones pendientes)
+    const [eventosCalendario, setEventosCalendario] = useState([]);
+    const [loadingEventosCalendario, setLoadingEventosCalendario] = useState(false);
+
+    const fetchEventosUsuario = async () => {
+        if (!user || !user.id) return;
+        setLoadingEventosCalendario(true);
+        try {
+            // 1. Obtener clubes a los que el usuario pertenece
+            const resClubs = await api.get(`/clubes/user/${user.id}`);
+            const misClubes = resClubs.data || [];
+
+            // 2. Obtener invitaciones pendientes
+            let invitaciones = [];
+            try {
+                const resInv = await api.get('/clubes/invitaciones/pendientes');
+                invitaciones = resInv.data || [];
+            } catch (e) {
+                console.warn("No se pudieron cargar invitaciones pendientes para eventos:", e);
+            }
+
+            // 3. Crear mapa unificado de clubes únicos
+            const clubesMap = new Map();
+            misClubes.forEach(c => {
+                clubesMap.set(c.id, { id: c.id, nombre: c.nombre, esInvitacion: false });
+            });
+            invitaciones.forEach(inv => {
+                if (!clubesMap.has(inv.club_id)) {
+                    clubesMap.set(inv.club_id, { id: inv.club_id, nombre: inv.nombre, esInvitacion: true });
+                }
+            });
+
+            const clubesLista = Array.from(clubesMap.values());
+
+            // 4. Obtener eventos en paralelo para cada club
+            const eventosPromises = clubesLista.map(async (c) => {
+                try {
+                    const resEv = await api.get(`/clubes/${c.id}/eventos`);
+                    return (resEv.data || []).map(ev => ({
+                        ...ev,
+                        club_id: c.id,
+                        club_nombre: c.nombre,
+                        es_invitacion: c.esInvitacion
+                    }));
+                } catch (err) {
+                    console.warn(`Error al cargar eventos del club ${c.id}:`, err);
+                    return [];
+                }
+            });
+
+            const resultados = await Promise.all(eventosPromises);
+            setEventosCalendario(resultados.flat());
+        } catch (error) {
+            console.error("Error general al obtener eventos para el calendario:", error);
+        } finally {
+            setLoadingEventosCalendario(false);
+        }
+    };
+
+    const handleAsistenciaCalendario = async (evento, asistira) => {
+        // Solo alumnos y profesores pueden confirmar asistencia (roles 2, 3, 4)
+        const esAlumnoOProfesor = user && [2, 3, 4].includes(Number(user.role_id));
+        if (!esAlumnoOProfesor) {
+            console.warn("Acceso denegado: solo alumnos y profesores pueden confirmar asistencia.");
+            return;
+        }
+
+        // Solo se puede confirmar asistencia en eventos que aún no hayan pasado
+        if (evento?.fecha_evento) {
+            const fechaObj = new Date(String(evento.fecha_evento).replace(' ', 'T'));
+            if (!isNaN(fechaObj.getTime()) && fechaObj.getTime() < Date.now()) {
+                console.warn("No se puede registrar asistencia en un evento que ya ha concluido.");
+                return;
+            }
+        }
+
+        try {
+            await api.post(`/clubes/${evento.club_id}/eventos/${evento.id}/asistencia`, { asistira });
+            // Actualizar en el estado local de eventosCalendario reactivamente
+            setEventosCalendario(prev => prev.map(ev => {
+                if (ev.id === evento.id) {
+                    const anterior = ev.mi_respuesta;
+                    let nuevosAsistentes = Number(ev.total_asistentes || 0);
+                    if (asistira === 1 && anterior !== 1) nuevosAsistentes += 1;
+                    if (asistira === 0 && anterior === 1) nuevosAsistentes = Math.max(0, nuevosAsistentes - 1);
+                    return {
+                        ...ev,
+                        mi_respuesta: asistira,
+                        total_asistentes: nuevosAsistentes
+                    };
+                }
+                return ev;
+            }));
+        } catch (err) {
+            console.error("Error al registrar asistencia desde calendario:", err);
+            throw err;
+        }
+    };
+
+    useEffect(() => {
+        if (user && user.id) {
+            fetchEventosUsuario();
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (activeTab === 'calendario') {
+            fetchEventosUsuario();
+        }
+    }, [activeTab]);
+
+    // Función para refrescar paneles al aceptar/rechazar invitaciones o unirse a un club
     const handleUpdate = () => {
         fetchUserClubs();
         fetchAvisos();
+        fetchEventosUsuario();
     };
 
     const openMembersModal = async (club) => {
@@ -210,31 +314,13 @@ const GestionDashboard = () => {
             </header>
 
             <div className="dashboard-layout">
-                <aside className={`admin-sidebar-fixed ${isSidebarOpen ? 'active' : ''}`}>
-                    <nav className="sidebar-links">
-                        <ul>
-                            <li onClick={() => { setActiveTab('avisos'); setIsSidebarOpen(false); }}>🏠 Inicio</li>
-                            <li onClick={() => { setActiveTab('clubs'); setIsSidebarOpen(false); }}>📅 Mis Clubs</li>
-                            
-                            {/* Mostrar Unirse a un Club solo a Alumnos (2) */}
-                            {user?.role_id === 2 && <li onClick={() => { setActiveTab('unirse'); setIsSidebarOpen(false); }}>🔑 Unirse a un Club</li>}
-
-                            {/* Opción para crear club, solo para profesores (rol 3) */}
-                            {user?.role_id === 3 && (
-                                <li onClick={goToCreateClub} className="special-link">➕ Crear Club</li>
-                            )}
-
-                            {/* Canales de Chat Institucionales para Encargados */}
-                            {esEncargado && (
-                                <>
-                                    <li onClick={() => { setIsSidebarOpen(false); navigate('/chat-directivos'); }}>🏛️ Chat Directivos</li>
-                                    <li onClick={() => { setIsSidebarOpen(false); navigate('/chat-encargados'); }}>🤝 Chat Encargados</li>
-                                </>
-                            )}
-                        </ul>
-                    </nav>
-                    <button onClick={logout} className="logout-button">Cerrar Sesión</button>
-                </aside>
+                <Sidebar 
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                    esEncargado={esEncargado}
+                />
 
                 <main className="admin-main-scroll">
                     <div className="hub-container-centered">
@@ -251,6 +337,16 @@ const GestionDashboard = () => {
                             >
                                 📁 👥 Clubs <span className="tab-badge">{userClubs.length}</span>
                             </button>
+                            <button 
+                                className={`folder-btn ${activeTab === 'calendario' ? 'active-clubs' : ''}`}
+                                onClick={() => setActiveTab('calendario')}
+                                style={{
+                                    backgroundColor: activeTab === 'calendario' ? '#003366' : undefined,
+                                    color: activeTab === 'calendario' ? '#ffffff' : undefined
+                                }}
+                            >
+                                📁 🗓️ Calendario <span className="tab-badge">{eventosCalendario.length}</span>
+                            </button>
                         </div>
 
                         <div className="folder-body" style={{ borderColor: activeTab === 'avisos' ? '#ff9800' : (activeTab === 'unirse' ? '#28a745' : '#003366') }}>
@@ -258,39 +354,6 @@ const GestionDashboard = () => {
                                 <div className="avisos-list">
                                     {/* Panel de Invitaciones (Renderizado como avisos urgentes) */}
                                     <AccionesAlumno onUpdate={handleUpdate} mostrar="invitaciones" />
-
-                                    {descartadosAvisos.length > 0 && (
-                                        <div style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            padding: '8px 14px',
-                                            marginBottom: '15px',
-                                            backgroundColor: '#eef2f7',
-                                            borderRadius: '8px',
-                                            fontSize: '0.85rem',
-                                            color: '#555',
-                                            flexWrap: 'wrap',
-                                            gap: '8px'
-                                        }}>
-                                            <span>🗑️ Has descartado {descartadosAvisos.length} aviso(s) para tu cuenta.</span>
-                                            <button
-                                                onClick={handleRestaurarAvisos}
-                                                style={{
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    color: '#003366',
-                                                    fontWeight: 'bold',
-                                                    cursor: 'pointer',
-                                                    textDecoration: 'underline',
-                                                    padding: 0,
-                                                    fontSize: '0.85rem'
-                                                }}
-                                            >
-                                                ↺ Restaurar todos los avisos
-                                            </button>
-                                        </div>
-                                    )}
 
                                     {loadingAvisos ? (
                                         <p style={{ padding: '20px' }}>Cargando avisos...</p>
@@ -407,6 +470,25 @@ const GestionDashboard = () => {
                                         )}
                                     </div>
                                 </div>
+                            ) : activeTab === 'calendario' ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #e1e5eb', paddingBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                                        <h3 style={{ margin: 0, color: '#003366', fontSize: '1.3rem' }}>
+                                            🗓️ Calendario de Eventos y Actividades
+                                        </h3>
+                                        <span style={{ fontSize: '0.88rem', color: '#555' }}>
+                                            Eventos de tus clubes e invitaciones pendientes
+                                        </span>
+                                    </div>
+                                    <CalendarioEventos 
+                                        eventos={eventosCalendario}
+                                        modo="usuario"
+                                        onAsistencia={handleAsistenciaCalendario}
+                                        clubes={userClubs}
+                                        cargando={loadingEventosCalendario}
+                                        onRefresh={fetchEventosUsuario}
+                                    />
+                                </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     <h3 style={{ margin: '0 0 10px 0', color: '#003366', borderBottom: '2px solid #e1e5eb', paddingBottom: '10px' }}>
@@ -417,7 +499,7 @@ const GestionDashboard = () => {
                                     ) : userClubs.length > 0 ? (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                             {userClubs.map(club => {
-                                                const canEnterChat = club.estatus !== 'en_revision' && club.estatus !== 'esperando_firmas';
+                                                const canEnterChat = club.estatus === 'activo' && club.inscripcion_estatus === 'activo';
                                                 return (
                                                     <div 
                                                         key={club.id} 
