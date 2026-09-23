@@ -78,15 +78,27 @@ router.get('/:id/avisos', verificarToken, requireVerificado, async (req, res) =>
 });
 
 router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) => {
-    const { contenido } = req.body;
+    const { contenido, titulo, prioridad } = req.body;
+    const prioridadValida = ['alta', 'normal', 'baja'].includes(String(prioridad).toLowerCase()) 
+        ? String(prioridad).toLowerCase() 
+        : 'normal';
+
     try {
-        await db.query(`INSERT INTO avisos (club_id, usuario_id, contenido, fecha_envio) VALUES (?, ?, ?, NOW())`, [req.params.id, req.user.id, contenido]);
+        await db.query(
+            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, activo) VALUES (?, ?, ?, ?, ?, NOW(), 1)`,
+            [req.params.id, req.user.id, titulo || null, contenido, prioridadValida]
+        );
 
         const io = req.app.get('socketio');
-        io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso' });
+        if (io) {
+            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida });
+        }
 
-        res.status(201).json({ message: "Aviso publicado" });
-    } catch (error) { res.status(500).json({ message: "Error al crear aviso" }); }
+        res.status(201).json({ message: "Aviso publicado exitosamente", prioridad: prioridadValida });
+    } catch (error) { 
+        console.error("Error al crear aviso:", error);
+        res.status(500).json({ message: "Error al crear aviso" }); 
+    }
 });
 
 router.get('/:id/eventos', verificarToken, requireVerificado, async (req, res) => {
@@ -104,26 +116,53 @@ router.get('/:id/eventos', verificarToken, requireVerificado, async (req, res) =
 });
 
 router.post('/:id/eventos', verificarToken, requireVerificado, async (req, res) => {
-    const { titulo, descripcion, fecha_evento, lugar } = req.body;
+    const { titulo, descripcion, fecha_evento, lugar, prioridad = 'alta', notificarAviso = true } = req.body;
 
-    // Validamos y convertimos la fecha ANTES de tocar la base de datos,
-    // ahora que la columna es DATETIME y no acepta cualquier texto.
+    // Validamos y convertimos la fecha ANTES de tocar la base de datos
     const fechaConvertida = convertirAFechaMySQL(fecha_evento);
     if (!fechaConvertida) {
         return res.status(400).json({ message: "La fecha del evento no es válida. Usa un formato como 'YYYY-MM-DDTHH:mm:ss'." });
     }
 
+    const prioridadValida = ['alta', 'normal', 'baja'].includes(String(prioridad).toLowerCase()) 
+        ? String(prioridad).toLowerCase() 
+        : 'alta';
+
     try {
+        // 1. Registrar el evento con su nivel de prioridad
         await db.query(
-            `INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar) VALUES (?, ?, ?, ?, ?, ?)`,
-            [req.params.id, req.user.id, titulo, descripcion, fechaConvertida, lugar]
+            `INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar, prioridad) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [req.params.id, req.user.id, titulo, descripcion, fechaConvertida, lugar, prioridadValida]
         );
 
-        const io = req.app.get('socketio');
-        io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'evento' });
+        // 2. Notificar a los miembros creando un aviso oficial con prioridad alta (o la asignada)
+        if (notificarAviso !== false) {
+            let fechaLegible = fechaConvertida;
+            try {
+                const f = new Date(fechaConvertida);
+                fechaLegible = f.toLocaleString('es-MX', { dateStyle: 'full', timeStyle: 'short' });
+            } catch (e) {}
 
-        res.status(201).json({ message: "Evento creado" });
-    } catch (error) { res.status(500).json({ message: "Error al crear evento" }); }
+            const tituloAviso = `📅 Nuevo Evento: ${titulo}`;
+            const contenidoAviso = `Se ha programado una nueva actividad oficial: "${titulo}".\n📅 Fecha: ${fechaLegible}${lugar ? `\n📍 Lugar: ${lugar}` : ''}.\n${descripcion ? `📝 Detalles: ${descripcion}\n` : ''}¡Por favor confirma tu asistencia en la sección de Eventos del Club!`;
+
+            await db.query(
+                `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, activo) VALUES (?, ?, ?, ?, ?, NOW(), 1)`,
+                [req.params.id, req.user.id, tituloAviso, contenidoAviso, prioridadValida]
+            );
+        }
+
+        const io = req.app.get('socketio');
+        if (io) {
+            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'evento', prioridad: prioridadValida });
+            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida });
+        }
+
+        res.status(201).json({ message: "Evento creado y aviso notificado con prioridad", prioridad: prioridadValida });
+    } catch (error) { 
+        console.error("Error al crear evento:", error);
+        res.status(500).json({ message: "Error al crear evento" }); 
+    }
 });
 
 router.post('/:id/eventos/:idEvento/asistencia', verificarToken, requireVerificado, async (req, res) => {
@@ -436,6 +475,194 @@ router.get('/:id/miembros', verificarToken, requireVerificado, async (req, res) 
     } catch (error) {
         console.error("Error al obtener firmas:", error);
         res.status(500).json({ message: "Error al cargar la lista de firmas" });
+    }
+});
+
+// ==========================================
+// --- INFORMACIÓN DE EMERGENCIA DE UN MIEMBRO (SOLO ENCARGADOS Y ADMIN) ---
+// ==========================================
+router.get('/:idClub/miembros/:idUsuario/emergencia', verificarToken, requireVerificado, async (req, res) => {
+    const { idClub, idUsuario } = req.params;
+    const solicitanteId = req.user.id;
+    const solicitanteRol = Number(req.user.rol);
+
+    try {
+        // 1. Barrera de Seguridad: Verificar que el solicitante sea Administrador (rol 1) o Encargado Activo de ESTE club
+        if (solicitanteRol !== 1) {
+            const [esEncargado] = await db.query(`
+                SELECT id FROM inscripciones 
+                WHERE club_id = ? AND usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo'
+                LIMIT 1
+            `, [idClub, solicitanteId]);
+
+            if (esEncargado.length === 0) {
+                return res.status(403).json({ message: "Acceso denegado. Exclusivo para encargados de este club." });
+            }
+        }
+
+        // 2. Verificar que el miembro pertenezca al club especificado
+        const [perteneceAlClub] = await db.query(`
+            SELECT id, rol_en_club, estatus FROM inscripciones 
+            WHERE club_id = ? AND usuario_id = ?
+            LIMIT 1
+        `, [idClub, idUsuario]);
+
+        if (perteneceAlClub.length === 0) {
+            return res.status(404).json({ message: "El usuario no pertenece a este club." });
+        }
+
+        // 3. Consultar datos del usuario
+        const [filasUsuario] = await db.query(`
+            SELECT id, nombres, CONCAT(apellido_paterno, ' ', IFNULL(apellido_materno, '')) AS apellidos,
+                   boleta, num_empleado, correo, nss, tipo_sangre, condiciones_preexistentes
+            FROM usuarios
+            WHERE id = ?
+        `, [idUsuario]);
+
+        if (filasUsuario.length === 0) {
+            return res.status(404).json({ message: "Usuario no encontrado." });
+        }
+
+        const usuario = filasUsuario[0];
+
+        // 4. Consultar contactos de emergencia
+        const [contactos] = await db.query(`
+            SELECT id, nombre, telefono, parentesco
+            FROM contactos_emergencia
+            WHERE usuario_id = ?
+            ORDER BY id ASC
+        `, [idUsuario]);
+
+        res.status(200).json({
+            usuario_id: usuario.id,
+            nombre_completo: `${usuario.nombres} ${usuario.apellidos}`.trim(),
+            boleta: usuario.boleta,
+            num_empleado: usuario.num_empleado,
+            correo: usuario.correo,
+            rol_en_club: perteneceAlClub[0].rol_en_club,
+            estatus_inscripcion: perteneceAlClub[0].estatus,
+            tipo_sangre: usuario.tipo_sangre || null,
+            alergias: usuario.condiciones_preexistentes || null,
+            nss: usuario.nss || null,
+            contactos: contactos || []
+        });
+    } catch (error) {
+        console.error("Error al obtener información de emergencia:", error);
+        res.status(500).json({ message: "Error interno al cargar la información de emergencia." });
+    }
+});
+
+// ==========================================
+// --- INFORMACIÓN DE EMERGENCIA DE TODOS LOS MIEMBROS (SOLO ENCARGADOS Y ADMIN) ---
+// ==========================================
+router.get('/:idClub/emergencias', verificarToken, requireVerificado, async (req, res) => {
+    const { idClub } = req.params;
+    const solicitanteId = req.user.id;
+    const solicitanteRol = Number(req.user.rol || req.user.role_id);
+
+    try {
+        let esAdmin = solicitanteRol === 1;
+        if (!esAdmin) {
+            const [u] = await db.query('SELECT role_id FROM usuarios WHERE id = ?', [solicitanteId]);
+            if (u.length > 0 && Number(u[0].role_id) === 1) {
+                esAdmin = true;
+            }
+        }
+
+        // 1. Barrera de Seguridad: Verificar que el solicitante sea Administrador (rol 1) o Encargado Activo de ESTE club
+        if (!esAdmin) {
+            const [esEncargado] = await db.query(`
+                SELECT id FROM inscripciones 
+                WHERE club_id = ? AND usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo'
+                LIMIT 1
+            `, [idClub, solicitanteId]);
+
+            if (esEncargado.length === 0) {
+                return res.status(403).json({ message: "Acceso denegado. Exclusivo para encargados de este club y administradores." });
+            }
+        }
+
+        // 2. Obtener datos del club
+        const [clubes] = await db.query(`SELECT id, nombre FROM clubes WHERE id = ?`, [idClub]);
+        if (clubes.length === 0) {
+            return res.status(404).json({ message: "Club no encontrado." });
+        }
+        const club = clubes[0];
+
+        // 3. Obtener todos los miembros activos del club
+        const [miembros] = await db.query(`
+            SELECT 
+                u.id AS usuario_id,
+                u.nombres,
+                CONCAT(u.apellido_paterno, ' ', IFNULL(u.apellido_materno, '')) AS apellidos,
+                u.boleta,
+                u.num_empleado,
+                u.correo,
+                u.nss,
+                u.tipo_sangre,
+                u.condiciones_preexistentes AS alergias,
+                i.rol_en_club,
+                i.estatus AS estatus_inscripcion
+            FROM inscripciones i
+            JOIN usuarios u ON i.usuario_id = u.id
+            WHERE i.club_id = ? AND i.estatus = 'activo'
+            ORDER BY 
+                CASE 
+                    WHEN i.rol_en_club = 'encargado_profesor' THEN 1
+                    WHEN i.rol_en_club = 'encargado_alumno' THEN 2
+                    ELSE 3
+                END,
+                u.nombres ASC, u.apellido_paterno ASC
+        `, [idClub]);
+
+        if (miembros.length === 0) {
+            return res.status(200).json({ club, miembros: [] });
+        }
+
+        // 4. Obtener contactos de emergencia de los miembros
+        const memberIds = miembros.map(m => m.usuario_id);
+        const [contactos] = await db.query(`
+            SELECT id, usuario_id, nombre, telefono, parentesco
+            FROM contactos_emergencia
+            WHERE usuario_id IN (?)
+            ORDER BY id ASC
+        `, [memberIds]);
+
+        // Mapear contactos por usuario_id
+        const contactosMap = {};
+        for (const c of contactos) {
+            if (!contactosMap[c.usuario_id]) {
+                contactosMap[c.usuario_id] = [];
+            }
+            contactosMap[c.usuario_id].push({
+                id: c.id,
+                nombre: c.nombre,
+                telefono: c.telefono,
+                parentesco: c.parentesco
+            });
+        }
+
+        const miembrosConEmergencia = miembros.map(m => ({
+            usuario_id: m.usuario_id,
+            nombre_completo: `${m.nombres} ${m.apellidos}`.trim(),
+            boleta: m.boleta,
+            num_empleado: m.num_empleado,
+            correo: m.correo,
+            rol_en_club: m.rol_en_club,
+            estatus_inscripcion: m.estatus_inscripcion,
+            tipo_sangre: m.tipo_sangre || null,
+            alergias: m.alergias || null,
+            nss: m.nss || null,
+            contactos: contactosMap[m.usuario_id] || []
+        }));
+
+        res.status(200).json({
+            club,
+            miembros: miembrosConEmergencia
+        });
+    } catch (error) {
+        console.error("Error al obtener emergencias del club:", error);
+        res.status(500).json({ message: "Error interno al cargar la información de emergencia del club." });
     }
 });
 

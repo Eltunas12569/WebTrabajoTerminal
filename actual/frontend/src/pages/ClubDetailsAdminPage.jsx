@@ -232,55 +232,78 @@ const ClubDetailsAdminPage = () => {
                         </div>
                     </div>
                 ) : (
-                    <div style={{ backgroundColor: '#f0f2f5', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ backgroundColor: '#f0f2f5', flex: 1, display: 'flex', flexDirection: 'column', marginTop: '65px', padding: '24px 30px' }}>
                         
-                        {/* Portada y Foto de Perfil (Estilo Facebook) */}
-                        <div style={{ position: 'relative', width: '100%', height: '300px', background: 'linear-gradient(135deg, #003366 0%, #00509e 100%)', display: 'flex', justifyContent: 'center' }}>
-                            {/* Foto de Perfil */}
-                            <div style={{ 
-                                position: 'absolute', bottom: '-65px', width: '150px', height: '150px', 
-                                backgroundColor: '#fff', borderRadius: '50%', border: '5px solid #fff', 
-                                display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '5rem', 
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)', zIndex: 2
-                            }}>
-                                🏆
-                            </div>
-                        </div>
+                        {/* Cabecera Web Horizontal de Escritorio */}
+                        <div style={{
+                            maxWidth: '1200px',
+                            margin: '0 auto 20px auto',
+                            width: '100%',
+                            background: '#ffffff',
+                            borderRadius: '12px',
+                            boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+                            border: '1px solid #e1e5eb',
+                            overflow: 'hidden'
+                        }}>
+                            <div style={{ height: '6px', background: 'linear-gradient(90deg, #003366 0%, #800020 50%, #00509e 100%)' }} />
+                            <div style={{ padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', minWidth: '300px' }}>
+                                    <div style={{
+                                        width: '74px',
+                                        height: '74px',
+                                        borderRadius: '14px',
+                                        background: 'linear-gradient(135deg, #003366 0%, #00509e 100%)',
+                                        color: '#fff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '2.5rem',
+                                        boxShadow: '0 4px 12px rgba(0,51,102,0.2)',
+                                        flexShrink: 0
+                                    }}>
+                                        🏆
+                                    </div>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                                            <h2 style={{ margin: 0, fontSize: '1.8rem', color: '#003366', fontWeight: '800' }}>{club.nombre}</h2>
+                                            <span className={`club-tag tag-${club.estatus?.toLowerCase()}`} style={{ fontSize: '0.85rem', padding: '4px 12px' }}>
+                                                {club.estatus}
+                                            </span>
+                                        </div>
+                                        <div style={{ color: '#666', fontSize: '0.9rem' }}>
+                                            🛡️ Panel de Supervisión y Administración Institucional del Club
+                                        </div>
+                                    </div>
+                                </div>
 
-                        {/* Cabecera: Nombre y Botones */}
-                        <div style={{ padding: '80px 5% 25px 5%', backgroundColor: '#fff', textAlign: 'center', borderBottom: '1px solid #e4e6eb' }}>
-                            <h2 style={{ margin: '0 0 10px 0', fontSize: '2.4rem', color: '#1c1e21', fontWeight: '800' }}>{club.nombre}</h2>
-                            <span className={`club-tag tag-${club.estatus?.toLowerCase()}`} style={{ fontSize: '1rem', padding: '6px 15px', display: 'inline-block', marginBottom: '25px' }}>
-                                {club.estatus}
-                            </span>
-                            
-                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                                {['en_revision', 'esperando_firmas'].includes(club.estatus) && (
-                                    <>
-                                        <button onClick={handleApproveClub} disabled={approving} style={{ padding: '10px 20px', background: '#1877f2', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'background 0.2s' }}>
-                                            {approving ? 'Aprobando...' : '✅ Aprobar Club'}
+                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                    {['en_revision', 'esperando_firmas'].includes(club.estatus) && (
+                                        <>
+                                            <button onClick={handleApproveClub} disabled={approving} style={{ padding: '10px 18px', background: '#1877f2', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', transition: 'background 0.2s' }}>
+                                                {approving ? 'Aprobando...' : '✅ Aprobar Club'}
+                                            </button>
+                                            <button onClick={() => setShowRejectModal(true)} style={{ padding: '10px 18px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                                ❌ Rechazar Club
+                                            </button>
+                                        </>
+                                    )}
+                                    {club.estatus === 'activo' && (
+                                        <button onClick={handlePauseClub} disabled={actionLoading === 'pausar'} style={{ padding: '10px 18px', background: '#ffc107', color: '#1c1e21', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                            {actionLoading === 'pausar' ? 'Pausando...' : '⏸️ Pausar Club'}
                                         </button>
-                                        <button onClick={() => setShowRejectModal(true)} style={{ padding: '10px 20px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}>
-                                            ❌ Rechazar Club
+                                    )}
+                                    {club.estatus === 'inactivo' && (
+                                        <button onClick={handleReactivateClub} disabled={actionLoading === 'reactivar'} style={{ padding: '10px 18px', background: '#28a745', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                            {actionLoading === 'reactivar' ? 'Reactivando...' : '▶️ Reactivar Club'}
                                         </button>
-                                    </>
-                                )}
-                                {club.estatus === 'activo' && (
-                                    <button onClick={handlePauseClub} disabled={actionLoading === 'pausar'} style={{ padding: '10px 20px', background: '#ffc107', color: '#1c1e21', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}>
-                                        {actionLoading === 'pausar' ? 'Pausando...' : '⏸️ Pausar Club'}
+                                    )}
+                                    <button onClick={() => setIsEditing(true)} style={{ padding: '10px 18px', background: '#e4e6eb', color: '#1c1e21', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', transition: 'background 0.2s' }}>
+                                        ✏️ Editar Encargados
                                     </button>
-                                )}
-                                {club.estatus === 'inactivo' && (
-                                    <button onClick={handleReactivateClub} disabled={actionLoading === 'reactivar'} style={{ padding: '10px 20px', background: '#28a745', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}>
-                                        {actionLoading === 'reactivar' ? 'Reactivando...' : '▶️ Reactivar Club'}
+                                    <button onClick={handleDeleteClub} style={{ padding: '10px 18px', background: '#fce8e6', color: '#e53935', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', transition: 'background 0.2s' }}>
+                                        🗑️ Eliminar
                                     </button>
-                                )}
-                                <button onClick={() => setIsEditing(true)} style={{ padding: '10px 20px', background: '#e4e6eb', color: '#1c1e21', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'background 0.2s' }}>
-                                    ✏️ Editar Encargados
-                                </button>
-                                <button onClick={handleDeleteClub} style={{ padding: '10px 20px', background: '#fce8e6', color: '#e53935', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'background 0.2s' }}>
-                                    🗑️ Eliminar
-                                </button>
+                                </div>
                             </div>
                         </div>
 

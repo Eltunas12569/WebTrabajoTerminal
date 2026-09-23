@@ -44,7 +44,12 @@ router.get('/user/:userId', verifyToken, requireVerificado, async (req, res) => 
         `);
 
         const [clubes] = await db.query(`
-            SELECT a.id, CONCAT('Aviso de ', c.nombre) AS titulo, a.contenido AS mensaje, 'normal' AS prioridad, a.fecha_envio, 'club' AS tipo
+            SELECT a.id, 
+                   COALESCE(a.titulo, CONCAT('Aviso de ', c.nombre)) AS titulo, 
+                   a.contenido AS mensaje, 
+                   COALESCE(a.prioridad, 'normal') AS prioridad, 
+                   a.fecha_envio, 
+                   'club' AS tipo
             FROM avisos a
             JOIN clubes c ON a.club_id = c.id
             JOIN inscripciones i ON c.id = i.club_id
@@ -78,7 +83,10 @@ router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) =>
 
         const [clubes] = await db.query(`
             SELECT 
-                a.id, c.nombre AS nombre_club, a.contenido AS mensaje, 
+                a.id, c.nombre AS nombre_club, 
+                COALESCE(a.titulo, CONCAT('Aviso de ', c.nombre)) AS titulo,
+                a.contenido AS mensaje, 
+                COALESCE(a.prioridad, 'normal') AS prioridad,
                 a.activo, a.fecha_envio, 'club' AS tipo
             FROM avisos a
             JOIN clubes c ON a.club_id = c.id
