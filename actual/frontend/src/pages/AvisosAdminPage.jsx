@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 import './css/Dashboards.css'; // Reutilizar estilos existentes
 import Sidebar from '../components/Sidebar';
 
@@ -17,12 +18,13 @@ const AvisosAdminPage = () => {
         const fetchAllAvisos = async () => {
             try {
                 setLoading(true);
-                // Este es el nuevo endpoint que creamos en el backend
+                // Endpoint administrativo para ver avisos globales y de clubes
                 const response = await api.get('/avisos/all-for-admin');
                 setAvisos(response.data);
             } catch (err) {
                 console.error("Error al cargar todos los avisos:", err);
-                setError(err.response?.data?.message || 'No se pudieron cargar los avisos. ¿Tienes permisos de administrador?');
+                const msg = err.response?.data?.message || err.response?.data?.mensaje || err.message || 'No se pudieron cargar los avisos.';
+                setError(msg);
             } finally {
                 setLoading(false);
             }
@@ -71,7 +73,7 @@ const AvisosAdminPage = () => {
             await api.delete(`/avisos/${aviso.tipo}/${aviso.id}`);
             setAvisos((avisosActuales) => avisosActuales.filter((item) => `${item.tipo}-${item.id}` !== avisoKey));
         } catch (requestError) {
-            setError(requestError.response?.data?.message || 'No se pudo eliminar el aviso.');
+            setError(requestError.response?.data?.message || requestError.response?.data?.mensaje || requestError.message || 'No se pudo eliminar el aviso.');
         } finally {
             setEliminando('');
         }

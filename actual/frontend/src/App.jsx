@@ -14,6 +14,7 @@ import CambiarPasswordPage from './pages/CambiarPasswordPage';
 import ClubChatPage from './pages/ClubChatPage';
 import ClubDetailsPage from './pages/ClubDetailsPage';
 import ClubPanelPage from './pages/ClubPanelPage';
+import ClubEmergenciasPage from './pages/ClubEmergenciasPage';
 import VerificarCuentaPage from './pages/VerificarCuentaPage';
 import AvisoPrivacidadPage from './pages/AvisoPrivacidadPage';
 import TerminosCondicionesPage from './pages/TerminosCondicionesPage';
@@ -69,9 +70,9 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* Detalles Públicos del Club (Usuarios regulares) */}
+          {/* Detalles Públicos y Panel Unificado del Club */}
           <Route path="/club/:id" element={
-            <ProtectedRoute rolesPermitidos={[2, 3, 4]}>
+            <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
               <ClubDetailsPage />
             </ProtectedRoute>
           } />
@@ -126,10 +127,17 @@ function App() {
               <CambiarPasswordPage />
             </ProtectedRoute>
           } />
-          {/* Panel del club: avisos, eventos y recursos */}
+          {/* Panel del club: avisos, eventos y recursos (unificado con ClubDetailsPage) */}
           <Route path="/club/:id/panel" element={
-            <ProtectedRoute rolesPermitidos={[2, 3, 4]}>
+            <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
               <ClubPanelPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Directorio de Emergencias del Club (Encargados y Administrador) */}
+          <Route path="/club/:id/emergencias" element={
+            <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
+              <ClubEmergenciasPage />
             </ProtectedRoute>
           } />
 

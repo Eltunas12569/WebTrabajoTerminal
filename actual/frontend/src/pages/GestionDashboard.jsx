@@ -504,11 +504,7 @@ const GestionDashboard = () => {
                                                     <div 
                                                         key={club.id} 
                                                         onClick={() => {
-                                                            if (canEnterChat) {
-                                                                navigate(`/chat/${club.id}`);
-                                                            } else {
-                                                                navigate(`/club/${club.id}/panel`);
-                                                            }
+                                                            navigate(`/club/${club.id}`);
                                                         }}
                                                         style={{ 
                                                             background: '#ffffff',
@@ -571,8 +567,46 @@ const GestionDashboard = () => {
                                                             )}
                                                         </div>
 
-                                                        {club.mi_rol_interno === 'encargado_profesor' && club.estatus === 'esperando_firmas' && (
-                                                            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f0f2f5', paddingTop: '12px', marginTop: '4px' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #f0f2f5', paddingTop: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
+                                                            {canEnterChat && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); navigate(`/chat/${club.id}`); }}
+                                                                    style={{
+                                                                        background: '#003366',
+                                                                        color: '#fff',
+                                                                        border: 'none',
+                                                                        borderRadius: '6px',
+                                                                        padding: '7px 14px',
+                                                                        fontSize: '0.85rem',
+                                                                        fontWeight: 'bold',
+                                                                        cursor: 'pointer',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '5px'
+                                                                    }}
+                                                                >
+                                                                    💬 Entrar al Chat
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); navigate(`/club/${club.id}`); }}
+                                                                style={{
+                                                                    background: '#e7f3ff',
+                                                                    color: '#003366',
+                                                                    border: '1px solid #cce5ff',
+                                                                    borderRadius: '6px',
+                                                                    padding: '7px 14px',
+                                                                    fontSize: '0.85rem',
+                                                                    fontWeight: 'bold',
+                                                                    cursor: 'pointer',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '5px'
+                                                                }}
+                                                            >
+                                                                📋 Panel y Detalles
+                                                            </button>
+                                                            {club.mi_rol_interno === 'encargado_profesor' && club.estatus === 'esperando_firmas' && (
                                                                 <button 
                                                                     onClick={(e) => { e.stopPropagation(); openMembersModal(club); }}
                                                                     className="btn-review-club"
@@ -580,8 +614,8 @@ const GestionDashboard = () => {
                                                                 >
                                                                     📋 Ver Detalles y Firmas
                                                                 </button>
-                                                            </div>
-                                                        )}
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 );
                                             })}

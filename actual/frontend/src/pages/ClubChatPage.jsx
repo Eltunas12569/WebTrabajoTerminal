@@ -160,14 +160,51 @@ const ClubChatPage = () => {
 
     if (!club) return null;
 
+    const esAdmin = Number(user?.role_id) === 1 || Number(user?.rol) === 1;
+    const canManage = esAdmin || (club && ['encargado_profesor', 'encargado_alumno'].includes(club.mi_rol_interno) && club.inscripcion_estatus === 'activo') || (club && (club.profesor_encargado_id === user?.id || club.alumno_encargado_id === user?.id));
+
     return (
         <div className="web-dashboard">
-            <header className="admin-navbar-fixed" style={{backgroundColor: '#003366', color: '#fff'}}>
-                <div className="nav-left">
-                    <span className="nav-title">🏆 Chat del Club</span>
+            <header className="admin-navbar-fixed" style={{ backgroundColor: '#003366', color: '#fff', padding: '0 20px', minHeight: '65px' }}>
+                <div className="nav-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '1.6rem' }}>🏆</span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span className="nav-title" style={{ fontSize: '1.15rem', fontWeight: 'bold', lineHeight: '1.2', color: '#fff' }}>
+                            {club.nombre}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#d4edda', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#28a745', display: 'inline-block' }}></span>
+                            Chat en vivo del club
+                        </span>
+                    </div>
                 </div>
-                <div className="nav-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    {user?.role_id === 1 ? (
+
+                <div className="nav-right" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {canManage && (
+                        <button
+                            onClick={() => navigate(`/club/${club.id}/emergencias`)}
+                            style={{
+                                background: '#dc3545',
+                                border: 'none',
+                                color: '#fff',
+                                cursor: 'pointer',
+                                padding: '8px 14px',
+                                borderRadius: '6px',
+                                fontWeight: 'bold',
+                                fontSize: '0.86rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 2px 4px rgba(220, 53, 69, 0.3)',
+                                transition: 'background 0.2s ease'
+                            }}
+                            title="Directorio médico y contactos de emergencia de los miembros del club"
+                        >
+                            🚨 Emergencias
+                        </button>
+                    )}
+
+                    {esAdmin ? (
                         <button
                             onClick={() => navigate(`/admin/club/${club.id}`)}
                             style={{
@@ -175,10 +212,13 @@ const ClubChatPage = () => {
                                 border: 'none',
                                 color: '#fff',
                                 cursor: 'pointer',
-                                padding: '8px 16px',
+                                padding: '8px 14px',
                                 borderRadius: '6px',
                                 fontWeight: 'bold',
-                                fontSize: '0.88rem'
+                                fontSize: '0.86rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
                             }}
                         >
                             📋 Panel Admin
@@ -187,68 +227,45 @@ const ClubChatPage = () => {
                         <button
                             onClick={() => navigate(`/club/${club.id}/panel`)}
                             style={{
-                                background: '#28a745',
-                                border: 'none',
+                                background: '#00509e',
+                                border: '1px solid rgba(255,255,255,0.3)',
                                 color: '#fff',
                                 cursor: 'pointer',
-                                padding: '8px 16px',
+                                padding: '8px 14px',
                                 borderRadius: '6px',
                                 fontWeight: 'bold',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                fontSize: '0.88rem',
+                                fontSize: '0.86rem',
                                 boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
                                 transition: 'background 0.2s'
                             }}
-                            title="Ir al panel del club para ver avisos, eventos y miembros"
+                            title="Ir a la información general, avisos, eventos y miembros del club"
                         >
-                            📋 Panel del Club
+                            📋 Panel y Detalles
                         </button>
                     )}
-                    <button onClick={() => navigate(user?.role_id === 1 ? '/admin' : '/gestion')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', cursor: 'pointer', padding: '8px 15px', borderRadius: '5px', fontWeight: 'bold' }}>🔙 Volver</button>
+
+                    <button
+                        onClick={() => navigate(esAdmin ? '/admin' : '/gestion')}
+                        style={{
+                            background: 'rgba(255,255,255,0.2)',
+                            border: 'none',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            padding: '8px 14px',
+                            borderRadius: '6px',
+                            fontWeight: 'bold',
+                            fontSize: '0.86rem'
+                        }}
+                    >
+                        🔙 Volver
+                    </button>
                 </div>
             </header>
 
             <div style={{ marginTop: '65px', height: 'calc(100vh - 65px)', backgroundColor: '#e5ddd5', display: 'flex', flexDirection: 'column' }}>
-                <div style={{
-                    padding: '12px 25px',
-                    backgroundColor: '#002244',
-                    color: '#fff',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '15px',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-                    flexWrap: 'wrap'
-                }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <h3 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            🏆 {club.nombre}
-                        </h3>
-                        <span style={{ fontSize: '0.85rem', color: '#d4edda' }}>🟢 Conversación en vivo del club</span>
-                    </div>
-                    <button
-                        onClick={() => navigate(`/club/${club.id}/panel`)}
-                        style={{
-                            background: '#00509e',
-                            border: '1px solid rgba(255,255,255,0.3)',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            padding: '7px 15px',
-                            borderRadius: '6px',
-                            fontWeight: '600',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            fontSize: '0.85rem',
-                            transition: 'background 0.2s'
-                        }}
-                    >
-                        📋 Ver Avisos y Eventos del Club →
-                    </button>
-                </div>
-                
                 <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {mensajes.length === 0 && <p style={{ textAlign: 'center', color: '#666', marginTop: '20px', backgroundColor: 'rgba(255,255,255,0.8)', padding: '10px 20px', borderRadius: '8px', alignSelf: 'center' }}>No hay mensajes aún. ¡Sé el primero en saludar!</p>}
                     {mensajes.map((msg, idx) => {
