@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const verificarToken = require('../middlewares/authMiddleware');
-const requireVerificado = require('../middlewares/verificarCuentaMiddleware'); // NUEVO
+const requireVerificado = require('../middlewares/verificarCuentaMiddleware');
+const checkRole = require('../middlewares/roleAuth');
+const ROLES = require('../config/roles');
 
 
 function convertirAFechaMySQL(valor) {
@@ -84,6 +86,16 @@ router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) =
         : 'normal';
 
     try {
+        const rolUsuario = Number(req.user.rol || req.user.role_id);
+        if (rolUsuario !== 1) {
+            const [permiso] = await db.query(
+                `SELECT id FROM inscripciones WHERE club_id = ? AND usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo'`, 
+                [req.params.id, req.user.id]
+            );
+            if (permiso.length === 0) {
+                return res.status(403).json({ message: "Acceso denegado. Solo los encargados pueden publicar avisos en este club." });
+            }
+        }
         await db.query(
             `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, activo) VALUES (?, ?, ?, ?, ?, NOW(), 1)`,
             [req.params.id, req.user.id, titulo || null, contenido, prioridadValida]
@@ -404,7 +416,7 @@ router.put('/:id', verificarToken, requireVerificado, async (req, res) => {
     }
 });
 
-router.put('/:id/aprobar', verificarToken, requireVerificado, async (req, res) => {
+router.put('/:id/aprobar', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR]), async (req, res) => {
     const { id } = req.params;
     const codigoGenerado = Math.random().toString(36).substring(2, 8).toUpperCase();
     try {
@@ -413,28 +425,28 @@ router.put('/:id/aprobar', verificarToken, requireVerificado, async (req, res) =
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
 
-router.put('/:id/rechazar', verificarToken, requireVerificado, async (req, res) => {
+router.put('/:id/rechazar', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR]), async (req, res) => {
     try {
         await db.query(`UPDATE clubes SET estatus = 'rechazado', motivo_rechazo = ? WHERE id = ?`, [req.body.motivo, req.params.id]);
         res.status(200).json({ message: "Rechazado" });
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
 
-router.put('/:id/pausar', verificarToken, requireVerificado, async (req, res) => {
+router.put('/:id/pausar', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR]), async (req, res) => {
     try {
         await db.query(`UPDATE clubes SET estatus = 'inactivo' WHERE id = ?`, [req.params.id]);
         res.status(200).json({ message: "Pausado" });
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
 
-router.put('/:id/reactivar', verificarToken, requireVerificado, async (req, res) => {
+router.put('/:id/reactivar', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR]), async (req, res) => {
     try {
         await db.query(`UPDATE clubes SET estatus = 'activo' WHERE id = ?`, [req.params.id]);
         res.status(200).json({ message: "Reactivado" });
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
 
-router.delete('/:id', verificarToken, requireVerificado, async (req, res) => {
+router.delete('/:id', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR]), async (req, res) => {
     try {
         const [encargados] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno')`, [req.params.id]);
         await db.query('DELETE FROM clubes WHERE id = ?', [req.params.id]);

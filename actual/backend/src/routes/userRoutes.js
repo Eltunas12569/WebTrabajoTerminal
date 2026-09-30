@@ -27,47 +27,55 @@ router.get('/students-in-charge', verificarToken, requireVerificado, async (req,
     } catch (error) { res.status(500).json({ message: "Error al obtener alumnos" }); }
 });
 
+// 1. OBTENER TODOS LOS USUARIOS (Sin "eliminado = 0" y agregando nss)
 router.get('/all-for-admin', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR]), async (req, res) => {
     try {
-
         const [usuarios] = await db.query(`
             SELECT id, nombres, apellido_paterno, apellido_materno, correo, role_id, verificado, 
                    acepta_privacidad, version_aviso_privacidad, fecha_aceptacion_privacidad, 
-                   boleta, carrera, num_empleado
+                   boleta, carrera, num_empleado, nss
             FROM usuarios
-            WHERE id <> ? AND eliminado = 0
+            WHERE id <> ?
             ORDER BY nombres ASC, apellido_paterno ASC
         `, [req.user.id]);
         res.status(200).json(usuarios);
-    } catch (error) { res.status(500).json({ message: 'Error al obtener los usuarios' }); }
+    } catch (error) { 
+        res.status(500).json({ message: 'Error al obtener los usuarios' }); 
+    }
 });
 
+// 2. OBTENER UN USUARIO PARA EDITAR (Sin "eliminado = 0" y agregando nss)
 router.get('/:id/admin-edit', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR]), async (req, res) => {
     try {
         const [usuarios] = await db.query(`
-            SELECT id, nombres, apellido_paterno, apellido_materno, correo, role_id, boleta, carrera, num_empleado
+            SELECT id, nombres, apellido_paterno, apellido_materno, correo, role_id, boleta, carrera, num_empleado, nss
             FROM usuarios 
-            WHERE id = ? AND role_id <> ? AND eliminado = 0
+            WHERE id = ? AND role_id <> ?
         `, [req.params.id, ROLES.ADMINISTRADOR]);
 
         if (usuarios.length === 0) return res.status(404).json({ message: 'Usuario no encontrado o no editable.' });
         res.status(200).json(usuarios[0]);
-    } catch (error) { res.status(500).json({ message: 'Error al cargar el usuario' }); }
+    } catch (error) { 
+        res.status(500).json({ message: 'Error al cargar el usuario' }); 
+    }
 });
 
+// 3. GUARDAR LOS CAMBIOS DEL USUARIO (Recibiendo nss y guardando carrera para profesores)
 router.put('/:id/admin-edit', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR]), async (req, res) => {
     const idUsuario = Number(req.params.id);
-    const { nombres, apellido_paterno, apellido_materno, correo, boleta, carrera, num_empleado } = req.body;
+    // Agregamos nss a la extracción del body
+    const { nombres, apellido_paterno, apellido_materno, correo, boleta, carrera, num_empleado, nss } = req.body;
 
     if (!Number.isInteger(idUsuario) || idUsuario <= 0) return res.status(400).json({ message: 'Identificador de usuario inválido.' });
     if (!nombres?.trim() || !apellido_paterno?.trim() || !correo?.trim()) return res.status(400).json({ message: 'Nombres, apellido paterno y correo son obligatorios.' });
 
     const correoLimpio = correo.trim().toLowerCase();
     const conexion = await db.getConnection();
+    
     try {
         await conexion.beginTransaction();
 
-        const [usuarios] = await conexion.query('SELECT role_id FROM usuarios WHERE id = ? AND eliminado = 0 FOR UPDATE', [idUsuario]);
+        const [usuarios] = await conexion.query('SELECT role_id FROM usuarios WHERE id = ? FOR UPDATE', [idUsuario]);
         if (usuarios.length === 0 || Number(usuarios[0].role_id) === ROLES.ADMINISTRADOR) {
             await conexion.rollback();
             return res.status(403).json({ message: 'No está permitido modificar administradores.' });
@@ -86,18 +94,20 @@ router.put('/:id/admin-edit', verificarToken, requireVerificado, checkRole([ROLE
                 await conexion.rollback();
                 return res.status(400).json({ message: 'La boleta y la carrera son obligatorias para alumnos.' });
             }
+            // Agregamos el campo nss a la consulta SQL
             await conexion.query(
-                `UPDATE usuarios SET nombres = ?, apellido_paterno = ?, apellido_materno = ?, correo = ?, boleta = ?, carrera = ? WHERE id = ?`,
-                [nombres.trim(), apellido_paterno.trim(), apellido_materno?.trim() || null, correoLimpio, boleta.trim(), carrera.trim(), idUsuario]
+                `UPDATE usuarios SET nombres = ?, apellido_paterno = ?, apellido_materno = ?, correo = ?, boleta = ?, carrera = ?, nss = ? WHERE id = ?`,
+                [nombres.trim(), apellido_paterno.trim(), apellido_materno?.trim() || null, correoLimpio, boleta.trim(), carrera.trim(), nss?.trim() || null, idUsuario]
             );
         } else if (rolObjetivo === ROLES.PROFESOR) {
             if (!num_empleado?.trim()) {
                 await conexion.rollback();
                 return res.status(400).json({ message: 'El número de empleado es obligatorio para profesores.' });
             }
+            // Agregamos el campo carrera a la consulta SQL para los profesores
             await conexion.query(
-                `UPDATE usuarios SET nombres = ?, apellido_paterno = ?, apellido_materno = ?, correo = ?, num_empleado = ? WHERE id = ?`,
-                [nombres.trim(), apellido_paterno.trim(), apellido_materno?.trim() || null, correoLimpio, num_empleado.trim(), idUsuario]
+                `UPDATE usuarios SET nombres = ?, apellido_paterno = ?, apellido_materno = ?, correo = ?, num_empleado = ?, carrera = ? WHERE id = ?`,
+                [nombres.trim(), apellido_paterno.trim(), apellido_materno?.trim() || null, correoLimpio, num_empleado.trim(), carrera?.trim() || null, idUsuario]
             );
         }
 
@@ -105,10 +115,32 @@ router.put('/:id/admin-edit', verificarToken, requireVerificado, checkRole([ROLE
         res.status(200).json({ message: 'Usuario actualizado correctamente.' });
     } catch (error) {
         await conexion.rollback();
-        if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'La boleta o el número de empleado ya está registrado.' });
+        if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'La boleta, NSS o número de empleado ya está registrado.' });
         res.status(500).json({ message: 'Error al actualizar el usuario' });
     } finally {
         conexion.release();
+    }
+});
+
+// 4. ELIMINACIÓN FÍSICA (Borrado Seguro para cumplir con la auditoría)
+router.delete('/:id/admin-delete', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR]), async (req, res) => {
+    const idUsuario = Number(req.params.id);
+
+    if (!Number.isInteger(idUsuario) || idUsuario <= 0) {
+        return res.status(400).json({ message: 'Identificador de usuario inválido.' });
+    }
+
+    try {
+        const [resultado] = await db.query('DELETE FROM usuarios WHERE id = ? AND role_id <> ?', [idUsuario, ROLES.ADMINISTRADOR]);
+        
+        if (resultado.affectedRows === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado o no se puede eliminar a otro administrador.' });
+        }
+        
+        res.status(200).json({ message: 'Usuario eliminado permanentemente del sistema.' });
+    } catch (error) {
+        console.error("Error en borrado definitivo:", error);
+        res.status(500).json({ message: 'Error interno al intentar eliminar al usuario.' });
     }
 });
 

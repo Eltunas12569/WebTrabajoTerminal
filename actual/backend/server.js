@@ -94,7 +94,7 @@ io.use(async (socket, siguiente) => {
 });
 
 io.on('connection', (socket) => {
-    console.log('✅ Usuario conectado al socket:', socket.id, '- Usuario:', socket.datosUsuario.id);
+    //console.log('✅ Usuario conectado al socket:', socket.id, '- Usuario:', socket.datosUsuario.id);
 
     socket.on('unirse_club', async (idClub) => {
         try {
@@ -108,7 +108,7 @@ io.on('connection', (socket) => {
                 }
             }
             socket.join(`club_${idClub}`);
-            console.log(`Usuario ${socket.datosUsuario.id} se unió al chat del club ${idClub}`);
+            //console.log(`Usuario ${socket.datosUsuario.id} se unió al chat del club ${idClub}`);
         } catch (error) {
             console.error('Error al verificar pertenencia al club:', error);
             socket.emit('error_socket', 'Error al unirse al club');
@@ -151,7 +151,7 @@ io.on('connection', (socket) => {
                 }
             }
             socket.join('sala_directivos');
-            console.log(`Usuario ${socket.datosUsuario.id} se unió al chat de directivos`);
+            //console.log(`Usuario ${socket.datosUsuario.id} se unió al chat de directivos`);
         } catch (error) {
             console.error('Error al verificar permisos de directivos:', error);
             socket.emit('error_socket', 'Error al unirse al chat de directivos');
@@ -255,7 +255,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('❌ Usuario desconectado:', socket.id);
+        //console.log('❌ Usuario desconectado:', socket.id);
     });
 });
 

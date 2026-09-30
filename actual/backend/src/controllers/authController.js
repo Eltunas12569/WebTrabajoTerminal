@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 
 const iniciarSesion = async (req, res) => {
     try {
-        console.log("Intento de inicio de sesión recibido:", req.body);
+        //console.log("Intento de inicio de sesión recibido:", req.body);
         const { correo, password: contrasena } = req.body;
 
         if (!correo || !contrasena) {
@@ -20,7 +20,7 @@ const iniciarSesion = async (req, res) => {
 
 const registrar = async (req, res) => {
     try {
-        console.log("Datos de registro recibidos:", req.body);
+        //console.log("Datos de registro recibidos:", req.body);
         const {
             nombres, apellido_paterno, apellido_materno,
             nss, boleta, correo, password: contrasena, rol_id: idRol,
