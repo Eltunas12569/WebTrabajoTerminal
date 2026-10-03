@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import RecuperarPasswordPage from './pages/RecuperarPasswordPage';
@@ -21,8 +21,28 @@ import TerminosCondicionesPage from './pages/TerminosCondicionesPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminEditUserPage from './pages/AdminEditUserPage';
 import AdminCalendarioPage from './pages/AdminCalendarioPage';
+import AdminPoliticasPage from './pages/AdminPoliticasPage';
 import CanalesChatPage from './pages/CanalesChatPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
+import ModalAceptacionPoliticas from './components/ModalAceptacionPoliticas';
+
+/**
+ * Componente modal global para bloquear la interfaz si las políticas legales están desactualizadas.
+ * Se monta a nivel raíz para impedir cualquier interacción hasta que el usuario acepte.
+ */
+function GlobalPoliticasModal() {
+  const { user, mostrarModalPoliticas, politicaPendiente, aceptarNuevasPoliticas, logout } = useAuth();
+
+  if (!user || !mostrarModalPoliticas) return null;
+
+  return (
+    <ModalAceptacionPoliticas
+      politica={politicaPendiente}
+      onAceptar={aceptarNuevasPoliticas}
+      onLogout={logout}
+    />
+  );
+}
 
 /**
  * Configuración de Rutas del Sistema de Gestión Deportiva - ESCOM
@@ -31,6 +51,7 @@ import UnauthorizedPage from './pages/UnauthorizedPage';
 function App() {
   return (
     <AuthProvider>
+      <GlobalPoliticasModal />
       <Router>
         <Routes>
           {/* --- RUTAS PÚBLICAS --- */}
@@ -107,6 +128,13 @@ function App() {
           <Route path="/admin/calendario" element={
             <ProtectedRoute rolesPermitidos={[1]}>
               <AdminCalendarioPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Gestión de Políticas, Aviso de Privacidad y Términos (Administrador) */}
+          <Route path="/admin/politicas" element={
+            <ProtectedRoute rolesPermitidos={[1]}>
+              <AdminPoliticasPage />
             </ProtectedRoute>
           } />
 
