@@ -120,6 +120,12 @@ const Sidebar = ({
                                     🗓️ Calendario de Eventos
                                 </li>
                                 <li 
+                                    onClick={() => handleAction(() => navigate('/admin/politicas'))}
+                                    style={isPathActive('/admin/politicas') ? activeItemStyle : undefined}
+                                >
+                                    ⚖️ Políticas y Privacidad
+                                </li>
+                                <li 
                                     onClick={() => {
                                         if (onSelectCanal) {
                                             handleAction(() => onSelectCanal('directivos'));
