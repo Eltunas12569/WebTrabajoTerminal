@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import Sidebar from '../components/Sidebar';
 import './css/Dashboards.css';
@@ -8,13 +7,11 @@ import './css/AdminPoliticas.css';
 
 const AdminPoliticasPage = () => {
     const { user, logout } = useAuth();
-    const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const [loading, setLoading] = useState(true);
     const [estadisticas, setEstadisticas] = useState(null);
     const [versiones, setVersiones] = useState([]);
-    const [ultimasAceptaciones, setUltimasAceptaciones] = useState([]);
     const [versionVigente, setVersionVigente] = useState('1.0');
 
     // Estado del formulario de nueva versión
@@ -33,7 +30,6 @@ const AdminPoliticasPage = () => {
             const res = await api.get('/politicas/admin/estadisticas');
             setEstadisticas(res.data.estadisticas);
             setVersiones(res.data.versiones || []);
-            setUltimasAceptaciones(res.data.ultimas_aceptaciones || []);
             setVersionVigente(res.data.version_vigente || '1.0');
         } catch (error) {
             console.error('Error al cargar datos de políticas:', error);
@@ -56,7 +52,7 @@ const AdminPoliticasPage = () => {
 
         const confirmacion = window.confirm(
             `⚠️ ATENCIÓN: ¿Estás seguro de publicar la versión ${nuevaVersion}?\n\n` +
-            `Esta acción emitirá una ALERTA OBLIGATORIA EN TIEMPO REAL a todos los usuarios conectados y bloqueará su acceso a la plataforma hasta que acepten las nuevas condiciones (LGPDPPSO).`
+            `Esta acción emitirá una notificación de actualización a todos los usuarios de la plataforma.`
         );
 
         if (!confirmacion) return;
@@ -119,22 +115,22 @@ const AdminPoliticasPage = () => {
             <main className="dashboard-content" style={{ marginTop: '70px', padding: '24px' }}>
                 <div className="admin-politicas-container">
                     <header className="admin-politicas-header">
-                        <h1>⚖️ Gestión de Aviso de Privacidad y Términos</h1>
+                        <h1>Gestión de Aviso de Privacidad y Términos</h1>
                         <p>
-                            Administración centralizada de versiones legales, emisión de alertas masivas en tiempo real y bitácora de consentimiento (LGPDPPSO Arts. 28, 31, 43, 63 y 250).
+                            Administración centralizada de versiones legales y emisión de notificaciones de actualización para los usuarios de la plataforma.
                         </p>
                     </header>
 
-                    {/* Métricas clave */}
+                    {/* Métricas clave (3 tarjetas en escritorio) */}
                     <div className="politicas-metrics-grid">
                         <div className="politica-metric-card">
                             <span className="metric-label">Versión Vigente</span>
-                            <span className="metric-value" style={{ color: '#6b0f1a' }}>v{versionVigente}</span>
+                            <span className="metric-value" style={{ color: '#003366' }}>v{versionVigente}</span>
                             <span className="metric-subtext">Actualmente requerida a todos los usuarios</span>
                         </div>
 
                         <div className="politica-metric-card">
-                            <span className="metric-label">Usuarios al Día</span>
+                            <span className="metric-label">Aceptaciones Totales</span>
                             <span className="metric-value" style={{ color: '#16a34a' }}>
                                 {estadisticas ? estadisticas.usuarios_al_dia : '...'}
                             </span>
@@ -156,109 +152,74 @@ const AdminPoliticasPage = () => {
                             </span>
                             <span className="metric-subtext">Bloqueados hasta aceptar la nueva versión</span>
                         </div>
-
-                        <div className="politica-metric-card">
-                            <span className="metric-label">Tasa de Aceptación</span>
-                            <span className="metric-value">
-                                {estadisticas ? `${estadisticas.porcentaje_cumplimiento}%` : '...'}
-                            </span>
-                            <span className="metric-subtext">Cumplimiento institucional</span>
-                        </div>
                     </div>
 
-                    {/* Fila con Formulario de Publicación y Resumen */}
-                    <div className="politicas-two-col">
-                        {/* Formulario de actualización */}
-                        <div className="politica-card">
-                            <h3 className="politica-card-title">
-                                📢 Publicar Nueva Versión Legal
-                            </h3>
+                    {/* Formulario de publicación de nueva versión */}
+                    <div className="politica-card">
+                        <h3 className="politica-card-title">
+                            📢 Publicar Nueva Versión Legal
+                        </h3>
 
-                            <div className="aviso-alerta-box">
-                                <strong>⚠️ Impacto en la plataforma:</strong> Al guardar, el servidor emitirá un evento WebSocket instantáneo que mostrará un modal bloqueante a todos los usuarios conectados. Ningún usuario podrá realizar acciones hasta otorgar su consentimiento.
-                            </div>
-
-                            {mensajeExito && (
-                                <div style={{ background: '#dcfce7', color: '#166534', padding: '12px', borderRadius: '8px', marginBottom: '15px', fontWeight: '600', fontSize: '13.5px' }}>
-                                    ✓ {mensajeExito}
-                                </div>
-                            )}
-
-                            {errorForm && (
-                                <div style={{ background: '#fee2e2', color: '#991b1b', padding: '12px', borderRadius: '8px', marginBottom: '15px', fontWeight: '600', fontSize: '13.5px' }}>
-                                    ⚠️ {errorForm}
-                                </div>
-                            )}
-
-                            <form onSubmit={handlePublicarNuevaVersion}>
-                                <div className="form-group-politica">
-                                    <label htmlFor="input-version">Identificador de Versión (ej. 1.2 o 2.0):</label>
-                                    <input 
-                                        id="input-version"
-                                        type="text" 
-                                        placeholder="Ej. 1.2"
-                                        value={nuevaVersion}
-                                        onChange={(e) => setNuevaVersion(e.target.value)}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="form-group-politica">
-                                    <label htmlFor="input-titulo">Título Descriptivo de la Actualización:</label>
-                                    <input 
-                                        id="input-titulo"
-                                        type="text" 
-                                        placeholder="Ej. Actualización de Medidas de Seguridad y Derechos ARCO 2026"
-                                        value={nuevoTitulo}
-                                        onChange={(e) => setNuevoTitulo(e.target.value)}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="form-group-politica">
-                                    <label htmlFor="input-resumen">Resumen Explicativo de Cambios (se mostrará a los alumnos):</label>
-                                    <textarea 
-                                        id="input-resumen"
-                                        placeholder="Describe brevemente las cláusulas modificadas, nuevos procedimientos ARCO o motivos de la actualización..."
-                                        value={nuevoResumen}
-                                        onChange={(e) => setNuevoResumen(e.target.value)}
-                                        required
-                                    />
-                                </div>
-
-                                <button 
-                                    type="submit" 
-                                    className="btn-publicar-version"
-                                    disabled={publicando}
-                                >
-                                    {publicando ? 'Publicando y Alertando...' : '📢 Publicar y Notificar a Todos los Usuarios'}
-                                </button>
-                            </form>
+                        <div className="aviso-alerta-box">
+                            <strong>⚠️ Impacto en la plataforma:</strong> Al guardar, el servidor emitirá una notificación inmediata a los usuarios solicitando la ratificación del aviso de privacidad antes de continuar utilizando el sistema.
                         </div>
 
-                        {/* Información normativa */}
-                        <div className="politica-card">
-                            <h3 className="politica-card-title">
-                                ⚖️ Marco Normativo y Garantías Legales
-                            </h3>
-                            <div style={{ fontSize: '13.5px', lineHeight: '1.6', color: '#334155' }}>
-                                <p>
-                                    <strong>Artículo 28 (LGPDPPSO):</strong> El responsable no podrá modificar sustancialmente las finalidades del tratamiento sin poner a disposición del titular un aviso de privacidad actualizado.
-                                </p>
-                                <p>
-                                    <strong>Artículo 31 (LGPDPPSO):</strong> Establece el principio de información previa. Los titulares deben ser notificados y otorgar consentimiento antes de que los cambios en el tratamiento de datos surtan efecto.
-                                </p>
-                                <p>
-                                    <strong>Artículo 63 (LGPDPPSO):</strong> Obliga al Instituto a mantener un programa de auditoría y bitácoras inalterables con marcas de tiempo (timestamp e IP) de los consentimientos otorgados.
-                                </p>
-                                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0', marginTop: '16px' }}>
-                                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', color: '#003366' }}>🛡️ Mecanismo de Seguridad Activo:</h4>
-                                    <p style={{ margin: 0, fontSize: '12.5px', color: '#64748b' }}>
-                                        El backend cuenta con un middleware estricto que intercepta y rechaza con <strong>HTTP 403 (POLITICAS_PENDIENTES)</strong> cualquier petición de usuarios desactualizados, garantizando que el bloqueo no pueda ser evadido desde el navegador.
-                                    </p>
-                                </div>
+                        {mensajeExito && (
+                            <div style={{ background: '#dcfce7', color: '#166534', padding: '12px', borderRadius: '8px', marginBottom: '15px', fontWeight: '600', fontSize: '13.5px' }}>
+                                ✓ {mensajeExito}
                             </div>
-                        </div>
+                        )}
+
+                        {errorForm && (
+                            <div style={{ background: '#fee2e2', color: '#991b1b', padding: '12px', borderRadius: '8px', marginBottom: '15px', fontWeight: '600', fontSize: '13.5px' }}>
+                                ⚠️ {errorForm}
+                            </div>
+                        )}
+
+                        <form onSubmit={handlePublicarNuevaVersion}>
+                            <div className="form-group-politica">
+                                <label htmlFor="input-version">Identificador de Versión (ej. 1.2 o 2.0):</label>
+                                <input 
+                                    id="input-version"
+                                    type="text" 
+                                    placeholder="Ej. 1.2"
+                                    value={nuevaVersion}
+                                    onChange={(e) => setNuevaVersion(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div className="form-group-politica">
+                                <label htmlFor="input-titulo">Título Descriptivo de la Actualización:</label>
+                                <input 
+                                    id="input-titulo"
+                                    type="text" 
+                                    placeholder="Ej. Actualización de Medidas de Seguridad y Derechos ARCO 2026"
+                                    value={nuevoTitulo}
+                                    onChange={(e) => setNuevoTitulo(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div className="form-group-politica">
+                                <label htmlFor="input-resumen">Resumen Explicativo de Cambios (se mostrará a los alumnos):</label>
+                                <textarea 
+                                    id="input-resumen"
+                                    placeholder="Describe brevemente las cláusulas modificadas, nuevos procedimientos o motivos de la actualización..."
+                                    value={nuevoResumen}
+                                    onChange={(e) => setNuevoResumen(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <button 
+                                type="submit" 
+                                className="btn-publicar-version"
+                                disabled={publicando}
+                            >
+                                {publicando ? 'Publicando y Notificando...' : '📢 Publicar y Notificar a Todos los Usuarios'}
+                            </button>
+                        </form>
                     </div>
 
                     {/* Tabla de versiones históricas */}
@@ -302,50 +263,6 @@ const AdminPoliticasPage = () => {
                                                 )}
                                             </td>
                                             <td>{v.autor || 'Sistema'}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
-                    </div>
-
-                    {/* Bitácora de Aceptaciones Recientes (Auditoría LGPDPPSO Art. 63) */}
-                    <div className="tabla-politicas-container">
-                        <h3 className="politica-card-title">
-                            🔍 Bitácora Inalterable de Consentimientos (Auditoría Art. 63)
-                        </h3>
-                        {ultimasAceptaciones.length === 0 ? (
-                            <p style={{ color: '#64748b', fontSize: '14px' }}>Aún no hay registros de aceptación en la bitácora.</p>
-                        ) : (
-                            <table className="tabla-politicas">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Usuario</th>
-                                        <th>Correo</th>
-                                        <th>Versión Aceptada</th>
-                                        <th>Fecha y Hora</th>
-                                        <th>IP Origen</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {ultimasAceptaciones.map((a) => (
-                                        <tr key={a.id}>
-                                            <td style={{ color: '#94a3b8' }}>#{a.id}</td>
-                                            <td style={{ fontWeight: '600' }}>{a.nombre_usuario}</td>
-                                            <td>{a.correo}</td>
-                                            <td>
-                                                <span style={{ fontWeight: '700', color: '#003366' }}>v{a.version_aceptada}</span>
-                                            </td>
-                                            <td>
-                                                {new Date(a.fecha_aceptacion).toLocaleString('es-MX', {
-                                                    dateStyle: 'medium',
-                                                    timeStyle: 'short'
-                                                })}
-                                            </td>
-                                            <td style={{ fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>
-                                                {a.ip_origen || '127.0.0.1'}
-                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>

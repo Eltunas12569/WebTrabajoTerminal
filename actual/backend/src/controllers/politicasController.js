@@ -6,7 +6,7 @@ const { invalidarCachePoliticas } = require('../middlewares/verificarPoliticas')
  * Garantiza cumplimiento estricto con los Artículos 28, 31, 43, 63 y 250 de la LGPDPPSO.
  */
 
-// 1. Obtener la versión activa del Aviso de Privacidad y Términos
+// 1. Obtener la versión activa del Aviso de Privacidad y Términos con métricas de aceptación
 const obtenerPoliticaActiva = async (req, res) => {
     try {
         const [filas] = await db.query(`
@@ -16,19 +16,36 @@ const obtenerPoliticaActiva = async (req, res) => {
             ORDER BY id DESC LIMIT 1
         `);
 
-        if (filas.length === 0) {
-            return res.status(200).json({
-                version: '1.0',
-                titulo: 'Aviso de Privacidad y Términos de Servicio',
-                resumen_cambios: 'Versión inicial de políticas institucionales.',
-                fecha_publicacion: new Date(),
-                activo: 1
-            });
-        }
+        const politica = filas.length > 0 ? filas[0] : {
+            version: '1.1',
+            titulo: 'Aviso de Privacidad y Términos de Servicio',
+            resumen_cambios: 'Versión vigente de políticas institucionales.',
+            fecha_publicacion: new Date(),
+            activo: 1
+        };
 
-        res.status(200).json(filas[0]);
+        const versionVigente = politica.version || '1.1';
+
+        const [totalUsuarios] = await db.query(`SELECT COUNT(*) AS total FROM usuarios`);
+        const [usuariosAceptados] = await db.query(`
+            SELECT COUNT(*) AS total FROM usuarios 
+            WHERE version_aviso_privacidad = ? 
+              AND acepta_privacidad = 1
+        `, [versionVigente]);
+
+        const total = totalUsuarios[0]?.total || 0;
+        const aceptados = usuariosAceptados[0]?.total || 0;
+        const faltantes = Math.max(0, total - aceptados);
+
+        res.status(200).json({
+            ...politica,
+            version_actual: versionVigente,
+            usuarios_aceptados: aceptados,
+            usuarios_faltantes: faltantes,
+            total_usuarios: total
+        });
     } catch (error) {
-        console.error('Error al obtener política activa:', error);
+        console.error('Error al obtener política activa con métricas:', error);
         res.status(500).json({ message: 'Error interno al consultar la versión de políticas' });
     }
 };
@@ -171,6 +188,26 @@ const actualizarVersionPolitica = async (req, res) => {
             INSERT INTO politicas_versiones (version, titulo, resumen_cambios, fecha_publicacion, activo, creado_por)
             VALUES (?, ?, ?, NOW(), 1, ?)
         `, [versionLimpia, titulo.trim(), resumen_cambios.trim(), req.user.id]);
+
+        // Registrar la aceptación del administrador como autor de la versión
+        await db.query(`
+            UPDATE usuarios 
+            SET version_aviso_privacidad = ?,
+                version_terminos = ?,
+                acepta_privacidad = 1,
+                acepta_terminos = 1,
+                fecha_aceptacion_privacidad = NOW(),
+                fecha_aceptacion_terminos = NOW()
+            WHERE id = ?
+        `, [versionLimpia, versionLimpia, req.user.id]);
+
+        const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
+        const userAgent = req.headers['user-agent'] || null;
+        await db.query(`
+            INSERT INTO historial_aceptacion_politicas 
+            (usuario_id, version_aceptada, tipo, fecha_aceptacion, ip_origen, user_agent)
+            VALUES (?, ?, 'publicacion_y_aceptacion_admin', NOW(), ?, ?)
+        `, [req.user.id, versionLimpia, ip, userAgent ? userAgent.substring(0, 255) : null]);
 
         const nuevaPolitica = {
             id: resultado.insertId,

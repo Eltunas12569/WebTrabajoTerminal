@@ -1,110 +1,507 @@
-/* Reutilizamos la estructura base del contenedor */
-.register-container {
+/* ==========================================================================
+   REGISTRO INSTITUCIONAL - CLUB DEPORTIVO ESCOM IPN
+   DISTRIBUCIÓN OPTIMIZADA PARA COMPUTADORA (DESKTOP WIDE LAYOUT)
+   ========================================================================== */
+
+.register-screen {
     display: flex;
     justify-content: center;
     align-items: center;
     width: 100vw;
-    min-height: 100vh; /* Permite scroll si la pantalla es pequeña */
-    background-color: #b6ddff;
-    padding: 20px 0;
+    height: 100vh;
+    height: 100dvh;
+    background-color: #f0f2f5;
+    background-image: radial-gradient(circle at 50% 0%, #ffffff 0%, #f0f2f5 100%);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    margin: 0;
+    padding: clamp(12px, 2vh, 28px);
+    box-sizing: border-box;
+    position: relative;
+    overflow-y: auto;
 }
 
-.register-card {
+/* Marca de agua institucional sutil en el fondo */
+.register-watermark {
+    position: fixed;
+    top: 50%;
+    right: clamp(16px, 5vw, 80px);
+    width: min(30vw, 320px);
+    aspect-ratio: 1;
+    transform: translateY(-50%);
+    opacity: 0.05;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+}
+
+.register-watermark img {
     width: 100%;
-    max-width: 450px; /* Un poco más ancho para los campos de ESCOM */
-    padding: 30px 40px;
-    background-color: #FFFFFF;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-    text-align: center;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+/* Tarjeta ancha de escritorio optimizada (sin scroll en monitores) */
+.register-card-desktop {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 940px;
+    background: #ffffff;
+    border-radius: 18px;
+    padding: clamp(20px, 3vh, 32px) clamp(22px, 3.2vw, 42px);
+    box-shadow: 
+        0 12px 35px -5px rgba(0, 51, 102, 0.1),
+        0 2px 10px rgba(0, 0, 0, 0.04),
+        0 0 0 1px rgba(0, 51, 102, 0.06);
+    box-sizing: border-box;
+    margin: auto;
+    animation: cardEntrance 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes cardEntrance {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.99);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Encabezado horizontal para computadora: Brand a la izq, Selector de rol a la der */
+.register-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 16px;
+    margin-bottom: 18px;
+    gap: 16px;
+}
+
+.register-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.register-logo {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #071b4d;
+    border: 3px solid #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 51, 102, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.register-logo img {
+    width: 120%;
+    height: 120%;
+    object-fit: contain;
 }
 
 .register-title {
-    font-size: 24px;
-    color: #444;
-    font-weight: bold;
-    margin-bottom: 5px;
+    margin: 0;
+    color: #0f172a;
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
 }
 
 .register-subtitle {
-    font-size: 14px;
+    margin: 2px 0 0 0;
     color: #003366;
-    margin-bottom: 25px;
+    font-size: 0.88rem;
+    font-weight: 600;
 }
 
-.register-form {
+/* Selector de Rol horizontal */
+.role-toggle-desktop {
+    display: flex;
+    background: #f1f5f9;
+    padding: 3px;
+    border-radius: 10px;
+    gap: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+.role-btn-desktop {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.role-btn-desktop:hover:not(.active) {
+    color: #0f172a;
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.role-btn-desktop.active {
+    background: #003366;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 51, 102, 0.22);
+}
+
+/* Contenedor de 2 columnas de formulario para computadora */
+.register-columns-grid {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    gap: clamp(16px, 2.5vw, 32px);
+    margin-bottom: 16px;
+}
+
+.register-divider {
+    background-color: #f1f5f9;
+    width: 1px;
+    height: 100%;
+}
+
+.register-column {
     display: flex;
     flex-direction: column;
-    gap: 15px; /* Espaciado uniforme entre inputs */
-    text-align: left;
+    gap: 12px;
 }
 
-.register-input {
+/* Cabecera de sección por columna */
+.column-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
+}
+
+.column-badge {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #eff6ff;
+    color: #003366;
+    border: 1px solid #bfdbfe;
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.column-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #475569;
+}
+
+/* Campos y Etiquetas */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.form-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.form-label .req {
+    color: #800020;
+    margin-left: 2px;
+}
+
+.form-label .hint {
+    font-size: 0.73rem;
+    font-weight: 400;
+    color: #64748b;
+}
+
+/* Grilla interna de 2 columnas para campos dobles */
+.inner-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+/* Entradas de Formulario */
+.form-input {
     width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #000000;
-    font-size: 14px;
-    transition: border-color 0.3s;
     box-sizing: border-box;
-}
-
-.register-input:focus {
+    padding: 8.5px 12px;
+    font-size: 0.9rem;
+    color: #0f172a;
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    transition: border-color 0.2s, box-shadow 0.2s;
     outline: none;
-    border-color: #003366;
-    box-shadow: 0 0 5px rgba(0, 51, 102, 0.2);
+    font-family: inherit;
 }
 
-/* Ocultar flechas en inputs numéricos (Chrome, Safari, Edge, Opera) */
-.register-input::-webkit-outer-spin-button,
-.register-input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
+.form-input::placeholder {
+    color: #94a3b8;
+    font-size: 0.85rem;
+}
+
+.form-input:hover:not(:disabled):not(:focus) {
+    border-color: #94a3b8;
+}
+
+.form-input:focus {
+    border-color: #003366;
+    box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.12);
+}
+
+.form-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 15px;
+    padding-right: 32px;
+    cursor: pointer;
+}
+
+/* Input con botón de ver contraseña */
+.password-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.eye-btn {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #64748b;
+    padding: 5px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+}
+
+.eye-btn:hover {
+    color: #003366;
+}
+
+.eye-btn svg {
+    width: 17px;
+    height: 17px;
+}
+
+/* Feedback de contraseñas */
+.pass-hint {
+    font-size: 0.72rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 2px;
+}
+
+.pass-hint.valid {
+    color: #15803d;
+}
+
+.pass-hint.invalid {
+    color: #dc2626;
+}
+
+.input-error {
+    border-color: #ef4444 !important;
+}
+
+.input-error:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+/* Pie del formulario (Acciones) */
+.register-bottom-row {
+    border-top: 1px solid #f1f5f9;
+    padding-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.terms-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    cursor: pointer;
+}
+
+.terms-checkbox {
+    width: 16px;
+    height: 16px;
+    accent-color: #003366;
+    cursor: pointer;
+    flex-shrink: 0;
     margin: 0;
 }
 
-/* Ocultar flechas en inputs numéricos (Firefox) */
-.register-input[type="number"] {
-    -moz-appearance: textfield;
+.terms-text {
+    font-size: 0.82rem;
+    color: #334155;
+    line-height: 1.4;
 }
 
-/* Botón Principal (Guinda ESCOM) */
-.btn-register {
-    width: 100%;
-    padding: 14px;
-    background-color: #800020;
-    color: white;
+.terms-text a {
+    color: #003366;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.terms-text a:hover {
+    color: #800020;
+}
+
+/* Fila de Botón de Envío y Regreso */
+.actions-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.btn-submit-wide {
+    flex: 1;
+    max-width: 320px;
+    padding: 10.5px 22px;
+    background: #003366;
+    color: #ffffff;
     border: none;
     border-radius: 8px;
-    font-size: 16px;
-    font-weight: bold;
+    font-size: 0.95rem;
+    font-weight: 700;
     cursor: pointer;
-    transition: background 0.3s;
-    margin-top: 10px;
+    transition: background 0.2s, transform 0.1s;
+    box-shadow: 0 4px 12px rgba(0, 51, 102, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 auto;
 }
 
-.btn-register:hover {
-    background-color: #600018;
+.btn-submit-wide:hover:not(:disabled) {
+    background: #002244;
 }
 
-/* Botón para volver (Azul IPN) */
-.btn-back {
+.btn-submit-wide:active:not(:disabled) {
+    transform: scale(0.99);
+}
+
+.btn-submit-wide:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.spinner {
+    width: 15px;
+    height: 15px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.link-login-flat {
     background: none;
     border: none;
     color: #003366;
-    font-size: 14px;
-    font-weight: bold;
-    text-decoration: underline;
+    font-size: 0.88rem;
+    font-weight: 600;
     cursor: pointer;
-    margin-top: 10px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    transition: color 0.2s;
+    text-align: center;
+    display: block;
+    margin: 0 auto;
 }
 
-.register-error-banner {
-    margin-top: 20px;
-    padding: 12px;
-    background-color: #F8E8EB;
-    color: #A00020;
-    border-left: 5px solid #A00020;
-    border-radius: 4px;
-    font-size: 13px;
-    text-align: left;
+.link-login-flat:hover {
+    color: #0055ff;
+}
+
+/* Banner de Error */
+.error-banner-desktop {
+    margin-top: 10px;
+    padding: 8px 14px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-left: 4px solid #dc2626;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #991b1b;
+    font-size: 0.84rem;
+}
+
+.error-banner-desktop svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+/* ==========================================================================
+   ADAPTACIÓN RESPONSIVE (Si la ventana del navegador se achica)
+   ========================================================================== */
+@media (max-width: 860px) {
+    .register-header-row {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .register-columns-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .register-divider {
+        display: none;
+    }
+
+    .btn-submit-wide {
+        max-width: 100%;
+        width: 100%;
+    }
 }

@@ -4,12 +4,10 @@ import './ModalAceptacionPoliticas.css';
 /**
  * Modal Bloqueante de Aceptación Obligatoria de Políticas Legales.
  * 
- * Garantiza cumplimiento estricto con:
- * - LGPDPPSO Arts. 28, 31, 43, 63 y 250.
- * - Bloqueo total de la interfaz hasta el otorgamiento del consentimiento expreso.
+ * Cumplimiento con LGPDPPSO y gestión de consentimiento informado.
+ * Provee enlaces directos a las páginas completas de Aviso de Privacidad y Términos de Uso.
  */
 const ModalAceptacionPoliticas = ({ politica, onAceptar, onLogout }) => {
-    const [tabActiva, setTabActiva] = useState('resumen');
     const [aceptaAviso, setAceptaAviso] = useState(false);
     const [aceptaTerminos, setAceptaTerminos] = useState(false);
     const [enviando, setEnviando] = useState(false);
@@ -85,85 +83,55 @@ const ModalAceptacionPoliticas = ({ politica, onAceptar, onLogout }) => {
                     </div>
                 </div>
 
-                {/* Banner de alerta normativa */}
+                {/* Banner de alerta */}
                 <div className="modal-politicas-banner-aviso">
-                    ⚠️ <strong>Acción requerida:</strong> Se han actualizado las disposiciones del Aviso de Privacidad y Términos de Uso en cumplimiento de la <em>Ley General de Protección de Datos Personales en Posesión de Sujetos Obligados (LGPDPPSO)</em>. Para continuar utilizando los módulos del sistema, debes aceptar las nuevas condiciones.
+                    ⚠️ <strong>Acción requerida:</strong> Se han actualizado las disposiciones del Aviso de Privacidad y Términos de Uso. Para continuar utilizando los módulos del sistema, debes revisar y aceptar las nuevas condiciones.
                 </div>
 
-                {/* Navegación por pestañas */}
-                <div className="modal-politicas-tabs">
-                    <button 
-                        type="button"
-                        className={`modal-politicas-tab ${tabActiva === 'resumen' ? 'active' : ''}`}
-                        onClick={() => setTabActiva('resumen')}
-                    >
-                        📋 Resumen de Cambios
-                    </button>
-                    <button 
-                        type="button"
-                        className={`modal-politicas-tab ${tabActiva === 'privacidad' ? 'active' : ''}`}
-                        onClick={() => setTabActiva('privacidad')}
-                    >
-                        🔒 Aviso de Privacidad
-                    </button>
-                    <button 
-                        type="button"
-                        className={`modal-politicas-tab ${tabActiva === 'terminos' ? 'active' : ''}`}
-                        onClick={() => setTabActiva('terminos')}
-                    >
-                        📜 Términos y Condiciones
-                    </button>
-                </div>
-
-                {/* Cuerpo del modal según la pestaña activa */}
+                {/* Cuerpo del modal */}
                 <div className="modal-politicas-body">
-                    {tabActiva === 'resumen' && (
-                        <div className="modal-politicas-tab-content">
-                            <div className="modal-politicas-resumen-box">
-                                <h4>Resumen Ejecutivo de la Actualización (Versión {versionMostrar}):</h4>
-                                <p>{politica?.resumen_cambios || 'Se actualizaron las medidas de seguridad, retención de datos personales y mecanismos para el ejercicio de derechos ARCO de la comunidad politécnica.'}</p>
-                            </div>
-                            <p>
-                                De acuerdo con los artículos 28 y 43 de la LGPDPPSO, el Instituto Politécnico Nacional notifica formalmente cualquier modificación al tratamiento de tus datos personales a través de la presente plataforma antes de que surtan efectos.
-                            </p>
-                        </div>
-                    )}
+                    {/* Resumen ejecutivo de los cambios */}
+                    <div className="modal-politicas-resumen-box">
+                        <h4>📋 Resumen Ejecutivo de Cambios (Versión {versionMostrar}):</h4>
+                        <p>
+                            {politica?.resumen_cambios || 'Se actualizaron las medidas de seguridad, retención de datos personales y mecanismos para el ejercicio de derechos ARCO de la comunidad politécnica.'}
+                        </p>
+                    </div>
 
-                    {tabActiva === 'privacidad' && (
-                        <div className="modal-politicas-tab-content">
-                            <div className="modal-politicas-doc-box">
-                                <h4>Aviso de Privacidad Integral - Puntos Clave:</h4>
-                                <ul>
-                                    <li><strong>Responsable:</strong> Escuela Superior de Cómputo (ESCOM) del Instituto Politécnico Nacional.</li>
-                                    <li><strong>Finalidades:</strong> Registro y administración de clubes deportivos y culturales, seguimiento de asistencias y contacto en caso de emergencia médica.</li>
-                                    <li><strong>Minimización de Datos:</strong> Se recaban estrictamente boleta, nombre institucional, NSS y datos de contacto de emergencia, evitando datos sensibles innecesarios.</li>
-                                    <li><strong>Seguridad:</strong> Hashing criptográfico robusto (bcrypt 10 rondas), certificados SSL/TLS y control de acceso basado en roles (RBAC).</li>
-                                    <li><strong>Derechos ARCO:</strong> Puedes solicitar Acceso, Rectificación, Cancelación u Oposición a través de tu perfil o ante la Unidad de Transparencia del IPN.</li>
-                                </ul>
-                            </div>
-                            <p style={{ fontSize: '13px', color: '#64748b' }}>
-                                Puedes consultar el texto completo en cualquier momento en el apartado de <em>Aviso de Privacidad</em>.
-                            </p>
+                    {/* Enlaces directos a las páginas completas */}
+                    <div className="modal-politicas-links-banner">
+                        <span className="modal-politicas-links-title">
+                            📄 Consulta la documentación completa en las páginas oficiales:
+                        </span>
+                        <div className="modal-politicas-links-grid">
+                            <a 
+                                href="/aviso-privacidad" 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="modal-doc-link-btn"
+                            >
+                                <span className="modal-doc-icon">🔒</span>
+                                <div className="modal-doc-text">
+                                    <strong>Aviso de Privacidad Integral</strong>
+                                    <small>Abrir página completa en nueva pestaña ↗</small>
+                                </div>
+                            </a>
+                            <a 
+                                href="/terminos-condiciones" 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="modal-doc-link-btn"
+                            >
+                                <span className="modal-doc-icon">📜</span>
+                                <div className="modal-doc-text">
+                                    <strong>Términos y Condiciones de Uso</strong>
+                                    <small>Abrir página completa en nueva pestaña ↗</small>
+                                </div>
+                            </a>
                         </div>
-                    )}
+                    </div>
 
-                    {tabActiva === 'terminos' && (
-                        <div className="modal-politicas-tab-content">
-                            <div className="modal-politicas-doc-box">
-                                <h4>Términos y Condiciones de Uso - Puntos Clave:</h4>
-                                <ul>
-                                    <li><strong>Uso Institucional:</strong> La cuenta es intransferible y de uso exclusivo para las actividades de los clubes autorizados de la ESCOM.</li>
-                                    <li><strong>Conducta y Convivencia:</strong> Se prohíbe el uso de los canales de chat o avisos para conductas hostiles, spam o actividades contrarias a la disciplina del IPN.</li>
-                                    <li><strong>Vigencia y Membresía:</strong> La participación en clubes está sujeta a los estatutos académicos y las directrices de los profesores y coordinadores encargados.</li>
-                                </ul>
-                            </div>
-                            <p style={{ fontSize: '13px', color: '#64748b' }}>
-                                El incumplimiento de estos términos podrá derivar en la suspensión temporal o definitiva de la cuenta en el sistema.
-                            </p>
-                        </div>
-                    )}
-
-                    {/* Casillas de verificación obligatorias */}
+                    {/* Casillas de verificación obligatorias con enlaces directos */}
                     <div className="modal-politicas-check-group">
                         <label className="modal-politicas-checkbox-item">
                             <input 
@@ -175,7 +143,16 @@ const ModalAceptacionPoliticas = ({ politica, onAceptar, onLogout }) => {
                                 }}
                             />
                             <span>
-                                He leído y <strong>acepto la versión {versionMostrar} del Aviso de Privacidad</strong> para el tratamiento y resguardo de mis datos personales.
+                                He leído y <strong>acepto la versión {versionMostrar} del{' '}
+                                <a 
+                                    href="/aviso-privacidad" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="modal-inline-link"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    Aviso de Privacidad ↗
+                                </a></strong> para el tratamiento y resguardo de mis datos personales.
                             </span>
                         </label>
 
@@ -189,7 +166,16 @@ const ModalAceptacionPoliticas = ({ politica, onAceptar, onLogout }) => {
                                 }}
                             />
                             <span>
-                                He leído y <strong>acepto los Términos y Condiciones de Uso</strong> del Sistema de Gestión de Clubes ESCOM IPN.
+                                He leído y <strong>acepto los{' '}
+                                <a 
+                                    href="/terminos-condiciones" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="modal-inline-link"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    Términos y Condiciones de Uso ↗
+                                </a></strong> del Sistema de Gestión de Clubes ESCOM IPN.
                             </span>
                         </label>
                     </div>
@@ -204,7 +190,7 @@ const ModalAceptacionPoliticas = ({ politica, onAceptar, onLogout }) => {
                 {/* Pie con acciones */}
                 <div className="modal-politicas-footer">
                     <span className="modal-politicas-footer-info">
-                        🔒 Registro auditado con sello de tiempo institucional
+                        🔒 Registro de consentimiento auditado institucionalmente
                     </span>
                     <div className="modal-politicas-footer-actions">
                         <button 

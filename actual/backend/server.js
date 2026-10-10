@@ -263,6 +263,7 @@ io.on('connection', (socket) => {
 // --- REGISTRO DE RUTAS API REST ---
 // ==========================================
 app.use('/api/auth', require('./src/routes/authRoutes'));
+app.use('/api/politicas', require('./src/routes/politicasRoutes'));
 app.use('/api/users', require('./src/routes/userRoutes'));
 app.use('/api/clubes', require('./src/routes/clubes'));
 app.use('/api/avisos', require('./src/routes/avisos'));
