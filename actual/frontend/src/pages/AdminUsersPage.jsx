@@ -21,6 +21,8 @@ const AdminUsersPage = () => {
     const [roleFilter, setRoleFilter] = useState('all');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+    const [deletingId, setDeletingId] = useState(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     useEffect(() => {
@@ -36,6 +38,36 @@ const AdminUsersPage = () => {
         };
         fetchUsuarios();
     }, []);
+
+    const handleDeleteUser = async (usuario) => {
+        if (Number(usuario.role_id) === 1) {
+            setError('No se puede eliminar a otro administrador.');
+            return;
+        }
+
+        const nombreCompleto = `${usuario.nombres} ${usuario.apellido_paterno} ${usuario.apellido_materno || ''}`.trim();
+        const confirmado = window.confirm(
+            `⚠️ ¿Estás seguro de eliminar permanentemente al usuario "${nombreCompleto}" (${usuario.correo})?\n\nEsta acción no se puede deshacer.`
+        );
+        if (!confirmado) return;
+
+        setDeletingId(usuario.id);
+        setError('');
+        setSuccessMessage('');
+
+        try {
+            const response = await api.delete(`/users/${usuario.id}/admin-delete`);
+            setUsuarios((prev) => prev.filter((item) => item.id !== usuario.id));
+            setSuccessMessage(response.data?.message || 'Usuario eliminado permanentemente del sistema.');
+        } catch (requestError) {
+            setError(
+                requestError.response?.data?.message ||
+                'No se pudo eliminar al usuario.'
+            );
+        } finally {
+            setDeletingId(null);
+        }
+    };
 
     const filteredUsers = usuarios.filter((usuario) => {
         const fullName = `${usuario.nombres} ${usuario.apellido_paterno} ${usuario.apellido_materno || ''}`.toLowerCase();
@@ -94,7 +126,8 @@ const AdminUsersPage = () => {
 
                     {loading && <div className="loading-state">Cargando usuarios...</div>}
                     {error && <div className="message-banner error">{error}</div>}
-                    {!loading && !error && (
+                    {successMessage && <div className="message-banner success">{successMessage}</div>}
+                    {!loading && (
                         <div className="admin-users-table-wrap">
                             <table className="admin-users-table">
                                 <thead>
@@ -123,9 +156,21 @@ const AdminUsersPage = () => {
                                                 </span>
                                             </td>
                                             <td>
-                                                <button className="user-edit-button" onClick={() => navigate(`/admin/usuarios/${usuario.id}/editar`)}>
-                                                    Editar
-                                                </button>
+                                                <div className="user-actions-group">
+                                                    <button className="user-edit-button" onClick={() => navigate(`/admin/usuarios/${usuario.id}/editar`)}>
+                                                        Editar
+                                                    </button>
+                                                    {Number(usuario.role_id) !== 1 && (
+                                                        <button
+                                                            type="button"
+                                                            className="user-delete-button"
+                                                            onClick={() => handleDeleteUser(usuario)}
+                                                            disabled={deletingId === usuario.id}
+                                                        >
+                                                            {deletingId === usuario.id ? 'Eliminando...' : '🗑️ Eliminar'}
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

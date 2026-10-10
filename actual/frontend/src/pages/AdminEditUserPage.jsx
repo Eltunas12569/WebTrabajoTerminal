@@ -13,6 +13,7 @@ const AdminEditUserPage = () => {
     const [formData, setFormData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -57,6 +58,28 @@ const AdminEditUserPage = () => {
             setError(requestError.response?.data?.message || 'No se pudo actualizar el usuario.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleDeleteUser = async () => {
+        if (!formData) return;
+
+        const nombreCompleto = `${formData.nombres} ${formData.apellido_paterno} ${formData.apellido_materno || ''}`.trim();
+        const confirmado = window.confirm(
+            `⚠️ ¿Estás seguro de eliminar permanentemente al usuario "${nombreCompleto}" (${formData.correo})?\n\nEsta acción no se puede deshacer.`
+        );
+        if (!confirmado) return;
+
+        setDeleting(true);
+        setMessage('');
+        setError('');
+
+        try {
+            await api.delete(`/users/${id}/admin-delete`);
+            navigate('/admin/usuarios');
+        } catch (requestError) {
+            setError(requestError.response?.data?.message || 'No se pudo eliminar al usuario.');
+            setDeleting(false);
         }
     };
 
@@ -114,8 +137,16 @@ const AdminEditUserPage = () => {
                             {error && <div className="message-banner error">{error}</div>}
                             {message && <div className="message-banner success">{message}</div>}
                             <div className="admin-edit-actions">
-                                <button type="button" className="admin-edit-cancel" onClick={() => navigate('/admin/usuarios')}>Cancelar</button>
-                                <button type="submit" className="admin-edit-save" disabled={saving}>{saving ? 'Guardando...' : 'Guardar cambios'}</button>
+                                <button
+                                    type="button"
+                                    className="admin-edit-delete"
+                                    onClick={handleDeleteUser}
+                                    disabled={deleting || saving}
+                                >
+                                    {deleting ? 'Eliminando...' : '🗑️ Eliminar usuario'}
+                                </button>
+                                <button type="button" className="admin-edit-cancel" onClick={() => navigate('/admin/usuarios')} disabled={deleting}>Cancelar</button>
+                                <button type="submit" className="admin-edit-save" disabled={saving || deleting}>{saving ? 'Guardando...' : 'Guardar cambios'}</button>
                             </div>
                         </form>
                     )}
