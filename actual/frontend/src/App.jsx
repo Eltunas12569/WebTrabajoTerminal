@@ -9,6 +9,7 @@ import GestionDashboard from './pages/GestionDashboard';
 import CrearClubPage from './pages/CrearClubPage'; 
 import ClubDetailsAdminPage from './pages/ClubDetailsAdminPage';
 import AvisosAdminPage from './pages/AvisosAdminPage';
+import CrearAvisoGlobalPage from './pages/CrearAvisoGlobalPage';
 import PerfilPage from './pages/PerfilPage';
 import CambiarPasswordPage from './pages/CambiarPasswordPage';
 import ClubChatPage from './pages/ClubChatPage';
@@ -117,6 +118,13 @@ function App() {
           <Route path="/admin/avisos" element={
             <ProtectedRoute rolesPermitidos={[1]}>
               <AvisosAdminPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Crear Aviso Global (Administrador) */}
+          <Route path="/admin/avisos/crear" element={
+            <ProtectedRoute rolesPermitidos={[1]}>
+              <CrearAvisoGlobalPage />
             </ProtectedRoute>
           } />
 
