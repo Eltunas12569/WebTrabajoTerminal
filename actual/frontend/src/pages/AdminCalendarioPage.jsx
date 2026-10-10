@@ -331,11 +331,12 @@ const AdminCalendarioPage = () => {
                                                 onChange={(e) => setFiltroClub(e.target.value)}
                                                 style={{
                                                     width: '100%',
-                                                    padding: '10px 14px',
-                                                    borderRadius: '8px',
-                                                    border: '1px solid #cbd5e1',
+                                                    padding: '10px 40px 10px 14px',
+                                                    borderRadius: '10px',
+                                                    border: '1.5px solid #cbd5e1',
                                                     fontSize: '0.92rem',
-                                                    background: '#fff',
+                                                    fontWeight: '600',
+                                                    backgroundColor: '#f8fafc',
                                                     cursor: 'pointer',
                                                     boxSizing: 'border-box'
                                                 }}
@@ -355,11 +356,12 @@ const AdminCalendarioPage = () => {
                                                 onChange={(e) => setOrden(e.target.value)}
                                                 style={{
                                                     width: '100%',
-                                                    padding: '10px 14px',
-                                                    borderRadius: '8px',
-                                                    border: '1px solid #cbd5e1',
+                                                    padding: '10px 40px 10px 14px',
+                                                    borderRadius: '10px',
+                                                    border: '1.5px solid #cbd5e1',
                                                     fontSize: '0.92rem',
-                                                    background: '#fff',
+                                                    fontWeight: '600',
+                                                    backgroundColor: '#f8fafc',
                                                     cursor: 'pointer',
                                                     boxSizing: 'border-box'
                                                 }}

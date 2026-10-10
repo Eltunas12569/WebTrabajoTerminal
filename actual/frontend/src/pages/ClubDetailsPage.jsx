@@ -49,6 +49,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     const [tituloAviso, setTituloAviso] = useState('');
     const [nuevoAviso, setNuevoAviso] = useState('');
     const [prioridadAviso, setPrioridadAviso] = useState('normal');
+    const [alcanceAviso, setAlcanceAviso] = useState('club');
     const [fechaVencimientoAviso, setFechaVencimientoAviso] = useState('');
     const [descartadosAvisos, setDescartadosAvisos] = useState([]);
 
@@ -60,7 +61,8 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         descripcion: '',
         fecha_evento: '',
         lugar: '',
-        prioridad: 'alta'
+        prioridad: 'alta',
+        alcance: 'club'
     });
 
     // Estados de Miembros y Filtros Web
@@ -86,11 +88,19 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         mensajeExito: ''
     });
 
+    // Estados para el Modal de Lista de Asistentes de un Evento (Encargados)
+    const [eventoAsistentesModal, setEventoAsistentesModal] = useState(null);
+    const [asistentesEvento, setAsistentesEvento] = useState([]);
+    const [loadingAsistentes, setLoadingAsistentes] = useState(false);
+    const [errorAsistentes, setErrorAsistentes] = useState('');
+    const [busquedaAsistente, setBusquedaAsistente] = useState('');
+
     // Roles y permisos
     const esAdmin = Number(user?.role_id) === 1 || Number(user?.rol) === 1;
-    const canManage = esAdmin || (
+    const esEncargadoClub = Boolean(
         club && ['encargado_profesor', 'encargado_alumno'].includes(miRolInterno) && inscripcionEstatus === 'activo'
-    ) || (
+    );
+    const canManage = esAdmin || esEncargadoClub || (
         club && (club.profesor_encargado_id === user?.id || club.alumno_encargado_id === user?.id)
     );
 
@@ -106,15 +116,11 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         }
     }, [user]);
 
-    // Cargar información del club y membresía
+    // Verificar rol en el club y cargar información del club
     useEffect(() => {
         const fetchClubData = async () => {
+            setLoading(true);
             try {
-                const response = await api.get('/clubes');
-                const clubEncontrado = response.data.find(c => String(c.id) === String(id));
-                if (!clubEncontrado) throw new Error('Club no encontrado');
-                setClub(clubEncontrado);
-
                 if (user?.id) {
                     const userClubsRes = await api.get(`/clubes/user/${user.id}`);
                     const miRegistro = userClubsRes.data.find(uc => String(uc.id) === String(id));
@@ -126,6 +132,11 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                         setIsMember(true);
                     }
                 }
+
+                const response = await api.get('/clubes');
+                const clubEncontrado = response.data.find(c => String(c.id) === String(id));
+                if (!clubEncontrado) throw new Error('Club no encontrado');
+                setClub(clubEncontrado);
             } catch (err) {
                 if (!club) setError('Error al cargar la información del club.');
             } finally {
@@ -239,9 +250,10 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             etapa: 'confirmar',
             procesando: false,
             datos: {
-                titulo: tituloAviso.trim() || 'Comunicado General del Club',
+                titulo: tituloAviso.trim() || (alcanceAviso === 'global' ? `Comunicado Global - ${club?.nombre || 'Club'}` : 'Comunicado General del Club'),
                 contenido: nuevoAviso.trim(),
                 prioridad: prioridadAviso,
+                alcance: alcanceAviso,
                 fecha_vencimiento: fechaVencimientoAviso
             },
             mensajeExito: ''
@@ -275,7 +287,8 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             procesando: false,
             datos: {
                 ...eventoForm,
-                prioridad: eventoForm.prioridad || 'alta'
+                prioridad: eventoForm.prioridad || 'alta',
+                alcance: eventoForm.alcance || 'club'
             },
             mensajeExito: ''
         });
@@ -289,16 +302,22 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
         try {
             if (modalConfirmacion.tipo === 'aviso') {
+                const esGlobalAviso = alcanceAviso === 'global';
                 await api.post(`/clubes/${id}/avisos`, {
                     titulo: tituloAviso.trim() || undefined,
                     contenido: nuevoAviso.trim(),
                     prioridad: prioridadAviso,
+                    alcance: alcanceAviso,
+                    es_global: esGlobalAviso,
                     fecha_vencimiento: fechaVencimientoAviso
                 });
-                const msg = `✓ Aviso publicado exitosamente con prioridad ${prioridadAviso.toUpperCase()} para todos los miembros.`;
+                const msg = esGlobalAviso
+                    ? `✓ Aviso GLOBAL publicado exitosamente con prioridad ${prioridadAviso.toUpperCase()} para toda la comunidad.`
+                    : `✓ Aviso publicado exitosamente con prioridad ${prioridadAviso.toUpperCase()} para los miembros del club.`;
                 setTituloAviso('');
                 setNuevoAviso('');
                 setPrioridadAviso('normal');
+                setAlcanceAviso('club');
                 setFechaVencimientoAviso('');
                 setSuccess(msg);
                 fetchAvisos();
@@ -307,17 +326,25 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                     ...prev,
                     procesando: false,
                     etapa: 'exito',
-                    mensajeExito: 'El aviso oficial ha sido publicado correctamente y ya se encuentra visible en el Muro de Avisos para todos los miembros del club.'
+                    mensajeExito: esGlobalAviso
+                        ? 'El aviso global ha sido publicado correctamente y ya es visible tanto en el tablero general de toda la comunidad como en el Muro de Avisos del club.'
+                        : 'El aviso oficial ha sido publicado correctamente y ya se encuentra visible en el Muro de Avisos para todos los miembros del club.'
                 }));
             } else if (modalConfirmacion.tipo === 'evento') {
                 const prio = eventoForm.prioridad || 'alta';
+                const alcanceEv = eventoForm.alcance || 'club';
+                const esGlobalEvento = alcanceEv === 'global';
                 await api.post(`/clubes/${id}/eventos`, {
                     ...eventoForm,
                     prioridad: prio,
+                    alcance: alcanceEv,
+                    es_global: esGlobalEvento,
                     notificarAviso: true
                 });
-                const msg = `✓ Evento agendado y notificado con prioridad ${prio.toUpperCase()} a todos los integrantes.`;
-                setEventoForm({ titulo: '', descripcion: '', fecha_evento: '', lugar: '', prioridad: 'alta' });
+                const msg = esGlobalEvento
+                    ? `✓ Evento GLOBAL agendado y notificado con prioridad ${prio.toUpperCase()} a toda la comunidad.`
+                    : `✓ Evento agendado y notificado con prioridad ${prio.toUpperCase()} a los integrantes del club.`;
+                setEventoForm({ titulo: '', descripcion: '', fecha_evento: '', lugar: '', prioridad: 'alta', alcance: 'club' });
                 setSuccess(msg);
                 fetchEventos();
                 fetchAvisos();
@@ -326,7 +353,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                     ...prev,
                     procesando: false,
                     etapa: 'exito',
-                    mensajeExito: 'El evento ha sido registrado en el calendario del club y se ha enviado un aviso automático a todos los integrantes.'
+                    mensajeExito: esGlobalEvento
+                        ? 'El evento global ha sido registrado en el calendario general y se ha enviado un aviso automático a toda la comunidad.'
+                        : 'El evento ha sido registrado en el calendario del club y se ha enviado un aviso automático a todos los integrantes.'
                 }));
             }
         } catch (err) {
@@ -370,6 +399,25 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             fetchEventos();
         } catch (err) {
             setError(err.response?.data?.message || 'Error al registrar asistencia.');
+        }
+    };
+
+    const handleVerAsistentesEvento = async (evento) => {
+        if (!canManage) return;
+        setEventoAsistentesModal(evento);
+        setAsistentesEvento([]);
+        setLoadingAsistentes(true);
+        setErrorAsistentes('');
+        setBusquedaAsistente('');
+
+        try {
+            const res = await api.get(`/clubes/${id}/eventos/${evento.id}/asistentes`);
+            setAsistentesEvento(res.data?.asistentes || []);
+        } catch (err) {
+            console.error('Error al cargar asistentes del evento:', err);
+            setErrorAsistentes(err.response?.data?.message || 'No se pudo cargar la lista de asistentes.');
+        } finally {
+            setLoadingAsistentes(false);
         }
     };
 
@@ -457,7 +505,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     // Cronograma formateado
     let cronogramaItems = [];
     try {
-        cronogramaItems = typeof club.cronograma === 'string' ? JSON.parse(club.cronograma) : (club.cronograma || []);
+        let parsed = typeof club.cronograma === 'string' ? JSON.parse(club.cronograma) : (club.cronograma || []);
+        if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+        cronogramaItems = Array.isArray(parsed) ? parsed : [];
     } catch (e) {
         cronogramaItems = [];
     }
@@ -689,6 +739,30 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
                                 {/* Lado Derecho: Acciones Rápidas */}
                                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    {esEncargadoClub && (
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate(`/club/${id}/editar`)}
+                                            style={{
+                                                background: '#f8fafc',
+                                                border: '1px solid #cbd5e1',
+                                                color: '#003366',
+                                                cursor: 'pointer',
+                                                padding: '10px 16px',
+                                                borderRadius: '8px',
+                                                fontWeight: 'bold',
+                                                fontSize: '0.9rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            title="Modificar la información general del club"
+                                        >
+                                            ✏️ Editar Información
+                                        </button>
+                                    )}
+
                                     {canManage && (
                                         <button
                                             type="button"
@@ -763,21 +837,10 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                     <button
                                         type="button"
                                         onClick={() => navigate(esAdmin ? '/admin' : '/gestion')}
-                                        style={{
-                                            background: '#e9ecef',
-                                            border: '1px solid #ced4da',
-                                            color: '#333',
-                                            cursor: 'pointer',
-                                            padding: '10px 16px',
-                                            borderRadius: '8px',
-                                            fontWeight: 'bold',
-                                            fontSize: '0.9rem',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px'
-                                        }}
+                                        className="btn-volver-modern"
                                     >
-                                        🔙 Volver
+                                        <span className="btn-volver-icon">←</span>
+                                        <span>Volver</span>
                                     </button>
                                 </div>
                             </div>
@@ -860,9 +923,32 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                     
                                     {/* Tarjeta de Descripción y Objetivos */}
                                     <div style={{ background: '#ffffff', padding: '26px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
-                                        <h3 style={{ margin: '0 0 16px 0', fontSize: '1.25rem', color: '#003366', borderBottom: '2px solid #f0f2f5', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            📖 Acerca del Club
-                                        </h3>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f0f2f5', paddingBottom: '10px', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                                            <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#003366', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                📖 Acerca del Club
+                                            </h3>
+                                            {esEncargadoClub && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => navigate(`/club/${id}/editar`)}
+                                                    style={{
+                                                        background: '#eff6ff',
+                                                        border: '1px solid #bfdbfe',
+                                                        color: '#003366',
+                                                        cursor: 'pointer',
+                                                        padding: '6px 14px',
+                                                        borderRadius: '6px',
+                                                        fontWeight: '700',
+                                                        fontSize: '0.84rem',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px'
+                                                    }}
+                                                >
+                                                    ✏️ Editar Información
+                                                </button>
+                                            )}
+                                        </div>
                                         <p style={{ fontSize: '1rem', color: '#333', lineHeight: '1.65', margin: '0 0 20px 0' }}>
                                             {club.descripcion || 'Sin descripción registrada por el momento.'}
                                         </p>
@@ -1208,6 +1294,17 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                         </span>
                                                                     )}
 
+                                                                    {/* Insignia de Alcance */}
+                                                                    {Number(aviso.es_global) === 1 ? (
+                                                                        <span style={{ fontSize: '0.74rem', background: '#f3e8ff', color: '#6b21a8', border: '1px solid #d8b4fe', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                                             Global (Comunidad)
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span style={{ fontSize: '0.74rem', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                                             Solo Club
+                                                                        </span>
+                                                                    )}
+
                                                                     {/* Insignia de Prioridad */}
                                                                     {esAlta && (
                                                                         <span style={{ fontSize: '0.74rem', background: '#ffeef0', color: '#dc3545', border: '1px solid #f5c6cb', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
@@ -1396,25 +1493,36 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                             {/* Información del Evento y Asistencia */}
                                                             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                                                 <div>
-                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
                                                                         <h4 style={{ margin: 0, color: '#003366', fontSize: '1.1rem' }}>
                                                                             {evento.titulo}
                                                                         </h4>
-                                                                        {esAltaPrioridad && (
-                                                                            <span style={{ fontSize: '0.72rem', background: '#ffeef0', color: '#dc3545', border: '1px solid #f5c6cb', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
-                                                                                🔴 Alta Prioridad
-                                                                            </span>
-                                                                        )}
-                                                                        {esBajaPrioridad && (
-                                                                            <span style={{ fontSize: '0.72rem', background: '#e8f5e9', color: '#2e7d32', border: '1px solid #c8e6c9', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
-                                                                                🟢 Baja Prioridad
-                                                                            </span>
-                                                                        )}
-                                                                        {!esAltaPrioridad && !esBajaPrioridad && (
-                                                                            <span style={{ fontSize: '0.72rem', background: '#e7f3ff', color: '#003366', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
-                                                                                🔵 Normal
-                                                                            </span>
-                                                                        )}
+                                                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                                            {Number(evento.es_global) === 1 ? (
+                                                                                <span style={{ fontSize: '0.72rem', background: '#f3e8ff', color: '#6b21a8', border: '1px solid #d8b4fe', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
+                                                                                    Global
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
+                                                                                 Solo Club
+                                                                                </span>
+                                                                            )}
+                                                                            {esAltaPrioridad && (
+                                                                                <span style={{ fontSize: '0.72rem', background: '#ffeef0', color: '#dc3545', border: '1px solid #f5c6cb', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
+                                                                                    🔴 Alta Prioridad
+                                                                                </span>
+                                                                            )}
+                                                                            {esBajaPrioridad && (
+                                                                                <span style={{ fontSize: '0.72rem', background: '#e8f5e9', color: '#2e7d32', border: '1px solid #c8e6c9', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
+                                                                                    🟢 Baja Prioridad
+                                                                                </span>
+                                                                            )}
+                                                                            {!esAltaPrioridad && !esBajaPrioridad && (
+                                                                                <span style={{ fontSize: '0.72rem', background: '#e7f3ff', color: '#003366', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
+                                                                                    🔵 Normal
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
 
                                                                     <div style={{ fontSize: '0.85rem', color: '#555', display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '8px' }}>
@@ -1430,8 +1538,32 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                 </div>
 
                                                                 <div style={{ borderTop: '1px solid #eee', paddingTop: '10px', marginTop: '6px' }}>
-                                                                    <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '8px' }}>
-                                                                        👥 <strong>Confirmados:</strong> {evento.total_asistentes || 0} integrantes
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                                                                        <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                                                                            👥 <strong>Confirmados:</strong> {evento.total_asistentes || 0} integrantes
+                                                                        </div>
+
+                                                                        {canManage && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleVerAsistentesEvento(evento)}
+                                                                                style={{
+                                                                                    backgroundColor: '#eff6ff',
+                                                                                    color: '#003366',
+                                                                                    border: '1px solid #bfdbfe',
+                                                                                    borderRadius: '7px',
+                                                                                    padding: '5px 11px',
+                                                                                    fontSize: '0.8rem',
+                                                                                    fontWeight: '700',
+                                                                                    cursor: 'pointer',
+                                                                                    display: 'inline-flex',
+                                                                                    alignItems: 'center',
+                                                                                    gap: '5px'
+                                                                                }}
+                                                                            >
+                                                                                📋 Ver lista de asistentes
+                                                                            </button>
+                                                                        )}
                                                                     </div>
 
                                                                     {esAlumnoOProfesor && (
@@ -1530,29 +1662,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                 </span>
                                             </div>
 
-                                            {/* Acceso al Directorio Completo si es Encargado/Admin */}
-                                            {canManage && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => navigate(`/club/${id}/emergencias`)}
-                                                    style={{
-                                                        background: '#dc3545',
-                                                        border: 'none',
-                                                        color: '#fff',
-                                                        cursor: 'pointer',
-                                                        padding: '9px 16px',
-                                                        borderRadius: '6px',
-                                                        fontWeight: 'bold',
-                                                        fontSize: '0.88rem',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '6px',
-                                                        boxShadow: '0 2px 6px rgba(220, 53, 69, 0.25)'
-                                                    }}
-                                                >
-                                                    🚨 Abrir Directorio Médico Completo
-                                                </button>
-                                            )}
+                                            
                                         </div>
 
                                         {/* Filtros y Buscador en Tiempo Real */}
@@ -1901,6 +2011,67 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                             </div>
                                                         </div>
 
+                                                        {/* Selector de Alcance / Visibilidad del Aviso */}
+                                                        <div style={{ marginBottom: '16px' }}>
+                                                            <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.88rem', marginBottom: '8px', color: '#333' }}>
+                                                                Alcance / Visibilidad del Aviso:
+                                                            </label>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setAlcanceAviso('club')}
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'flex-start',
+                                                                        gap: '10px',
+                                                                        padding: '12px 16px',
+                                                                        borderRadius: '10px',
+                                                                        border: alcanceAviso === 'club' ? '2px solid #003366' : '1px solid #ced4da',
+                                                                        background: alcanceAviso === 'club' ? '#f0f5fa' : '#fff',
+                                                                        color: alcanceAviso === 'club' ? '#003366' : '#475569',
+                                                                        cursor: 'pointer',
+                                                                        textAlign: 'left',
+                                                                        transition: 'all 0.2s'
+                                                                    }}
+                                                                >
+                                                                
+                                                                    <div>
+                                                                        <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>Solo para el Club</div>
+                                                                        <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
+                                                                            Visible únicamente para miembros de {club?.nombre || 'este club'}
+                                                                        </div>
+                                                                    </div>
+                                                                </button>
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setAlcanceAviso('global')}
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'flex-start',
+                                                                        gap: '10px',
+                                                                        padding: '12px 16px',
+                                                                        borderRadius: '10px',
+                                                                        border: alcanceAviso === 'global' ? '2px solid #7c3aed' : '1px solid #ced4da',
+                                                                        background: alcanceAviso === 'global' ? '#faf5ff' : '#fff',
+                                                                        color: alcanceAviso === 'global' ? '#6b21a8' : '#475569',
+                                                                        cursor: 'pointer',
+                                                                        textAlign: 'left',
+                                                                        transition: 'all 0.2s'
+                                                                    }}
+                                                                >
+                                                                    <div>
+                                                                        <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>Global (Toda la Comunidad)</div>
+                                                                        <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
+                                                                            Visible para todos los usuarios del sistema y en el portal general
+                                                                        </div>
+                                                                    </div>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
                                                         {/* Selector de Prioridad del Aviso */}
                                                         <div style={{ marginBottom: '16px' }}>
                                                             <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.88rem', marginBottom: '8px', color: '#333' }}>
@@ -2111,10 +2282,70 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                 />
                                                             </div>
 
+                                                            {/* Selector de Alcance / Visibilidad del Evento */}
+                                                            <div>
+                                                                <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.88rem', marginBottom: '8px', color: '#333' }}>
+                                                                    Alcance / Visibilidad del Evento:
+                                                                </label>
+                                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setEventoForm({ ...eventoForm, alcance: 'club' })}
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'flex-start',
+                                                                            gap: '10px',
+                                                                            padding: '12px 16px',
+                                                                            borderRadius: '10px',
+                                                                            border: (eventoForm.alcance || 'club') === 'club' ? '2px solid #003366' : '1px solid #ced4da',
+                                                                            background: (eventoForm.alcance || 'club') === 'club' ? '#f0f5fa' : '#fff',
+                                                                            color: (eventoForm.alcance || 'club') === 'club' ? '#003366' : '#475569',
+                                                                            cursor: 'pointer',
+                                                                            textAlign: 'left',
+                                                                            transition: 'all 0.2s'
+                                                                        }}
+                                                                    >
+                                                                        <div>
+                                                                            <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>Solo para el Club</div>
+                                                                            <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
+                                                                                Exclusivo para integrantes de {club?.nombre || 'este club'}
+                                                                            </div>
+                                                                        </div>
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setEventoForm({ ...eventoForm, alcance: 'global' })}
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'flex-start',
+                                                                            gap: '10px',
+                                                                            padding: '12px 16px',
+                                                                            borderRadius: '10px',
+                                                                            border: eventoForm.alcance === 'global' ? '2px solid #7c3aed' : '1px solid #ced4da',
+                                                                            background: eventoForm.alcance === 'global' ? '#faf5ff' : '#fff',
+                                                                            color: eventoForm.alcance === 'global' ? '#6b21a8' : '#475569',
+                                                                            cursor: 'pointer',
+                                                                            textAlign: 'left',
+                                                                            transition: 'all 0.2s'
+                                                                        }}
+                                                                    >
+                                                                        <div>
+                                                                            <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>Global (Toda la Comunidad)</div>
+                                                                            <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
+                                                                                Visible en el calendario y avisos de toda la comunidad
+                                                                            </div>
+                                                                        </div>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
                                                             {/* Selector de Prioridad del Evento */}
                                                             <div>
                                                                 <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.88rem', marginBottom: '8px', color: '#333' }}>
-                                                                    Prioridad del Evento y Notificación a Miembros:
+                                                                    Prioridad del Evento y Notificación:
                                                                 </label>
                                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
                                                                     <button
@@ -2450,7 +2681,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                 : 'Confirmar Creación de Evento'}
                                         </h3>
                                         <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                                            Verifica los datos antes de notificar a los miembros del club
+                                            {modalConfirmacion.datos?.alcance === 'global'
+                                                ? 'Verifica los datos antes de publicar para toda la comunidad'
+                                                : 'Verifica los datos antes de notificar a los miembros del club'}
                                         </span>
                                     </div>
                                 </div>
@@ -2469,24 +2702,37 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                         <strong style={{ color: '#0f172a', fontSize: '1rem' }}>
                                             {modalConfirmacion.datos?.titulo}
                                         </strong>
-                                        <span style={{
-                                            fontSize: '0.75rem',
-                                            fontWeight: '700',
-                                            padding: '3px 10px',
-                                            borderRadius: '999px',
-                                            background: modalConfirmacion.datos?.prioridad === 'alta'
-                                                ? '#fee2e2'
-                                                : modalConfirmacion.datos?.prioridad === 'baja'
-                                                    ? '#dcfce7'
-                                                    : '#e0f2fe',
-                                            color: modalConfirmacion.datos?.prioridad === 'alta'
-                                                ? '#b91c1c'
-                                                : modalConfirmacion.datos?.prioridad === 'baja'
-                                                    ? '#15803d'
-                                                    : '#0369a1'
-                                        }}>
-                                            PRIORIDAD {(modalConfirmacion.datos?.prioridad || 'normal').toUpperCase()}
-                                        </span>
+                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                fontWeight: '700',
+                                                padding: '3px 10px',
+                                                borderRadius: '999px',
+                                                background: modalConfirmacion.datos?.alcance === 'global' ? '#f3e8ff' : '#f1f5f9',
+                                                color: modalConfirmacion.datos?.alcance === 'global' ? '#6b21a8' : '#334155',
+                                                border: modalConfirmacion.datos?.alcance === 'global' ? '1px solid #d8b4fe' : '1px solid #cbd5e1'
+                                            }}>
+                                                {modalConfirmacion.datos?.alcance === 'global' ? ' GLOBAL (COMUNIDAD)' : ' SOLO CLUB'}
+                                            </span>
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                fontWeight: '700',
+                                                padding: '3px 10px',
+                                                borderRadius: '999px',
+                                                background: modalConfirmacion.datos?.prioridad === 'alta'
+                                                    ? '#fee2e2'
+                                                    : modalConfirmacion.datos?.prioridad === 'baja'
+                                                        ? '#dcfce7'
+                                                        : '#e0f2fe',
+                                                color: modalConfirmacion.datos?.prioridad === 'alta'
+                                                    ? '#b91c1c'
+                                                    : modalConfirmacion.datos?.prioridad === 'baja'
+                                                        ? '#15803d'
+                                                        : '#0369a1'
+                                            }}>
+                                                PRIORIDAD {(modalConfirmacion.datos?.prioridad || 'normal').toUpperCase()}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     {modalConfirmacion.tipo === 'aviso' && modalConfirmacion.datos?.fecha_vencimiento && (
@@ -2529,8 +2775,12 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
                                 <p style={{ margin: '0 0 22px 0', fontSize: '0.9rem', color: '#475569', lineHeight: '1.5' }}>
                                     {modalConfirmacion.tipo === 'aviso'
-                                        ? '¿Estás seguro de que deseas publicar este aviso? Se mostrará inmediatamente en el tablero de todos los integrantes.'
-                                        : '¿Estás seguro de que deseas agendar este evento? Se habilitará el registro de asistencia y se notificará a todos los integrantes.'}
+                                        ? (modalConfirmacion.datos?.alcance === 'global'
+                                            ? '¿Estás seguro de publicar este aviso como GLOBAL? Será visible para todos los usuarios del sistema y en el portal general.'
+                                            : '¿Estás seguro de que deseas publicar este aviso? Se mostrará inmediatamente en el tablero de los integrantes de este club.')
+                                        : (modalConfirmacion.datos?.alcance === 'global'
+                                            ? '¿Estás seguro de agendar este evento como GLOBAL? Aparecerá en el calendario y avisos de toda la comunidad.'
+                                            : '¿Estás seguro de que deseas agendar este evento? Se habilitará el registro de asistencia y se notificará a los integrantes del club.')}
                                 </p>
 
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
@@ -2639,6 +2889,276 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                 </div>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* ================================================================= */}
+            {/* MODAL: LISTA DE ASISTENTES DE UN EVENTO (EXCLUSIVO ENCARGADOS)    */}
+            {/* ================================================================= */}
+            {eventoAsistentesModal && (
+                <div
+                    onClick={() => setEventoAsistentesModal(null)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+                        backdropFilter: 'blur(3px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 2600,
+                        padding: '20px'
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            backgroundColor: '#ffffff',
+                            borderRadius: '14px',
+                            width: '100%',
+                            maxWidth: '660px',
+                            maxHeight: '84vh',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            boxShadow: '0 20px 50px rgba(15, 23, 42, 0.28)',
+                            border: '1px solid #e2e8f0',
+                            overflow: 'hidden'
+                        }}
+                    >
+                        {/* Cabecera del Modal */}
+                        <div style={{
+                            padding: '18px 24px',
+                            borderBottom: '1px solid #e2e8f0',
+                            backgroundColor: '#f8fafc',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            gap: '12px'
+                        }}>
+                            <div>
+                                <span style={{
+                                    display: 'inline-block',
+                                    fontSize: '0.74rem',
+                                    fontWeight: '700',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px',
+                                    color: '#003366',
+                                    backgroundColor: '#e0f2fe',
+                                    padding: '3px 9px',
+                                    borderRadius: '999px',
+                                    marginBottom: '6px'
+                                }}>
+                                    📋 Lista de Asistencia Confirmada
+                                </span>
+                                <h3 style={{ margin: 0, fontSize: '1.18rem', color: '#0f172a', fontWeight: '800' }}>
+                                    {eventoAsistentesModal.titulo}
+                                </h3>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '0.84rem', color: '#64748b' }}>
+                                    {eventoAsistentesModal.fecha_evento
+                                        ? new Date(String(eventoAsistentesModal.fecha_evento).replace(' ', 'T')).toLocaleString('es-MX', {
+                                            dateStyle: 'medium',
+                                            timeStyle: 'short'
+                                        })
+                                        : ''}
+                                    {eventoAsistentesModal.lugar ? ` • 📍 ${eventoAsistentesModal.lugar}` : ''}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setEventoAsistentesModal(null)}
+                                style={{
+                                    background: '#ffffff',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '8px',
+                                    width: '32px',
+                                    height: '32px',
+                                    cursor: 'pointer',
+                                    fontWeight: '700',
+                                    color: '#475569',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: 0
+                                }}
+                                title="Cerrar"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Buscador interno si hay asistentes */}
+                        {!loadingAsistentes && !errorAsistentes && asistentesEvento.length > 0 && (
+                            <div style={{ padding: '12px 24px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                                <input
+                                    type="text"
+                                    value={busquedaAsistente}
+                                    onChange={(e) => setBusquedaAsistente(e.target.value)}
+                                    placeholder="🔍 Filtrar asistente por nombre, boleta o correo..."
+                                    style={{
+                                        flex: '1 1 240px',
+                                        padding: '8px 12px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #cbd5e1',
+                                        fontSize: '0.88rem',
+                                        outline: 'none'
+                                    }}
+                                />
+                                <span style={{ fontSize: '0.84rem', fontWeight: '700', color: '#003366' }}>
+                                    Total confirmados: {asistentesEvento.length}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Cuerpo del Modal */}
+                        <div style={{ padding: '18px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                            {loadingAsistentes ? (
+                                <div style={{ textAlign: 'center', padding: '35px 15px', color: '#64748b' }}>
+                                    ⏳ Cargando lista de asistentes...
+                                </div>
+                            ) : errorAsistentes ? (
+                                <div style={{ backgroundColor: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '14px', borderRadius: '8px', textAlign: 'center', fontWeight: '600' }}>
+                                    ⚠️ {errorAsistentes}
+                                </div>
+                            ) : asistentesEvento.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '35px 15px', color: '#64748b' }}>
+                                    <div style={{ fontSize: '2.2rem', marginBottom: '8px' }}>👥</div>
+                                    <strong style={{ display: 'block', color: '#334155', marginBottom: '4px' }}>
+                                        Sin asistentes confirmados aún
+                                    </strong>
+                                    <span style={{ fontSize: '0.88rem' }}>
+                                        Ningún integrante ha confirmado su asistencia a este evento todavía.
+                                    </span>
+                                </div>
+                            ) : (
+                                (() => {
+                                    const query = busquedaAsistente.trim().toLowerCase();
+                                    const filtrados = query
+                                        ? asistentesEvento.filter(a =>
+                                            (a.nombre_completo || '').toLowerCase().includes(query) ||
+                                            (a.boleta || '').toLowerCase().includes(query) ||
+                                            (a.num_empleado || '').toLowerCase().includes(query) ||
+                                            (a.correo || '').toLowerCase().includes(query)
+                                        )
+                                        : asistentesEvento;
+
+                                    if (filtrados.length === 0) {
+                                        return (
+                                            <div style={{ textAlign: 'center', padding: '25px', color: '#64748b', fontSize: '0.9rem' }}>
+                                                No se encontraron asistentes que coincidan con "{busquedaAsistente}".
+                                            </div>
+                                        );
+                                    }
+
+                                    return filtrados.map((asistente, idx) => {
+                                        const inicial = (asistente.nombre_completo || 'U').charAt(0).toUpperCase();
+                                        const identificador = asistente.boleta
+                                            ? `Boleta: ${asistente.boleta}`
+                                            : asistente.num_empleado
+                                                ? `No. Emp: ${asistente.num_empleado}`
+                                                : 'Sin identificador';
+                                        const rolEtiqueta = asistente.rol_en_club === 'encargado_profesor'
+                                            ? '🎓 Profesor Titular'
+                                            : asistente.rol_en_club === 'encargado_alumno'
+                                                ? '⭐ Alumno Encargado'
+                                                : '👤 Miembro';
+
+                                        return (
+                                            <div
+                                                key={asistente.usuario_id || idx}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    gap: '12px',
+                                                    flexWrap: 'wrap',
+                                                    padding: '12px 14px',
+                                                    borderRadius: '10px',
+                                                    border: '1px solid #e2e8f0',
+                                                    backgroundColor: '#ffffff'
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    <div style={{
+                                                        width: '38px',
+                                                        height: '38px',
+                                                        borderRadius: '50%',
+                                                        backgroundColor: '#003366',
+                                                        color: '#ffffff',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontWeight: '800',
+                                                        fontSize: '0.95rem',
+                                                        flexShrink: 0
+                                                    }}>
+                                                        {inicial}
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.94rem' }}>
+                                                            {asistente.nombre_completo}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                                            {identificador} {asistente.correo ? `• ${asistente.correo}` : ''}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: '700',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '999px',
+                                                        backgroundColor: '#f1f5f9',
+                                                        color: '#334155',
+                                                        border: '1px solid #cbd5e1'
+                                                    }}>
+                                                        {rolEtiqueta}
+                                                    </span>
+                                                    <span style={{
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: '700',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '999px',
+                                                        backgroundColor: '#dcfce7',
+                                                        color: '#166534'
+                                                    }}>
+                                                        ✓ Confirmado
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    });
+                                })()
+                            )}
+                        </div>
+
+                        {/* Pie del Modal */}
+                        <div style={{
+                            padding: '14px 24px',
+                            borderTop: '1px solid #e2e8f0',
+                            backgroundColor: '#f8fafc',
+                            display: 'flex',
+                            justifyContent: 'flex-end'
+                        }}>
+                            <button
+                                type="button"
+                                onClick={() => setEventoAsistentesModal(null)}
+                                style={{
+                                    padding: '8px 20px',
+                                    backgroundColor: '#003366',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontWeight: '700',
+                                    fontSize: '0.88rem',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Cerrar
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

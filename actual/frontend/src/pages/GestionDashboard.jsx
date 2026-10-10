@@ -163,7 +163,7 @@ const GestionDashboard = () => {
 
             const clubesMap = new Map();
             misClubes.forEach(c => {
-                clubesMap.set(c.id, { id: c.id, nombre: c.nombre, esInvitacion: false });
+                clubesMap.set(c.id, { ...c, id: c.id, nombre: c.nombre, esInvitacion: false });
             });
             invitaciones.forEach(inv => {
                 if (!clubesMap.has(inv.club_id)) {
@@ -174,13 +174,19 @@ const GestionDashboard = () => {
             const clubesLista = Array.from(clubesMap.values());
 
             const eventosPromises = clubesLista.map(async (c) => {
+                const esEncargado = (
+                    (['encargado_profesor', 'encargado_alumno'].includes(c.mi_rol_interno) && c.inscripcion_estatus === 'activo') ||
+                    c.profesor_encargado_id === user?.id ||
+                    c.alumno_encargado_id === user?.id
+                );
                 try {
                     const resEv = await api.get(`/clubes/${c.id}/eventos`);
                     return (resEv.data || []).map(ev => ({
                         ...ev,
                         club_id: c.id,
                         club_nombre: c.nombre,
-                        es_invitacion: c.esInvitacion
+                        es_invitacion: c.esInvitacion,
+                        es_encargado: esEncargado
                     }));
                 } catch (err) {
                     console.warn(`Error al cargar eventos del club ${c.id}:`, err);
@@ -188,8 +194,29 @@ const GestionDashboard = () => {
                 }
             });
 
-            const resultados = await Promise.all(eventosPromises);
-            setEventosCalendario(resultados.flat());
+            const [resultadosClubes, resGlobales] = await Promise.all([
+                Promise.all(eventosPromises),
+                api.get('/clubes/eventos/globales').catch(() => ({ data: [] }))
+            ]);
+
+            const eventosPorId = new Map();
+            resultadosClubes.flat().forEach(ev => {
+                eventosPorId.set(ev.id, ev);
+            });
+
+            (resGlobales.data || []).forEach(evGlobal => {
+                if (!eventosPorId.has(evGlobal.id)) {
+                    eventosPorId.set(evGlobal.id, {
+                        ...evGlobal,
+                        club_nombre: evGlobal.club_nombre || 'Evento Global',
+                        es_invitacion: false,
+                        es_encargado: false,
+                        es_global: 1
+                    });
+                }
+            });
+
+            setEventosCalendario(Array.from(eventosPorId.values()));
         } catch (error) {
             console.error("Error general al obtener eventos para el calendario:", error);
         } finally {
@@ -625,6 +652,19 @@ const GestionDashboard = () => {
                                                             >
                                                                 📋 Panel y Detalles
                                                             </button>
+
+                                                            {['encargado_profesor', 'encargado_alumno'].includes(club.mi_rol_interno) && club.inscripcion_estatus === 'activo' && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-club-action details"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        navigate(`/club/${club.id}/editar`);
+                                                                    }}
+                                                                >
+                                                                    ✏️ Editar Información
+                                                                </button>
+                                                            )}
 
                                                             {club.mi_rol_interno === 'encargado_profesor' && club.estatus === 'esperando_firmas' && (
                                                                 <button 

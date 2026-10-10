@@ -122,9 +122,22 @@ const AvisosAdminPage = () => {
                             <p style={{ margin: '4px 0 0 0', color: '#666' }}>Visualiza todos los avisos globales y de clubes.</p>
                         </div>
                         <div>
-                            {/* <button onClick={() => navigate('/admin/avisos/crear')} className="special-link" style={{ padding: '10px 15px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                            <button
+                                onClick={() => navigate('/admin/avisos/crear')}
+                                className="special-link"
+                                style={{
+                                    padding: '10px 16px',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    backgroundColor: '#003366',
+                                    color: '#ffffff',
+                                    fontWeight: '700',
+                                    boxShadow: '0 2px 6px rgba(0, 51, 102, 0.2)'
+                                }}
+                            >
                                 ➕ Crear Aviso Global
-                            </button> */}
+                            </button>
                         </div>
                     </div>
 

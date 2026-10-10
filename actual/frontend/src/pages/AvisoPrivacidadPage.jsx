@@ -1,8 +1,36 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 import './css/AvisoPrivacidad.css';
 
 const AvisoPrivacidadPage = () => {
     const navigate = useNavigate();
+    const [politicaActual, setPoliticaActual] = useState(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        api.get('/politicas/actual')
+            .then((res) => {
+                if (isMounted && res.data) {
+                    setPoliticaActual(res.data);
+                }
+            })
+            .catch((err) => {
+                console.error('Error al obtener la versión actual de políticas:', err);
+            });
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    const versionActiva = politicaActual?.version || politicaActual?.version_actual || '1.1';
+    const fechaPublicacion = politicaActual?.fecha_publicacion
+        ? new Date(politicaActual.fecha_publicacion).toLocaleDateString('es-MX', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric'
+          })
+        : '7 de septiembre de 2026';
 
     const volverAtras = () => {
         if (window.history.length > 1) {
@@ -19,7 +47,9 @@ const AvisoPrivacidadPage = () => {
                     <div>
                         <p className="privacy-eyebrow">Sistema de Clubes ESCOM IPN</p>
                         <h1>Aviso de Privacidad</h1>
-                        <p className="privacy-version">Versión 1.1 · 7 de septiembre de 2026</p>
+                        <p className="privacy-version">
+                            Versión {versionActiva} · {fechaPublicacion}
+                        </p>
                     </div>
                     <button type="button" className="privacy-close" onClick={volverAtras}>
                         ← Volver
@@ -209,7 +239,7 @@ const AvisoPrivacidadPage = () => {
                 </section>
 
                 <footer className="privacy-footer">
-                    <span>Versión 1.1 · Última actualización: 7 de septiembre de 2026</span>
+                    <span>Versión {versionActiva} · Última actualización: {fechaPublicacion}</span>
                     <span>ESCOM IPN</span>
                 </footer>
             </article>

@@ -77,16 +77,24 @@ router.get('/:id/avisos', verificarToken, requireVerificado, async (req, res) =>
         `, [req.params.id]);
 
         const [avisos] = await db.query(`
-            SELECT a.*, CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre
-            FROM avisos a JOIN usuarios u ON a.usuario_id = u.id
-            WHERE a.club_id = ? AND a.activo = 1 ORDER BY a.fecha_envio DESC
+            SELECT a.*,
+                   u.nombres,
+                   CONCAT(u.apellido_paterno, ' ', IFNULL(u.apellido_materno, '')) AS apellidos,
+                   CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre,
+                   u.role_id,
+                   i.rol_en_club
+            FROM avisos a
+            JOIN usuarios u ON a.usuario_id = u.id
+            LEFT JOIN inscripciones i ON i.club_id = a.club_id AND i.usuario_id = u.id
+            WHERE a.club_id = ? AND a.activo = 1
+            ORDER BY a.fecha_envio DESC
         `, [req.params.id]);
         res.status(200).json(avisos);
     } catch (error) { res.status(500).json({ message: "Error al cargar avisos" }); }
 });
 
 router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) => {
-    const { contenido, titulo, prioridad, fecha_vencimiento } = req.body;
+    const { contenido, titulo, prioridad, fecha_vencimiento, alcance, es_global } = req.body;
 
     if (!contenido || !String(contenido).trim()) {
         return res.status(400).json({ message: "El contenido del aviso es obligatorio." });
@@ -105,6 +113,12 @@ router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) =
         ? String(prioridad).toLowerCase() 
         : 'normal';
 
+    const esGlobal = (
+        es_global === true ||
+        es_global === 1 ||
+        String(alcance || '').toLowerCase() === 'global'
+    ) ? 1 : 0;
+
     try {
         const rolUsuario = Number(req.user.rol || req.user.role_id);
         if (rolUsuario !== 1) {
@@ -116,20 +130,53 @@ router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) =
                 return res.status(403).json({ message: "Acceso denegado. Solo los encargados pueden publicar avisos en este club." });
             }
         }
-        await db.query(
-            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1)`,
-            [req.params.id, req.user.id, titulo || null, contenido, prioridadValida, fechaVencimientoConvertida]
+        const [resultado] = await db.query(
+            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo, es_global) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1, ?)`,
+            [req.params.id, req.user.id, titulo || null, contenido, prioridadValida, fechaVencimientoConvertida, esGlobal]
         );
 
         const io = req.app.get('socketio');
         if (io) {
-            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida });
+            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida, es_global: esGlobal });
+            if (esGlobal === 1) {
+                io.emit('nuevo_aviso_global', {
+                    id: resultado.insertId,
+                    titulo: titulo || 'Comunicado Global de Club',
+                    contenido,
+                    prioridad: prioridadValida,
+                    es_global: 1
+                });
+            }
         }
 
-        res.status(201).json({ message: "Aviso publicado exitosamente", prioridad: prioridadValida, fecha_vencimiento: fechaVencimientoConvertida });
+        res.status(201).json({
+            message: esGlobal ? "Aviso global publicado exitosamente" : "Aviso publicado exitosamente para el club",
+            prioridad: prioridadValida,
+            fecha_vencimiento: fechaVencimientoConvertida,
+            es_global: esGlobal
+        });
     } catch (error) { 
         console.error("Error al crear aviso:", error);
         res.status(500).json({ message: "Error al crear aviso" }); 
+    }
+});
+
+router.get('/eventos/globales', verificarToken, requireVerificado, async (req, res) => {
+    try {
+        const [eventos] = await db.query(`
+            SELECT e.*,
+                   c.nombre AS club_nombre,
+                   (SELECT COUNT(*) FROM asistencias_eventos WHERE evento_id = e.id AND asistira = 1) AS total_asistentes,
+                   (SELECT asistira FROM asistencias_eventos WHERE evento_id = e.id AND usuario_id = ?) AS mi_respuesta
+            FROM eventos_club e
+            JOIN clubes c ON e.club_id = c.id
+            WHERE e.es_global = 1 AND c.estatus = 'activo'
+            ORDER BY e.fecha_evento ASC
+        `, [req.user.id]);
+        res.status(200).json(eventos);
+    } catch (error) {
+        console.error("Error al cargar eventos globales:", error);
+        res.status(500).json({ message: "Error al cargar eventos globales" });
     }
 });
 
@@ -148,7 +195,7 @@ router.get('/:id/eventos', verificarToken, requireVerificado, async (req, res) =
 });
 
 router.post('/:id/eventos', verificarToken, requireVerificado, async (req, res) => {
-    const { titulo, descripcion, fecha_evento, lugar, prioridad = 'alta', notificarAviso = true } = req.body;
+    const { titulo, descripcion, fecha_evento, lugar, prioridad = 'alta', notificarAviso = true, alcance, es_global } = req.body;
 
     // Validamos y convertimos la fecha ANTES de tocar la base de datos
     const fechaConvertida = convertirAFechaMySQL(fecha_evento);
@@ -160,14 +207,31 @@ router.post('/:id/eventos', verificarToken, requireVerificado, async (req, res) 
         ? String(prioridad).toLowerCase() 
         : 'alta';
 
+    const esGlobal = (
+        es_global === true ||
+        es_global === 1 ||
+        String(alcance || '').toLowerCase() === 'global'
+    ) ? 1 : 0;
+
     try {
-        // 1. Registrar el evento con su nivel de prioridad
+        const rolUsuario = Number(req.user.rol || req.user.role_id);
+        if (rolUsuario !== 1) {
+            const [permiso] = await db.query(
+                `SELECT id FROM inscripciones WHERE club_id = ? AND usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo'`,
+                [req.params.id, req.user.id]
+            );
+            if (permiso.length === 0) {
+                return res.status(403).json({ message: "Acceso denegado. Solo los encargados pueden agendar eventos en este club." });
+            }
+        }
+
+        // 1. Registrar el evento con su nivel de prioridad y alcance (es_global)
         await db.query(
-            `INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar, prioridad) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [req.params.id, req.user.id, titulo, descripcion, fechaConvertida, lugar, prioridadValida]
+            `INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar, prioridad, es_global) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [req.params.id, req.user.id, titulo, descripcion, fechaConvertida, lugar, prioridadValida, esGlobal]
         );
 
-        // 2. Notificar a los miembros creando un aviso oficial con prioridad alta (o la asignada)
+        // 2. Notificar creando un aviso oficial (del club o global según se haya elegido)
         if (notificarAviso !== false) {
             let fechaLegible = fechaConvertida;
             try {
@@ -175,22 +239,26 @@ router.post('/:id/eventos', verificarToken, requireVerificado, async (req, res) 
                 fechaLegible = f.toLocaleString('es-MX', { dateStyle: 'full', timeStyle: 'short' });
             } catch (e) {}
 
-            const tituloAviso = `📅 Nuevo Evento: ${titulo}`;
-            const contenidoAviso = `Se ha programado una nueva actividad oficial: "${titulo}".\n📅 Fecha: ${fechaLegible}${lugar ? `\n📍 Lugar: ${lugar}` : ''}.\n${descripcion ? `📝 Detalles: ${descripcion}\n` : ''}¡Por favor confirma tu asistencia en la sección de Eventos del Club!`;
+            const tituloAviso = esGlobal ? `🌍 Evento Global: ${titulo}` : `📅 Nuevo Evento: ${titulo}`;
+            const contenidoAviso = `Se ha programado una nueva actividad ${esGlobal ? 'abierta a toda la comunidad' : 'oficial del club'}: "${titulo}".\n📅 Fecha: ${fechaLegible}${lugar ? `\n📍 Lugar: ${lugar}` : ''}.\n${descripcion ? `📝 Detalles: ${descripcion}\n` : ''}¡Por favor confirma tu asistencia en el calendario o sección de Eventos!`;
 
             await db.query(
-                `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1)`,
-                [req.params.id, req.user.id, tituloAviso, contenidoAviso, prioridadValida, fechaConvertida]
+                `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo, es_global) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1, ?)`,
+                [req.params.id, req.user.id, tituloAviso, contenidoAviso, prioridadValida, fechaConvertida, esGlobal]
             );
         }
 
         const io = req.app.get('socketio');
         if (io) {
-            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'evento', prioridad: prioridadValida });
-            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida });
+            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'evento', prioridad: prioridadValida, es_global: esGlobal });
+            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida, es_global: esGlobal });
         }
 
-        res.status(201).json({ message: "Evento creado y aviso notificado con prioridad", prioridad: prioridadValida });
+        res.status(201).json({
+            message: esGlobal ? "Evento global creado y notificado a toda la comunidad" : "Evento creado y notificado a los miembros del club",
+            prioridad: prioridadValida,
+            es_global: esGlobal
+        });
     } catch (error) { 
         console.error("Error al crear evento:", error);
         res.status(500).json({ message: "Error al crear evento" }); 
@@ -206,6 +274,54 @@ router.post('/:id/eventos/:idEvento/asistencia', verificarToken, requireVerifica
         );
         res.status(200).json({ message: "Asistencia actualizada" });
     } catch (error) { res.status(500).json({ message: "Error al registrar asistencia" }); }
+});
+
+router.get('/:id/eventos/:idEvento/asistentes', verificarToken, requireVerificado, async (req, res) => {
+    const clubId = req.params.id;
+    const idEvento = req.params.idEvento;
+    const idUsuario = req.user.id;
+    const rolUsuario = Number(req.user.rol || req.user.role_id);
+
+    try {
+        // Verificar que el usuario sea administrador o encargado activo de este club
+        if (rolUsuario !== 1) {
+            const [permiso] = await db.query(
+                `SELECT id FROM inscripciones
+                 WHERE club_id = ? AND usuario_id = ?
+                   AND rol_en_club IN ('encargado_profesor', 'encargado_alumno')
+                   AND estatus = 'activo'
+                 LIMIT 1`,
+                [clubId, idUsuario]
+            );
+            if (permiso.length === 0) {
+                return res.status(403).json({ message: "Acceso exclusivo para los encargados del club." });
+            }
+        }
+
+        const [asistentes] = await db.query(
+            `SELECT u.id AS usuario_id,
+                    u.nombres,
+                    u.apellido_paterno,
+                    u.apellido_materno,
+                    CONCAT(u.nombres, ' ', u.apellido_paterno, IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != '', CONCAT(' ', u.apellido_materno), '')) AS nombre_completo,
+                    u.correo,
+                    u.boleta,
+                    u.num_empleado,
+                    IFNULL(i.rol_en_club, 'miembro') AS rol_en_club
+             FROM asistencias_eventos ae
+             JOIN eventos_club e ON ae.evento_id = e.id AND e.club_id = ?
+             JOIN usuarios u ON ae.usuario_id = u.id
+             LEFT JOIN inscripciones i ON i.usuario_id = u.id AND i.club_id = ?
+             WHERE ae.evento_id = ? AND ae.asistira = 1
+             ORDER BY u.apellido_paterno ASC, u.nombres ASC`,
+            [clubId, clubId, idEvento]
+        );
+
+        res.status(200).json({ asistentes });
+    } catch (error) {
+        console.error("Error al obtener asistentes del evento:", error);
+        res.status(500).json({ message: "Error al obtener la lista de asistentes del evento." });
+    }
 });
 
 
@@ -307,7 +423,12 @@ router.get('/', verificarToken, requireVerificado, async (req, res) => {
             LEFT JOIN inscripciones ia ON c.id = ia.club_id AND ia.rol_en_club = 'encargado_alumno' AND ia.estatus = 'activo'
             LEFT JOIN usuarios a ON ia.usuario_id = a.id
         `);
-        const clubesTratados = filas.map(club => ({ ...club, cronograma: club.cronograma ? JSON.stringify(club.cronograma) : null }));
+        const clubesTratados = filas.map(club => ({
+            ...club,
+            cronograma: club.cronograma
+                ? (typeof club.cronograma === 'string' ? club.cronograma : JSON.stringify(club.cronograma))
+                : null
+        }));
         res.status(200).json(clubesTratados);
     } catch (error) { 
         res.status(500).json({ message: "Error interno" }); 
@@ -333,7 +454,12 @@ router.get('/user/:idUsuario', verificarToken, requireVerificado, async (req, re
             LEFT JOIN usuarios a ON ia.usuario_id = a.id
         `, [idUsuario]);
 
-        const clubesTratados = filas.map(club => ({ ...club, cronograma: club.cronograma ? JSON.stringify(club.cronograma) : null }));
+        const clubesTratados = filas.map(club => ({
+            ...club,
+            cronograma: club.cronograma
+                ? (typeof club.cronograma === 'string' ? club.cronograma : JSON.stringify(club.cronograma))
+                : null
+        }));
         res.status(200).json(clubesTratados);
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
@@ -401,8 +527,31 @@ router.post('/', verificarToken, requireVerificado, async (req, res) => {
 router.put('/:id', verificarToken, requireVerificado, async (req, res) => {
     const { id } = req.params;
     const { nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, nuevo_profesor_id, nuevo_alumno_id } = req.body;
-    
+    const rolUsuario = Number(req.user.rol || req.user.role_id);
+    const esAdmin = rolUsuario === 1;
+
     try {
+        if (!esAdmin) {
+            const [permiso] = await db.query(
+                `SELECT id FROM inscripciones WHERE club_id = ? AND usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo' LIMIT 1`,
+                [id, req.user.id]
+            );
+            if (permiso.length === 0) {
+                return res.status(403).json({ message: "Acceso denegado. Solo los encargados activos de este club o un administrador pueden modificar la información." });
+            }
+        }
+
+        const [clubesActuales] = await db.query(`SELECT * FROM clubes WHERE id = ?`, [id]);
+        if (clubesActuales.length === 0) {
+            return res.status(404).json({ message: "Club no encontrado." });
+        }
+        const clubActual = clubesActuales[0];
+
+        const nombreFinal = esAdmin && nombre !== undefined ? nombre : clubActual.nombre;
+        const cronogramaFinal = cronograma !== undefined
+            ? (typeof cronograma === 'string' ? cronograma : JSON.stringify(cronograma))
+            : (clubActual.cronograma ? (typeof clubActual.cronograma === 'string' ? clubActual.cronograma : JSON.stringify(clubActual.cronograma)) : null);
+
         await db.query(
             `UPDATE clubes 
              SET nombre = ?, descripcion = ?, objetivo = ?, cronograma = ?, 
@@ -410,24 +559,35 @@ router.put('/:id', verificarToken, requireVerificado, async (req, res) => {
                  estatus = IF(estatus = 'rechazado', 'en_revision', estatus), 
                  motivo_rechazo = IF(estatus = 'rechazado', NULL, motivo_rechazo) 
              WHERE id = ?`,
-            [nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, id]
+            [
+                nombreFinal,
+                descripcion !== undefined ? descripcion : clubActual.descripcion,
+                objetivo !== undefined ? objetivo : clubActual.objetivo,
+                cronogramaFinal,
+                detalle_actividades !== undefined ? detalle_actividades : clubActual.detalle_actividades,
+                espacios_tiempos !== undefined ? espacios_tiempos : clubActual.espacios_tiempos,
+                impacto !== undefined ? impacto : clubActual.impacto,
+                id
+            ]
         );
 
-        const [profesoresActuales] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_profesor'`, [id]);
-        const [alumnosActuales] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_alumno'`, [id]);
+        if (esAdmin && nuevo_profesor_id && nuevo_alumno_id) {
+            const [profesoresActuales] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_profesor'`, [id]);
+            const [alumnosActuales] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_alumno'`, [id]);
 
-        const idProfesorAnterior = profesoresActuales.length > 0 ? profesoresActuales[0].usuario_id : null;
-        const idAlumnoAnterior = alumnosActuales.length > 0 ? alumnosActuales[0].usuario_id : null;
+            const idProfesorAnterior = profesoresActuales.length > 0 ? profesoresActuales[0].usuario_id : null;
+            const idAlumnoAnterior = alumnosActuales.length > 0 ? alumnosActuales[0].usuario_id : null;
 
-        if (idProfesorAnterior && idProfesorAnterior !== nuevo_profesor_id) {
-            await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, idProfesorAnterior]);
+            if (idProfesorAnterior && idProfesorAnterior !== nuevo_profesor_id) {
+                await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, idProfesorAnterior]);
+            }
+            if (idAlumnoAnterior && idAlumnoAnterior !== nuevo_alumno_id) {
+                await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, idAlumnoAnterior]);
+            }
+
+            await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_profesor', estatus = 'activo'`, [nuevo_profesor_id, id]);
+            await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_alumno', estatus = 'activo'`, [nuevo_alumno_id, id]);
         }
-        if (idAlumnoAnterior && idAlumnoAnterior !== nuevo_alumno_id) {
-            await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, idAlumnoAnterior]);
-        }
-
-        await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_profesor', estatus = 'activo'`, [nuevo_profesor_id, id]);
-        await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_alumno', estatus = 'activo'`, [nuevo_alumno_id, id]);
        
         res.status(200).json({ message: "Editado y actualizado correctamente" });
     } catch (error) {

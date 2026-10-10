@@ -9,11 +9,13 @@ import GestionDashboard from './pages/GestionDashboard';
 import CrearClubPage from './pages/CrearClubPage'; 
 import ClubDetailsAdminPage from './pages/ClubDetailsAdminPage';
 import AvisosAdminPage from './pages/AvisosAdminPage';
+import CrearAvisoGlobalPage from './pages/CrearAvisoGlobalPage';
 import PerfilPage from './pages/PerfilPage';
 import CambiarPasswordPage from './pages/CambiarPasswordPage';
 import ClubChatPage from './pages/ClubChatPage';
 import ClubDetailsPage from './pages/ClubDetailsPage';
 import ClubPanelPage from './pages/ClubPanelPage';
+import EditarClubEncargadoPage from './pages/EditarClubEncargadoPage';
 import ClubEmergenciasPage from './pages/ClubEmergenciasPage';
 import VerificarCuentaPage from './pages/VerificarCuentaPage';
 import AvisoPrivacidadPage from './pages/AvisoPrivacidadPage';
@@ -98,6 +100,13 @@ function App() {
             </ProtectedRoute>
           } />
 
+          {/* Edición de Información del Club (Encargados del Club) */}
+          <Route path="/club/:id/editar" element={
+            <ProtectedRoute rolesPermitidos={[2, 3, 4]}>
+              <EditarClubEncargadoPage />
+            </ProtectedRoute>
+          } />
+
           {/* Detalles del Club (Administrador) */}
           <Route path="/admin/club/:id" element={
             <ProtectedRoute rolesPermitidos={[1]}>
@@ -109,6 +118,13 @@ function App() {
           <Route path="/admin/avisos" element={
             <ProtectedRoute rolesPermitidos={[1]}>
               <AvisosAdminPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Crear Aviso Global (Administrador) */}
+          <Route path="/admin/avisos/crear" element={
+            <ProtectedRoute rolesPermitidos={[1]}>
+              <CrearAvisoGlobalPage />
             </ProtectedRoute>
           } />
 

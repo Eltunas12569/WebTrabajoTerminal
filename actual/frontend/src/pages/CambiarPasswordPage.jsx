@@ -165,21 +165,11 @@ const CambiarPasswordPage = () => {
                         <button
                             type="button"
                             onClick={() => navigate('/perfil')}
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                color: '#003366',
-                                fontSize: '0.95rem',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                marginBottom: '18px',
-                                padding: 0
-                            }}
+                            className="btn-volver-modern"
+                            style={{ marginBottom: '18px', alignSelf: 'flex-start' }}
                         >
-                            ← Volver al Perfil
+                            <span className="btn-volver-icon">←</span>
+                            <span>Volver al Perfil</span>
                         </button>
 
                         <div className="crear-club-card" style={{ width: '100%', boxSizing: 'border-box', marginTop: 0 }}>

@@ -1,84 +1,62 @@
-/* Estilos para el Directorio de Emergencias Médicas de Clubes */
+/* Estilos para el Directorio de Emergencias Médicas de Clubes - Formato Escritorio de Rápido Acceso */
 
 .emergencias-container {
+    width: 100vw;
     min-height: 100vh;
-    background-color: #f4f6f9;
-    padding-top: 75px;
+    box-sizing: border-box;
+    background-color: #f1f5f9;
+    padding-top: 82px;
     padding-bottom: 50px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    color: #333;
+    color: #1e293b;
+    overflow-x: hidden;
 }
 
 .emergencias-content {
-    max-width: 1200px;
+    max-width: 1720px;
+    width: 96%;
     margin: 0 auto;
-    padding: 0 20px;
+    padding: 0 16px;
+    box-sizing: border-box;
 }
 
-/* Banner de Cabecera */
-.emergencias-hero {
-    background: linear-gradient(135deg, #003366 0%, #001f3f 100%);
-    color: #fff;
-    padding: 24px 30px;
-    border-radius: 12px;
-    margin-bottom: 25px;
-    box-shadow: 0 4px 15px rgba(0, 51, 102, 0.15);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 15px;
-}
-
-.emergencias-hero-text h1 {
-    margin: 0 0 6px 0;
-    font-size: 1.6rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.emergencias-hero-text p {
-    margin: 0;
-    color: #cbd5e1;
-    font-size: 0.95rem;
-}
-
-.emergencias-hero-badge {
-    background-color: #dc3545;
-    color: #fff;
-    font-size: 0.75rem;
-    font-weight: bold;
-    padding: 4px 10px;
-    border-radius: 20px;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
+/* Barra superior de resumen + accesos rápidos */
+.emergencias-top-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 18px;
 }
 
 /* KPIs de Resumen */
 .emergencias-kpis {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 15px;
-    margin-bottom: 25px;
+    grid-template-columns: repeat(3, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+@media (max-width: 900px) {
+    .emergencias-kpis {
+        grid-template-columns: 1fr;
+    }
 }
 
 .kpi-card {
-    background: #fff;
-    border-radius: 10px;
-    padding: 18px 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    border-left: 4px solid #003366;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 16px 22px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+    border: 1px solid #e2e8f0;
+    border-left: 5px solid #003366;
     display: flex;
     align-items: center;
-    gap: 15px;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    gap: 16px;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .kpi-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.09);
 }
 
 .kpi-card.kpi-danger {
@@ -94,14 +72,15 @@
 }
 
 .kpi-icon {
-    font-size: 2rem;
-    width: 48px;
-    height: 48px;
+    font-size: 1.85rem;
+    width: 50px;
+    height: 50px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 10px;
+    border-radius: 12px;
     background-color: #f1f5f9;
+    flex-shrink: 0;
 }
 
 .kpi-danger .kpi-icon {
@@ -118,118 +97,287 @@
 
 .kpi-info h4 {
     margin: 0;
-    font-size: 0.82rem;
+    font-size: 0.8rem;
+    font-weight: 700;
     color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .kpi-info .kpi-number {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin-top: 3px;
+    font-size: 1.65rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-top: 2px;
+    line-height: 1.1;
 }
 
-/* Barra de Filtros */
+/* Barra de Filtros de Accesibilidad Rápida (Sticky en escritorio) */
 .emergencias-filtros-card {
-    background: #fff;
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 25px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 72px;
+    z-index: 900;
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(8px);
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    padding: 16px 22px;
+    margin-bottom: 22px;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.07);
 }
 
-.filtros-header {
+.filtros-toolbar-top {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
+    justify-content: space-between;
+    gap: 16px;
     flex-wrap: wrap;
-    gap: 10px;
+    margin-bottom: 12px;
 }
 
-.filtros-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-    color: #003366;
+.busqueda-rapida-wrapper {
+    position: relative;
+    flex: 1 1 380px;
+    display: flex;
+    align-items: center;
+}
+
+.busqueda-rapida-icon {
+    position: absolute;
+    left: 14px;
+    font-size: 1.05rem;
+    color: #64748b;
+    pointer-events: none;
+}
+
+.busqueda-rapida-input {
+    width: 100%;
+    padding: 11px 38px 11px 40px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    background-color: #f8fafc;
+    color: #0f172a;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.busqueda-rapida-input:focus {
+    border-color: #00509e;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(0, 80, 158, 0.14);
+}
+
+.busqueda-clear-btn {
+    position: absolute;
+    right: 10px;
+    background: #e2e8f0;
+    border: none;
+    color: #475569;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.busqueda-clear-btn:hover {
+    background: #cbd5e1;
+    color: #0f172a;
+}
+
+/* Botones de filtro rápido a 1 clic */
+.quick-pills-group {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
-.filtros-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
-}
-
-.filtro-item {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.filtro-item label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #475569;
-}
-
-.filtro-item input,
-.filtro-item select {
-    padding: 9px 12px;
+.quick-pill {
     border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    font-size: 0.9rem;
+    background: #f8fafc;
+    color: #334155;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.83rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+}
+
+.quick-pill:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.quick-pill.active-default {
+    background: #003366;
+    border-color: #003366;
+    color: #ffffff;
+}
+
+.quick-pill.active-warning {
+    background: #f59e0b;
+    border-color: #d97706;
+    color: #ffffff;
+}
+
+.quick-pill.active-danger {
+    background: #dc2626;
+    border-color: #b91c1c;
+    color: #ffffff;
+}
+
+/* Segunda fila de filtros rápidos: Tipo de sangre y Rol */
+.filtros-toolbar-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding-top: 10px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.sangre-chips-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.sangre-chips-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    margin-right: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.sangre-chip {
+    padding: 5px 11px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.sangre-chip:hover {
+    border-color: #ef4444;
+    color: #b91c1c;
+    background: #fef2f2;
+}
+
+.sangre-chip.active {
+    background: #dc2626;
+    border-color: #b91c1c;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+}
+
+.filtros-selects-inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.select-compacto {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding: 7px 36px 7px 12px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 9px;
+    font-size: 0.83rem;
+    font-weight: 700;
     background-color: #f8fafc;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none'%3e%3crect width='24' height='24' rx='6' fill='%23e0f2fe'/%3e%3cpath d='M7 10l5 5 5-5' stroke='%23003366' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 20px 20px;
     color: #1e293b;
     outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-.filtro-item input:focus,
-.filtro-item select:focus {
+.select-compacto:hover {
+    background-color: #ffffff;
     border-color: #00509e;
-    box-shadow: 0 0 0 3px rgba(0, 80, 158, 0.15);
-    background-color: #fff;
+}
+
+.select-compacto:focus {
+    border-color: #003366;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.13);
 }
 
 .btn-reset-filtros {
-    background: #e2e8f0;
-    color: #475569;
-    border: none;
-    padding: 6px 14px;
-    border-radius: 6px;
-    font-size: 0.82rem;
-    font-weight: 600;
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
     cursor: pointer;
-    transition: background 0.2s ease;
+    transition: all 0.15s ease;
 }
 
 .btn-reset-filtros:hover {
-    background: #cbd5e1;
-    color: #1e293b;
+    background: #fecaca;
+    color: #7f1d1d;
 }
 
-/* Lista de Integrantes */
+/* Cuadrícula de Integrantes en formato Escritorio (2 columnas amplias) */
 .integrantes-lista {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(640px, 1fr));
+    gap: 20px;
+    align-items: stretch;
+}
+
+@media (max-width: 1360px) {
+    .integrantes-lista {
+        grid-template-columns: 1fr;
+    }
 }
 
 .integrante-card {
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+    border: 1px solid #cbd5e1;
     overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .integrante-card:hover {
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.09);
+    border-color: #94a3b8;
+}
+
+.integrante-card.card-alerta-medica {
+    border-top: 3px solid #f59e0b;
 }
 
 .integrante-card-header {
@@ -259,18 +407,21 @@
     align-items: center;
     justify-content: center;
     font-size: 1.1rem;
-    font-weight: bold;
+    font-weight: 800;
+    flex-shrink: 0;
 }
 
 .integrante-nombre h3 {
     margin: 0;
     font-size: 1.05rem;
     color: #0f172a;
+    font-weight: 700;
 }
 
 .integrante-nombre span {
     font-size: 0.82rem;
     color: #64748b;
+    font-weight: 500;
 }
 
 .integrante-badges {
@@ -306,15 +457,16 @@
     border: 1px solid #e2e8f0;
 }
 
-/* Cuerpo de la Tarjeta */
+/* Cuerpo de la Tarjeta (2 columnas internas en escritorio) */
 .integrante-card-body {
-    padding: 20px;
+    padding: 18px 20px;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1.05fr;
     gap: 20px;
+    flex: 1;
 }
 
-@media (max-width: 850px) {
+@media (max-width: 720px) {
     .integrante-card-body {
         grid-template-columns: 1fr;
     }
@@ -323,12 +475,12 @@
 .ficha-seccion {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
 .ficha-seccion h4 {
-    margin: 0 0 5px 0;
-    font-size: 0.88rem;
+    margin: 0 0 4px 0;
+    font-size: 0.84rem;
     color: #003366;
     display: flex;
     align-items: center;
@@ -336,20 +488,55 @@
     border-bottom: 2px solid #e2e8f0;
     padding-bottom: 6px;
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+/* Tira de datos vitales rápidos */
+.datos-vitales-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.dato-vital-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dato-vital-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+}
+
+.dato-vital-valor {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #0f172a;
 }
 
 .info-fila {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 0.88rem;
+    font-size: 0.86rem;
     padding: 5px 0;
-    border-bottom: 1px dashed #f1f5f9;
+    border-bottom: 1px dashed #e2e8f0;
+    gap: 8px;
 }
 
 .info-label {
     color: #64748b;
-    font-weight: 500;
+    font-weight: 600;
+    flex-shrink: 0;
 }
 
 .info-valor {
@@ -357,48 +544,51 @@
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    text-align: right;
 }
 
 .badge-sangre {
     background-color: #fee2e2;
     color: #b91c1c;
     border: 1px solid #fca5a5;
-    padding: 3px 10px;
+    padding: 4px 11px;
     border-radius: 8px;
     font-weight: 800;
-    font-size: 0.95rem;
-    letter-spacing: 0.5px;
+    font-size: 0.92rem;
+    letter-spacing: 0.4px;
 }
 
 .badge-sin-sangre {
     background-color: #f1f5f9;
     color: #94a3b8;
-    padding: 3px 8px;
+    padding: 4px 8px;
     border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: normal;
+    font-size: 0.78rem;
+    font-weight: 600;
 }
 
 .alergias-box {
     background-color: #fffbeb;
+    border: 1px solid #fde68a;
     border-left: 4px solid #f59e0b;
-    padding: 10px 12px;
-    border-radius: 6px;
-    font-size: 0.86rem;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
     color: #92400e;
-    margin-top: 6px;
+    margin-top: 4px;
     line-height: 1.4;
 }
 
 .alergias-limpio {
     background-color: #f0fdf4;
+    border: 1px solid #bbf7d0;
     border-left: 4px solid #10b981;
-    padding: 10px 12px;
-    border-radius: 6px;
-    font-size: 0.86rem;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.83rem;
     color: #166534;
-    margin-top: 6px;
+    margin-top: 4px;
 }
 
 /* Contactos de Emergencia */
@@ -410,13 +600,19 @@
 
 .contacto-mini-card {
     background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 10px 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 10px;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.contacto-mini-card:hover {
+    border-color: #94a3b8;
+    background: #ffffff;
 }
 
 .contacto-info {
@@ -426,12 +622,12 @@
 }
 
 .contacto-parentesco {
-    font-size: 0.72rem;
-    font-weight: 700;
+    font-size: 0.7rem;
+    font-weight: 800;
     text-transform: uppercase;
     color: #0369a1;
     background: #e0f2fe;
-    padding: 2px 6px;
+    padding: 2px 7px;
     border-radius: 4px;
     display: inline-block;
     align-self: flex-start;
@@ -439,42 +635,42 @@
 
 .contacto-nombre {
     font-size: 0.9rem;
-    font-weight: 600;
-    color: #1e293b;
+    font-weight: 700;
+    color: #0f172a;
 }
 
 .contacto-telefono {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #1e293b;
+    font-size: 1rem;
+    font-weight: 800;
+    color: #003366;
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-top: 2px;
+    gap: 5px;
+    margin-top: 1px;
 }
 
-/* Botón de Copiar Agrandado y Destacado */
+/* Botones de Acción Rápida (Copiar / Llamar) */
 .btn-copiar {
     background: #003366;
     border: 1px solid #002244;
     color: #ffffff;
     cursor: pointer;
-    padding: 10px 18px;
+    padding: 7px 13px;
     border-radius: 8px;
-    font-size: 0.95rem;
+    font-size: 0.82rem;
     font-weight: 700;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    box-shadow: 0 2px 6px rgba(0, 51, 102, 0.25);
-    transition: all 0.2s ease;
+    gap: 6px;
+    box-shadow: 0 2px 5px rgba(0, 51, 102, 0.18);
+    transition: all 0.15s ease;
     white-space: nowrap;
 }
 
 .btn-copiar:hover {
     background: #00509e;
     transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(0, 51, 102, 0.35);
+    box-shadow: 0 4px 10px rgba(0, 51, 102, 0.25);
 }
 
 .btn-copiar.copiado {
@@ -485,15 +681,16 @@
 }
 
 .sin-contactos-alerta {
-    background-color: #fee2e2;
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
     border-left: 4px solid #dc3545;
     color: #991b1b;
-    padding: 10px 14px;
-    border-radius: 6px;
-    font-size: 0.85rem;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 0.84rem;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 
 /* Modo Impresión */
@@ -512,22 +709,19 @@
     }
 
     .emergencias-container {
+        width: 100% !important;
         padding-top: 0 !important;
         background: #fff !important;
     }
 
     .emergencias-content {
         max-width: 100% !important;
+        width: 100% !important;
         padding: 0 !important;
     }
 
-    .emergencias-hero {
-        background: #003366 !important;
-        color: #fff !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-        padding: 15px !important;
-        margin-bottom: 15px !important;
+    .integrantes-lista {
+        display: block !important;
     }
 
     .integrante-card {

@@ -65,3 +65,46 @@ button {
   background-color: #ffffff; /* Fondo claro por defecto */
   color: #212529;
 }
+
+/* 6. Estética moderna institucional para todas las listas desplegables (select) */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: #f8fafc;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 24 24' fill='none'%3e%3crect width='24' height='24' rx='6' fill='%23eff6ff'/%3e%3cpath d='M7 10l5 5 5-5' stroke='%23003366' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 22px 22px;
+  padding: 10px 40px 10px 14px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #0f172a;
+  cursor: pointer;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+select:hover:not(:disabled) {
+  background-color: #ffffff;
+  border-color: #00509e;
+  box-shadow: 0 3px 8px rgba(0, 51, 102, 0.08);
+}
+
+select:focus {
+  background-color: #ffffff;
+  border-color: #003366;
+  box-shadow: 0 0 0 3.5px rgba(0, 51, 102, 0.14);
+  outline: none;
+}
+
+select option {
+  background-color: #ffffff;
+  color: #0f172a;
+  font-weight: 500;
+  padding: 10px;
+}

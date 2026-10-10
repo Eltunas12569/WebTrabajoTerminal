@@ -398,27 +398,59 @@ const PerfilPage = () => {
                                     <div className="form-group"><label>Alergias</label><input type="text" name="alergias" value={formData.alergias || ''} onChange={handleChange} placeholder="Ninguna / Penicilina, etc." /></div>
                                 </div>
 
-                                {formData.contactos.map((contacto, index) => (
-                                    <div key={index} style={{ display: 'flex', gap: '15px', alignItems: 'center', marginTop: '15px', padding: '15px', border: '1px solid #e1e5eb', borderRadius: '8px', flexWrap: 'wrap' }}>
-                                        <div className="form-group" style={{ flex: '1 1 200px', margin: 0 }}>
-                                            <label>Contacto de Emergencia #{index + 1} (Nombre)</label>
-                                            <input type="text" value={contacto.nombre} onChange={(e) => handleContactChange(index, 'nombre', e.target.value)} required placeholder="Nombre completo" />
+                                {formData.contactos.map((contacto, index) => {
+                                    const opcionesParentesco = [
+                                        'Madre',
+                                        'Padre',
+                                        'Tutor / Tutora',
+                                        'Hermano / Hermana',
+                                        'Esposo / Esposa / Pareja',
+                                        'Abuelo / Abuela',
+                                        'Tío / Tía',
+                                        'Primo / Prima',
+                                        'Hijo / Hija',
+                                        'Amigo / Amiga',
+                                        'Otro familiar'
+                                    ];
+                                    const valorActual = (contacto.parentesco || '').trim();
+                                    const incluyeValorActual = !valorActual || opcionesParentesco.includes(valorActual);
+
+                                    return (
+                                        <div key={index} style={{ display: 'flex', gap: '15px', alignItems: 'center', marginTop: '15px', padding: '15px', border: '1px solid #e1e5eb', borderRadius: '8px', flexWrap: 'wrap' }}>
+                                            <div className="form-group" style={{ flex: '1 1 200px', margin: 0 }}>
+                                                <label>Contacto de Emergencia #{index + 1} (Nombre)</label>
+                                                <input type="text" value={contacto.nombre} onChange={(e) => handleContactChange(index, 'nombre', e.target.value)} required placeholder="Nombre completo" />
+                                            </div>
+                                            <div className="form-group" style={{ flex: '1 1 180px', margin: 0 }}>
+                                                <label>Contacto de Emergencia #{index + 1} (Teléfono)</label>
+                                                <input type="text" value={contacto.telefono} onChange={(e) => handleContactChange(index, 'telefono', e.target.value)} required placeholder="10 dígitos" />
+                                            </div>
+                                            <div className="form-group" style={{ flex: '1 1 160px', margin: 0 }}>
+                                                <label>Parentesco / Relación</label>
+                                                <select
+                                                    value={contacto.parentesco || ''}
+                                                    onChange={(e) => handleContactChange(index, 'parentesco', e.target.value)}
+                                                    required
+                                                >
+                                                    <option value="">Selecciona parentesco...</option>
+                                                    {!incluyeValorActual && (
+                                                        <option value={contacto.parentesco}>{contacto.parentesco}</option>
+                                                    )}
+                                                    {opcionesParentesco.map((opcion) => (
+                                                        <option key={opcion} value={opcion}>
+                                                            {opcion}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            {formData.contactos.length > 2 && (
+                                                <button type="button" onClick={() => removeContact(index)} style={{ padding: '10px 14px', background: '#fce8e6', color: '#e53935', border: 'none', borderRadius: '5px', cursor: 'pointer', alignSelf: 'flex-end', marginBottom: '5px' }} title="Eliminar contacto">
+                                                    ✖
+                                                </button>
+                                            )}
                                         </div>
-                                        <div className="form-group" style={{ flex: '1 1 180px', margin: 0 }}>
-                                            <label>Contacto de Emergencia #{index + 1} (Teléfono)</label>
-                                            <input type="text" value={contacto.telefono} onChange={(e) => handleContactChange(index, 'telefono', e.target.value)} required placeholder="10 dígitos" />
-                                        </div>
-                                        <div className="form-group" style={{ flex: '1 1 160px', margin: 0 }}>
-                                            <label>Parentesco / Relación</label>
-                                            <input type="text" value={contacto.parentesco || ''} onChange={(e) => handleContactChange(index, 'parentesco', e.target.value)} placeholder="Ej. Padre, Madre, Tutor..." />
-                                        </div>
-                                        {formData.contactos.length > 2 && (
-                                            <button type="button" onClick={() => removeContact(index)} style={{ padding: '10px 14px', background: '#fce8e6', color: '#e53935', border: 'none', borderRadius: '5px', cursor: 'pointer', alignSelf: 'flex-end', marginBottom: '5px' }} title="Eliminar contacto">
-                                                ✖
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
+                                    );
+                                })}
                                 <button
                                     type="button"
                                     onClick={addContact}

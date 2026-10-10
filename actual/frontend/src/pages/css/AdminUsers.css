@@ -47,17 +47,23 @@
 .admin-users-toolbar select {
     min-height: 42px;
     box-sizing: border-box;
-    padding: 0 12px;
-    border: 1px solid #cbd5df;
-    border-radius: 6px;
-    background: #fff;
-    color: #1d2935;
-    font-size: 0.95rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    color: #0f172a;
+    font-size: 0.92rem;
 }
 
 .admin-users-toolbar input {
     flex: 1;
     min-width: 220px;
+    padding: 0 14px;
+    background-color: #ffffff;
+}
+
+.admin-users-toolbar select {
+    padding: 0 40px 0 14px;
+    background-color: #f8fafc;
+    font-weight: 600;
 }
 
 .admin-users-table-wrap {
@@ -119,6 +125,13 @@
     color: #003366;
 }
 
+.user-actions-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .user-edit-button {
     padding: 7px 11px;
     border: 1px solid #003366;
@@ -127,11 +140,33 @@
     color: #003366;
     font-weight: 700;
     cursor: pointer;
+    transition: all 0.15s ease;
 }
 
 .user-edit-button:hover {
     background: #003366;
     color: #fff;
+}
+
+.user-delete-button {
+    padding: 7px 11px;
+    border: 1px solid #dc2626;
+    border-radius: 5px;
+    background: #fef2f2;
+    color: #dc2626;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.user-delete-button:hover:not(:disabled) {
+    background: #dc2626;
+    color: #fff;
+}
+
+.user-delete-button:disabled {
+    cursor: wait;
+    opacity: 0.6;
 }
 
 .admin-edit-form {
@@ -175,16 +210,31 @@
 .admin-edit-actions {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
     gap: 12px;
     margin-top: 24px;
 }
 
 .admin-edit-cancel,
-.admin-edit-save {
+.admin-edit-save,
+.admin-edit-delete {
     padding: 11px 16px;
     border-radius: 6px;
     font-weight: 700;
     cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.admin-edit-delete {
+    margin-right: auto;
+    border: 1px solid #dc2626;
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.admin-edit-delete:hover:not(:disabled) {
+    background: #dc2626;
+    color: #fff;
 }
 
 .admin-edit-cancel {
@@ -199,7 +249,8 @@
     color: #fff;
 }
 
-.admin-edit-save:disabled {
+.admin-edit-save:disabled,
+.admin-edit-delete:disabled {
     cursor: wait;
     opacity: 0.65;
 }

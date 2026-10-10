@@ -266,10 +266,12 @@ const ClubDetailsAdminPage = () => {
                         {isEditing ? '✏️ Editar Configuración del Club' : '🛡️ Perfil del Club'}
                     </h1>
                     <button
+                        type="button"
                         onClick={() => isEditing ? setIsEditing(false) : navigate('/admin')}
-                        style={{ background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.25)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#fff', fontSize: '0.9rem', transition: 'background 0.2s' }}
+                        className="btn-volver-nav"
                     >
-                        ← Volver
+                        <span className="btn-volver-icon">←</span>
+                        <span>Volver</span>
                     </button>
                 </div>
 
