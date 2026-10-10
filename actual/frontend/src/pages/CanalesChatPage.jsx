@@ -4,7 +4,16 @@ import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 import api from '../services/api';
 import './css/Dashboards.css';
+import './css/ChatModerno.css';
 import Sidebar from '../components/Sidebar';
+
+// Icono vectorial de envío tipo avión de papel
+const SendIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+    </svg>
+);
 
 const CanalesChatPage = ({ canalInicial }) => {
     const { user, logout } = useAuth();
@@ -177,8 +186,8 @@ const CanalesChatPage = ({ canalInicial }) => {
 
     const getAvatarColor = (name) => {
         const colors = [
-            '#800020', '#003366', '#1E8449', '#D4AC0D',
-            '#7D3C98', '#A04000', '#2E4053', '#117864'
+            '#003366', '#800020', '#0284c7', '#059669',
+            '#7c3aed', '#d97706', '#475569', '#0d9488'
         ];
         const text = name || 'U';
         const index = text.charCodeAt(0) % colors.length;
@@ -186,8 +195,13 @@ const CanalesChatPage = ({ canalInicial }) => {
     };
 
     const handleBack = () => {
-        if (permisos.esAdmin) navigate('/admin');
-        else navigate('/gestion');
+        if (window.history.length > 1) {
+            navigate(-1);
+        } else if (permisos.esAdmin) {
+            navigate('/admin');
+        } else {
+            navigate('/gestion');
+        }
     };
 
     return (
@@ -204,16 +218,21 @@ const CanalesChatPage = ({ canalInicial }) => {
                     <button
                         onClick={handleBack}
                         style={{
-                            background: 'rgba(255,255,255,0.2)',
-                            border: 'none',
+                            background: 'rgba(255,255,255,0.15)',
+                            border: '1px solid rgba(255,255,255,0.25)',
                             color: '#fff',
                             cursor: 'pointer',
-                            padding: '8px 15px',
-                            borderRadius: '5px',
-                            fontWeight: 'bold'
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            fontWeight: '600',
+                            fontSize: '0.88rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.2s ease'
                         }}
                     >
-                        🔙 Volver
+                        ← Volver
                     </button>
                     <div className="profile-container">
                         <span className="profile-greeting">Hola, {user?.nombres}</span>
@@ -242,65 +261,49 @@ const CanalesChatPage = ({ canalInicial }) => {
 
                 <main className="admin-main-scroll" style={{ padding: 0, height: 'calc(100vh - 65px)', marginTop: '65px', display: 'flex', flexDirection: 'column' }}>
                     {loading ? (
-                        <div style={{ textAlign: 'center', padding: '50px', fontSize: '1.2rem', color: '#003366' }}>
-                            Conectando a las salas de comunicación...
+                        <div style={{ textAlign: 'center', padding: '60px 20px', fontSize: '1.15rem', color: '#003366', fontWeight: '600' }}>
+                            Conectando a las salas de comunicación institucional...
                         </div>
                     ) : errorAcceso ? (
-                        <div style={{ maxWidth: '600px', margin: '60px auto', padding: '30px', background: '#fff', borderRadius: '10px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-                            <span style={{ fontSize: '3rem' }}>🚫</span>
-                            <h2 style={{ color: '#c53030', marginTop: '15px' }}>Acceso No Autorizado</h2>
-                            <p style={{ color: '#555', lineHeight: '1.6', margin: '15px 0' }}>{errorAcceso}</p>
+                        <div style={{ maxWidth: '580px', margin: '60px auto', padding: '36px', background: '#fff', borderRadius: '14px', boxShadow: '0 8px 30px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+                            <span style={{ fontSize: '3rem', display: 'block', marginBottom: '10px' }}>🚫</span>
+                            <h2 style={{ color: '#c53030', margin: '0 0 10px 0', fontSize: '1.4rem' }}>Acceso No Autorizado</h2>
+                            <p style={{ color: '#475569', lineHeight: '1.6', margin: '15px 0' }}>{errorAcceso}</p>
                             <button onClick={handleBack} className="btn-crear-club" style={{ marginTop: '10px', maxWidth: '220px' }}>
                                 ← Volver al inicio
                             </button>
                         </div>
                     ) : (
-                        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#e5ddd5' }}>
-                            {/* Selector de Canales / Cabecera de la Sala */}
-                            <div style={{ backgroundColor: '#002244', color: '#fff', padding: '12px 25px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
-                                <div>
-                                    <h3 style={{ margin: 0, fontSize: '1.15rem' }}>
-                                        {canalActivo === 'directivos' ? '🏛️ Sala General de Directivos' : '🤝 Sala Exclusiva de Encargados'}
-                                    </h3>
-                                    <span style={{ fontSize: '0.8rem', color: '#d4edda' }}>
+                        <div className="chat-page-wrapper">
+                            {/* Selector de Canales / Cabecera moderna de la Sala */}
+                            <div className="chat-room-header">
+                                <div className="chat-room-info">
+                                    <div className="chat-room-title-row">
+                                        <h2 className="chat-room-title">
+                                            {canalActivo === 'directivos' ? '🏛️ Sala General de Directivos' : '🤝 Sala Exclusiva de Encargados'}
+                                        </h2>
+                                    </div>
+                                    <p className="chat-room-desc">
                                         {canalActivo === 'directivos' 
-                                            ? 'Canal institucional entre Administrador y Encargados de clubes' 
+                                            ? 'Canal institucional entre Administración ESCOM y Encargados de clubes' 
                                             : 'Canal exclusivo para intercambio entre Profesores Titulares y Alumnos Encargados'}
-                                    </span>
+                                    </p>
                                 </div>
 
                                 {/* Selector de canales (si tiene acceso a ambos) */}
                                 {permisos.esEncargado && (
-                                    <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.1)', padding: '4px', borderRadius: '8px' }}>
+                                    <div className="chat-channel-switcher">
                                         <button
                                             type="button"
                                             onClick={() => handleSelectCanal('directivos')}
-                                            style={{
-                                                padding: '6px 14px',
-                                                borderRadius: '6px',
-                                                border: 'none',
-                                                background: canalActivo === 'directivos' ? '#fff' : 'transparent',
-                                                color: canalActivo === 'directivos' ? '#003366' : '#fff',
-                                                fontWeight: 'bold',
-                                                cursor: 'pointer',
-                                                fontSize: '0.85rem'
-                                            }}
+                                            className={`chat-channel-pill ${canalActivo === 'directivos' ? 'active' : ''}`}
                                         >
                                             🏛️ Directivos
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => handleSelectCanal('encargados')}
-                                            style={{
-                                                padding: '6px 14px',
-                                                borderRadius: '6px',
-                                                border: 'none',
-                                                background: canalActivo === 'encargados' ? '#fff' : 'transparent',
-                                                color: canalActivo === 'encargados' ? '#003366' : '#fff',
-                                                fontWeight: 'bold',
-                                                cursor: 'pointer',
-                                                fontSize: '0.85rem'
-                                            }}
+                                            className={`chat-channel-pill ${canalActivo === 'encargados' ? 'active' : ''}`}
                                         >
                                             🤝 Encargados
                                         </button>
@@ -309,10 +312,16 @@ const CanalesChatPage = ({ canalInicial }) => {
                             </div>
 
                             {/* Área de Mensajes */}
-                            <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div className="chat-messages-area">
                                 {mensajes.length === 0 ? (
-                                    <div style={{ textAlign: 'center', color: '#666', marginTop: '30px', backgroundColor: 'rgba(255,255,255,0.85)', padding: '15px 25px', borderRadius: '8px', alignSelf: 'center', maxWidth: '400px' }}>
-                                        💬 No hay mensajes recientes en esta sala. ¡Comienza la conversación institucional!
+                                    <div className="chat-empty-state">
+                                        <div className="chat-empty-icon">💬</div>
+                                        <h3 className="chat-empty-title">
+                                            {canalActivo === 'directivos' ? 'Sala General de Directivos' : 'Sala Exclusiva de Encargados'}
+                                        </h3>
+                                        <p className="chat-empty-subtitle">
+                                            No hay mensajes previos en esta sala institucional. ¡Sé el primero en iniciar la conversación en tiempo real!
+                                        </p>
                                     </div>
                                 ) : (
                                     mensajes.map((msg, idx) => {
@@ -320,43 +329,48 @@ const CanalesChatPage = ({ canalInicial }) => {
                                         const isAdminSender = Number(msg.autor_rol || msg.rol_usuario) === 1;
 
                                         return (
-                                            <div key={msg.id || idx} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '75%', minWidth: '180px' }}>
+                                            <div 
+                                                key={msg.id || idx} 
+                                                className={`chat-message-row ${isMe ? 'me' : 'other'}`}
+                                            >
                                                 {!isMe && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', marginLeft: '6px' }}>
-                                                        <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#333' }}>
-                                                            {msg.autor_nombre}
-                                                        </span>
-                                                        {isAdminSender ? (
-                                                            <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', background: '#003366', color: '#fff', fontWeight: 'bold' }}>
-                                                                🛡️ Administrador
-                                                            </span>
-                                                        ) : msg.etiqueta_encargado ? (
-                                                            <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', background: '#e7f3ff', color: '#00509e', fontWeight: 'bold' }}>
-                                                                {msg.etiqueta_encargado}
-                                                            </span>
-                                                        ) : null}
+                                                    <div
+                                                        className="chat-author-avatar"
+                                                        style={{ backgroundColor: getAvatarColor(msg.autor_nombre) }}
+                                                        title={msg.autor_nombre}
+                                                    >
+                                                        {(msg.autor_nombre || 'U').charAt(0).toUpperCase()}
                                                     </div>
                                                 )}
 
-                                                <div
-                                                    style={{
-                                                        padding: '10px 14px',
-                                                        borderRadius: '12px',
-                                                        backgroundColor: isMe ? '#dcf8c6' : '#fff',
-                                                        color: '#111',
-                                                        borderTopRightRadius: isMe ? '0' : '12px',
-                                                        borderTopLeftRadius: !isMe ? '0' : '12px',
-                                                        boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
-                                                        position: 'relative'
-                                                    }}
-                                                >
-                                                    <div style={{ fontSize: '0.95rem', wordBreak: 'break-word', marginBottom: '14px', lineHeight: '1.4' }}>
-                                                        {msg.mensaje}
-                                                    </div>
-                                                    <div style={{ fontSize: '0.65rem', color: '#888', textAlign: 'right', position: 'absolute', bottom: '4px', right: '10px' }}>
-                                                        {msg.fecha_envio 
-                                                            ? new Date(msg.fecha_envio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                                            : ''}
+                                                <div className="chat-message-content">
+                                                    {!isMe && (
+                                                        <div className="chat-message-meta-header">
+                                                            <span className="chat-message-author-name">
+                                                                {msg.autor_nombre}
+                                                            </span>
+                                                            {isAdminSender ? (
+                                                                <span className="chat-role-badge chat-role-admin">
+                                                                    🛡️ Administrador
+                                                                </span>
+                                                            ) : msg.etiqueta_encargado ? (
+                                                                <span className="chat-role-badge chat-role-encargado">
+                                                                    ⭐ {msg.etiqueta_encargado}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                    )}
+
+                                                    <div className={`chat-bubble ${isMe ? 'bubble-me' : 'bubble-other'}`}>
+                                                        <p className="chat-bubble-text">{msg.mensaje}</p>
+                                                        <div className="chat-bubble-footer">
+                                                            <span>
+                                                                {msg.fecha_envio 
+                                                                    ? new Date(msg.fecha_envio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                                    : ''}
+                                                            </span>
+                                                            {isMe && <span className="chat-read-tick">✓</span>}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -367,37 +381,25 @@ const CanalesChatPage = ({ canalInicial }) => {
                             </div>
 
                             {/* Barra de Entrada de Mensaje */}
-                            <form onSubmit={handleSend} style={{ display: 'flex', padding: '15px 20px', backgroundColor: '#f0f0f0', alignItems: 'center', borderTop: '1px solid #ddd' }}>
-                                <input
-                                    type="text"
-                                    value={nuevoMensaje}
-                                    onChange={(e) => setNuevoMensaje(e.target.value)}
-                                    placeholder={`Enviar mensaje a la ${canalActivo === 'directivos' ? 'sala de directivos' : 'sala de encargados'}...`}
-                                    style={{ flex: 1, padding: '14px 20px', borderRadius: '24px', border: '1px solid #ccc', outline: 'none', fontSize: '0.95rem' }}
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={!nuevoMensaje.trim()}
-                                    style={{
-                                        marginLeft: '10px',
-                                        width: '46px',
-                                        height: '46px',
-                                        borderRadius: '50%',
-                                        border: 'none',
-                                        backgroundColor: nuevoMensaje.trim() ? '#003366' : '#a0a0a0',
-                                        color: '#fff',
-                                        cursor: nuevoMensaje.trim() ? 'pointer' : 'default',
-                                        display: 'flex',
-                                        justifyContent: 'center',
-                                        alignItems: 'center',
-                                        fontSize: '1.2rem',
-                                        transition: 'background 0.2s'
-                                    }}
-                                    title="Enviar mensaje"
-                                >
-                                    ➤
-                                </button>
-                            </form>
+                            <div className="chat-input-bar-container">
+                                <form onSubmit={handleSend} className="chat-input-form">
+                                    <input
+                                        type="text"
+                                        value={nuevoMensaje}
+                                        onChange={(e) => setNuevoMensaje(e.target.value)}
+                                        placeholder={`Escribe un mensaje para la ${canalActivo === 'directivos' ? 'sala de directivos' : 'sala de encargados'}...`}
+                                        className="chat-input-field"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!nuevoMensaje.trim()}
+                                        className="chat-send-btn"
+                                        title="Enviar mensaje"
+                                    >
+                                        <SendIcon />
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     )}
                 </main>
@@ -407,4 +409,3 @@ const CanalesChatPage = ({ canalInicial }) => {
 };
 
 export default CanalesChatPage;
-
