@@ -37,8 +37,14 @@ router.get('/', async (req, res) => {
 router.get('/user/:userId', verifyToken, requireVerificado, async (req, res) => {
     const { userId } = req.params;
     try {
+        await db.query(`
+            UPDATE avisos
+            SET activo = 0
+            WHERE fecha_vencimiento IS NOT NULL AND fecha_vencimiento < NOW()
+        `);
+
         const [globales] = await db.query(`
-            SELECT id, titulo, contenido AS mensaje, prioridad, fecha_envio, 'global' AS tipo 
+            SELECT id, titulo, contenido AS mensaje, prioridad, fecha_envio, fecha_vencimiento, 'global' AS tipo 
             FROM avisos 
             WHERE activo = 1 AND club_id IS NULL
         `);
@@ -49,6 +55,7 @@ router.get('/user/:userId', verifyToken, requireVerificado, async (req, res) => 
                    a.contenido AS mensaje, 
                    COALESCE(a.prioridad, 'normal') AS prioridad, 
                    a.fecha_envio, 
+                   a.fecha_vencimiento,
                    'club' AS tipo
             FROM avisos a
             JOIN clubes c ON a.club_id = c.id
@@ -87,7 +94,7 @@ router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) =>
                 COALESCE(a.titulo, CONCAT('Aviso de ', c.nombre)) AS titulo,
                 a.contenido AS mensaje, 
                 COALESCE(a.prioridad, 'normal') AS prioridad,
-                a.activo, a.fecha_envio, 'club' AS tipo
+                a.activo, a.fecha_envio, a.fecha_vencimiento, 'club' AS tipo
             FROM avisos a
             JOIN clubes c ON a.club_id = c.id
             WHERE a.club_id IS NOT NULL
@@ -111,8 +118,8 @@ router.post('/', verifyToken, requireVerificado, async (req, res) => {
         }
 
         const { titulo, contenido, prioridad = 'normal', fecha_vencimiento } = req.body;
-        if (!titulo || !contenido) {
-            return res.status(400).json({ message: 'El título y el contenido son obligatorios.' });
+        if (!titulo || !contenido || !fecha_vencimiento) {
+            return res.status(400).json({ message: 'El título, el contenido y la fecha de vencimiento son obligatorios.' });
         }
 
         const prioridadValida = ['alta', 'normal', 'baja'].includes(String(prioridad).toLowerCase()) 
@@ -122,7 +129,7 @@ router.post('/', verifyToken, requireVerificado, async (req, res) => {
         const [resultado] = await db.query(
             `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo) 
              VALUES (NULL, ?, ?, ?, ?, NOW(), ?, 1)`,
-            [req.user.id, titulo.trim(), contenido.trim(), prioridadValida, fecha_vencimiento || null]
+            [req.user.id, titulo.trim(), contenido.trim(), prioridadValida, fecha_vencimiento]
         );
 
         const io = req.app.get('socketio');

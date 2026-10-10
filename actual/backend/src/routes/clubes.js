@@ -70,6 +70,12 @@ router.get('/:id/chat', verificarToken, requireVerificado, async (req, res) => {
 
 router.get('/:id/avisos', verificarToken, requireVerificado, async (req, res) => {
     try {
+        await db.query(`
+            UPDATE avisos
+            SET activo = 0
+            WHERE club_id = ? AND fecha_vencimiento IS NOT NULL AND fecha_vencimiento < NOW()
+        `, [req.params.id]);
+
         const [avisos] = await db.query(`
             SELECT a.*, CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre
             FROM avisos a JOIN usuarios u ON a.usuario_id = u.id
@@ -80,7 +86,21 @@ router.get('/:id/avisos', verificarToken, requireVerificado, async (req, res) =>
 });
 
 router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) => {
-    const { contenido, titulo, prioridad } = req.body;
+    const { contenido, titulo, prioridad, fecha_vencimiento } = req.body;
+
+    if (!contenido || !String(contenido).trim()) {
+        return res.status(400).json({ message: "El contenido del aviso es obligatorio." });
+    }
+
+    if (!fecha_vencimiento) {
+        return res.status(400).json({ message: "La fecha de vencimiento del aviso es obligatoria." });
+    }
+
+    const fechaVencimientoConvertida = convertirAFechaMySQL(fecha_vencimiento);
+    if (!fechaVencimientoConvertida) {
+        return res.status(400).json({ message: "La fecha de vencimiento no es válida." });
+    }
+
     const prioridadValida = ['alta', 'normal', 'baja'].includes(String(prioridad).toLowerCase()) 
         ? String(prioridad).toLowerCase() 
         : 'normal';
@@ -97,8 +117,8 @@ router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) =
             }
         }
         await db.query(
-            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, activo) VALUES (?, ?, ?, ?, ?, NOW(), 1)`,
-            [req.params.id, req.user.id, titulo || null, contenido, prioridadValida]
+            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1)`,
+            [req.params.id, req.user.id, titulo || null, contenido, prioridadValida, fechaVencimientoConvertida]
         );
 
         const io = req.app.get('socketio');
@@ -106,7 +126,7 @@ router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) =
             io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida });
         }
 
-        res.status(201).json({ message: "Aviso publicado exitosamente", prioridad: prioridadValida });
+        res.status(201).json({ message: "Aviso publicado exitosamente", prioridad: prioridadValida, fecha_vencimiento: fechaVencimientoConvertida });
     } catch (error) { 
         console.error("Error al crear aviso:", error);
         res.status(500).json({ message: "Error al crear aviso" }); 
@@ -159,8 +179,8 @@ router.post('/:id/eventos', verificarToken, requireVerificado, async (req, res) 
             const contenidoAviso = `Se ha programado una nueva actividad oficial: "${titulo}".\n📅 Fecha: ${fechaLegible}${lugar ? `\n📍 Lugar: ${lugar}` : ''}.\n${descripcion ? `📝 Detalles: ${descripcion}\n` : ''}¡Por favor confirma tu asistencia en la sección de Eventos del Club!`;
 
             await db.query(
-                `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, activo) VALUES (?, ?, ?, ?, ?, NOW(), 1)`,
-                [req.params.id, req.user.id, tituloAviso, contenidoAviso, prioridadValida]
+                `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1)`,
+                [req.params.id, req.user.id, tituloAviso, contenidoAviso, prioridadValida, fechaConvertida]
             );
         }
 

@@ -3,19 +3,20 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import './css/Dashboards.css';
+import './css/GestionDashboard.css';
 import AccionesAlumno from '../components/AccionesAlumno';
 import CalendarioEventos from '../components/CalendarioEventos';
 import Sidebar from '../components/Sidebar';
 
 const GestionDashboard = () => {
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState('avisos'); // Default to avisos tab
-    const [userClubs, setUserClubs] = useState([]); // State for user's clubs
-    const [loadingClubs, setLoadingClubs] = useState(true); // Loading state for clubs
+    const [activeTab, setActiveTab] = useState('avisos');
+    const [userClubs, setUserClubs] = useState([]);
+    const [loadingClubs, setLoadingClubs] = useState(true);
     
-    const [avisos, setAvisos] = useState([]); // Estado para los avisos combinados
+    const [avisos, setAvisos] = useState([]);
     const [loadingAvisos, setLoadingAvisos] = useState(true);
 
     const [showMembersModal, setShowMembersModal] = useState(false);
@@ -35,9 +36,8 @@ const GestionDashboard = () => {
         navigate('/crear-club');
     };
 
-    // Extraemos la función para poder llamarla después de aceptar una invitación o unirse con código
     const fetchUserClubs = async () => {
-        if (user && user.id) { // Ensure user and user.id are available
+        if (user && user.id) {
             setLoadingClubs(true);
             try {
                 const response = await api.get(`/clubes/user/${user.id}`);
@@ -74,7 +74,7 @@ const GestionDashboard = () => {
                     const fechaB = b.fecha_envio || b.tiempo || 0;
                     const tA = new Date(fechaA).getTime() || 0;
                     const tB = new Date(fechaB).getTime() || 0;
-                    return tB - tA; // Si empatan, el más nuevo primero
+                    return tB - tA;
                 });
                 
                 setAvisos(ordenados);
@@ -86,7 +86,6 @@ const GestionDashboard = () => {
         }
     };
 
-    // Obtener los avisos (Globales + Clubs) del usuario
     useEffect(() => {
         fetchAvisos();
     }, [user]);
@@ -128,7 +127,6 @@ const GestionDashboard = () => {
         setLoadingAllClubs(true);
         try {
             const response = await api.get('/clubes');
-            // Filtramos solo los clubes que ya pasaron por revisión y están activos
             const activos = response.data.filter(club => club.estatus === 'activo');
             setAllActiveClubs(activos);
         } catch (error) {
@@ -144,7 +142,7 @@ const GestionDashboard = () => {
         }
     }, [activeTab]);
 
-    // Estados y lógica para el Calendario de Eventos (clubes inscritos e invitaciones pendientes)
+    // Estados y lógica para el Calendario de Eventos
     const [eventosCalendario, setEventosCalendario] = useState([]);
     const [loadingEventosCalendario, setLoadingEventosCalendario] = useState(false);
 
@@ -152,11 +150,9 @@ const GestionDashboard = () => {
         if (!user || !user.id) return;
         setLoadingEventosCalendario(true);
         try {
-            // 1. Obtener clubes a los que el usuario pertenece
             const resClubs = await api.get(`/clubes/user/${user.id}`);
             const misClubes = resClubs.data || [];
 
-            // 2. Obtener invitaciones pendientes
             let invitaciones = [];
             try {
                 const resInv = await api.get('/clubes/invitaciones/pendientes');
@@ -165,7 +161,6 @@ const GestionDashboard = () => {
                 console.warn("No se pudieron cargar invitaciones pendientes para eventos:", e);
             }
 
-            // 3. Crear mapa unificado de clubes únicos
             const clubesMap = new Map();
             misClubes.forEach(c => {
                 clubesMap.set(c.id, { id: c.id, nombre: c.nombre, esInvitacion: false });
@@ -178,7 +173,6 @@ const GestionDashboard = () => {
 
             const clubesLista = Array.from(clubesMap.values());
 
-            // 4. Obtener eventos en paralelo para cada club
             const eventosPromises = clubesLista.map(async (c) => {
                 try {
                     const resEv = await api.get(`/clubes/${c.id}/eventos`);
@@ -204,14 +198,12 @@ const GestionDashboard = () => {
     };
 
     const handleAsistenciaCalendario = async (evento, asistira) => {
-        // Solo alumnos y profesores pueden confirmar asistencia (roles 2, 3, 4)
         const esAlumnoOProfesor = user && [2, 3, 4].includes(Number(user.role_id));
         if (!esAlumnoOProfesor) {
             console.warn("Acceso denegado: solo alumnos y profesores pueden confirmar asistencia.");
             return;
         }
 
-        // Solo se puede confirmar asistencia en eventos que aún no hayan pasado
         if (evento?.fecha_evento) {
             const fechaObj = new Date(String(evento.fecha_evento).replace(' ', 'T'));
             if (!isNaN(fechaObj.getTime()) && fechaObj.getTime() < Date.now()) {
@@ -222,7 +214,6 @@ const GestionDashboard = () => {
 
         try {
             await api.post(`/clubes/${evento.club_id}/eventos/${evento.id}/asistencia`, { asistira });
-            // Actualizar en el estado local de eventosCalendario reactivamente
             setEventosCalendario(prev => prev.map(ev => {
                 if (ev.id === evento.id) {
                     const anterior = ev.mi_respuesta;
@@ -255,7 +246,6 @@ const GestionDashboard = () => {
         }
     }, [activeTab]);
 
-    // Función para refrescar paneles al aceptar/rechazar invitaciones o unirse a un club
     const handleUpdate = () => {
         fetchUserClubs();
         fetchAvisos();
@@ -268,7 +258,6 @@ const GestionDashboard = () => {
         setSelectedClubName(club.nombre);
         setSelectedClub(club);
         try {
-            // Utilizamos el endpoint que ya preparaste en el backend para obtener el estado de las firmas
             const response = await api.get(`/clubes/${club.id}/miembros`);
             setClubMembers(response.data);
         } catch (error) {
@@ -285,7 +274,7 @@ const GestionDashboard = () => {
             const response = await api.put(`/clubes/${selectedClub.id}/enviar-revision`, {});
             alert(response.data.message);
             setShowMembersModal(false);
-            fetchUserClubs(); // Recargamos para actualizar el estatus en pantalla
+            fetchUserClubs();
         } catch (error) {
             alert(error.response?.data?.message || "Error al enviar a revisión. Asegúrate de tener suficientes firmas.");
         } finally {
@@ -298,17 +287,28 @@ const GestionDashboard = () => {
         && c.inscripcion_estatus === 'activo'
     );
 
+    const esProfesor = Number(user?.role_id) === 3 || Number(user?.rol) === 3;
+    const esAlumno = [2, 4].includes(Number(user?.role_id));
+
     return (
         <div className="web-dashboard">
+            {/* NAVBAR SUPERIOR */}
             <header className="admin-navbar-fixed">
                 <div className="nav-left">
                     <button className="menu-toggle" onClick={toggleSidebar}>☰</button>
-                    <span className="nav-title">🏆 Club Deportivo - ESCOM</span>
+                    <span className="nav-title">Sistema de Clubs</span>
                 </div>
                 <div className="nav-right">
                     <div className="profile-container">
-                        <span className="profile-greeting">Hola, {user?.nombres}</span>
-                        <div className="profile-bubble" onClick={() => navigate('/perfil')} title="Configurar Perfil" role="button">{user?.nombres?.charAt(0).toUpperCase()}</div>
+                        <span className="profile-greeting">Hola, <strong>{user?.nombres}</strong></span>
+                        <div
+                            className="profile-bubble"
+                            onClick={() => navigate('/perfil')}
+                            title="Configurar Perfil"
+                            role="button"
+                        >
+                            {user?.nombres?.charAt(0).toUpperCase()}
+                        </div>
                     </div>
                 </div>
             </header>
@@ -322,163 +322,202 @@ const GestionDashboard = () => {
                     esEncargado={esEncargado}
                 />
 
-                <main className="admin-main-scroll">
-                    <div className="hub-container-centered">
-                        <div className="folder-tabs">
-                            <button 
-                                className={`folder-btn ${activeTab === 'avisos' ? 'active-avisos' : ''}`}
-                                onClick={() => setActiveTab('avisos')}
-                            >
-                                📁 🔔 Avisos <span className="tab-badge">{avisosVisibles.length}</span>
-                            </button>
-                            <button 
-                                className={`folder-btn ${activeTab === 'clubs' ? 'active-clubs' : ''}`}
-                                onClick={() => setActiveTab('clubs')}
-                            >
-                                📁 👥 Clubs <span className="tab-badge">{userClubs.length}</span>
-                            </button>
-                            <button 
-                                className={`folder-btn ${activeTab === 'calendario' ? 'active-clubs' : ''}`}
-                                onClick={() => setActiveTab('calendario')}
-                                style={{
-                                    backgroundColor: activeTab === 'calendario' ? '#003366' : undefined,
-                                    color: activeTab === 'calendario' ? '#ffffff' : undefined
-                                }}
-                            >
-                                📁 🗓️ Calendario <span className="tab-badge">{eventosCalendario.length}</span>
-                            </button>
-                        </div>
+                <main className="admin-main-scroll gestion-main-scroll">
+                    <div className="gestion-desktop-container">
 
-                        <div className="folder-body" style={{ borderColor: activeTab === 'avisos' ? '#ff9800' : (activeTab === 'unirse' ? '#28a745' : '#003366') }}>
+                        {/* 2. BARRA DE NAVEGACIÓN DE ESCRITORIO */}
+                        <nav className="gestion-nav-bar" aria-label="Navegación principal del panel">
+                            <div className="gestion-tabs-group">
+                                <button
+                                    type="button"
+                                    className={`gestion-tab-btn ${activeTab === 'avisos' ? 'active' : ''}`}
+                                    onClick={() => setActiveTab('avisos')}
+                                >
+                                    <span>🔔 Avisos y Comunicados</span>
+                                    <span className="gestion-tab-badge">{avisosVisibles.length}</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={`gestion-tab-btn ${activeTab === 'clubs' ? 'active' : ''}`}
+                                    onClick={() => setActiveTab('clubs')}
+                                >
+                                    <span>Mis Clubes</span>
+                                    <span className="gestion-tab-badge">{userClubs.length}</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={`gestion-tab-btn ${activeTab === 'calendario' ? 'active' : ''}`}
+                                    onClick={() => setActiveTab('calendario')}
+                                >
+                                    <span>🗓️ Calendario</span>
+                                    <span className="gestion-tab-badge">{eventosCalendario.length}</span>
+                                </button>
+
+                                {esAlumno && (
+                                    <button
+                                        type="button"
+                                        className={`gestion-tab-btn ${activeTab === 'unirse' ? 'active' : ''}`}
+                                        onClick={() => setActiveTab('unirse')}
+                                    >
+                                        <span>🔑 Explorar / Unirse a un Club</span>
+                                    </button>
+                                )}
+                            </div>
+                        </nav>
+
+                        {/* 3. PANEL DE CONTENIDO PRINCIPAL */}
+                        <div className="gestion-content-panel">
                             {activeTab === 'avisos' ? (
-                                <div className="avisos-list">
-                                    {/* Panel de Invitaciones (Renderizado como avisos urgentes) */}
+                                <div>
+                                    <div className="panel-section-header">
+                                        <div className="panel-section-title-group">
+                                            <h2>🔔 Centro de Avisos y Notificaciones</h2>
+                                            <p>Comunicados oficiales de la administración y anuncios de tus clubes inscritos</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Invitaciones urgentes a clubes */}
                                     <AccionesAlumno onUpdate={handleUpdate} mostrar="invitaciones" />
 
                                     {loadingAvisos ? (
-                                        <p style={{ padding: '20px' }}>Cargando avisos...</p>
+                                        <div className="gestion-empty-state">
+                                            <p>Cargando avisos recientes...</p>
+                                        </div>
                                     ) : avisosVisibles.length > 0 ? (
-                                        avisosVisibles.map(aviso => {
-                                            const avisoKey = `${aviso.tipo || 'aviso'}-${aviso.id}`;
-                                            const prioridadStr = aviso.prioridad ? String(aviso.prioridad).toLowerCase().trim() : 'normal';
-                                            let borderColor = '#003366';
-                                            let bgColor = '#f8f9fa';
-                                            
-                                            if (prioridadStr === 'alta') {
-                                                borderColor = '#dc3545';
-                                                bgColor = 'rgba(220, 53, 69, 0.05)';
-                                            } else if (prioridadStr === 'normal') {
-                                                borderColor = '#007bff';
-                                                bgColor = 'rgba(0, 123, 255, 0.05)';
-                                            } else if (prioridadStr === 'baja') {
-                                                borderColor = '#28a745';
-                                                bgColor = 'rgba(40, 167, 69, 0.05)';
-                                            }
-                                            return (
-                                            <div key={avisoKey} className="aviso-item" style={{ borderLeft: `5px solid ${borderColor}`, backgroundColor: bgColor, padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
-                                                <div className="aviso-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                                    <h4 style={{ margin: 0, color: borderColor }}>
-                                                        {aviso.tipo === 'global' ? '🌍 ' : '🛡️ '} 
-                                                        {aviso.titulo}
-                                                    </h4>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                        <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 'bold' }}>
-                                                            {new Date(aviso.fecha_envio || aviso.tiempo).toLocaleDateString('es-MX')}
-                                                        </span>
-                                                        <button
-                                                            onClick={(e) => handleDescartarAviso(avisoKey, e)}
-                                                            style={{
-                                                                background: 'none',
-                                                                border: 'none',
-                                                                color: '#888',
-                                                                cursor: 'pointer',
-                                                                fontSize: '1rem',
-                                                                fontWeight: 'bold',
-                                                                lineHeight: 1,
-                                                                padding: '4px 8px',
-                                                                borderRadius: '50%',
-                                                                transition: 'all 0.2s ease',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center'
-                                                            }}
-                                                            onMouseEnter={(e) => {
-                                                                e.currentTarget.style.color = '#dc3545';
-                                                                e.currentTarget.style.backgroundColor = 'rgba(220, 53, 69, 0.12)';
-                                                            }}
-                                                            onMouseLeave={(e) => {
-                                                                e.currentTarget.style.color = '#888';
-                                                                e.currentTarget.style.backgroundColor = 'transparent';
-                                                            }}
-                                                            title="Eliminar este aviso de mi vista"
-                                                            aria-label="Eliminar aviso de mi vista"
-                                                        >
-                                                            ✕
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <p style={{ margin: 0, color: '#333', lineHeight: '1.5' }}>{aviso.contenido || aviso.mensaje || aviso.descripcion}</p>
-                                            </div>
-                                            );
-                                        })
+                                        <div className="avisos-grid-list">
+                                            {avisosVisibles.map(aviso => {
+                                                const avisoKey = `${aviso.tipo || 'aviso'}-${aviso.id}`;
+                                                const prioridadStr = aviso.prioridad ? String(aviso.prioridad).toLowerCase().trim() : 'normal';
+                                                const esGlobal = aviso.tipo === 'global';
+
+                                                return (
+                                                    <article
+                                                        key={avisoKey}
+                                                        className={`gestion-aviso-card priority-${prioridadStr}`}
+                                                    >
+                                                        <div className="aviso-card-top">
+                                                            <div className="aviso-title-wrap">
+                                                                <span className={`aviso-type-tag ${esGlobal ? 'global' : 'club'}`}>
+                                                                    {esGlobal ? '🌍 Institucional' : '🛡️ Club'}
+                                                                </span>
+                                                                <h3 className="aviso-card-title">{aviso.titulo}</h3>
+                                                            </div>
+                                                            <div className="aviso-meta-right">
+                                                                <span className="aviso-date-badge">
+                                                                    📅 {new Date(aviso.fecha_envio || aviso.tiempo).toLocaleDateString('es-MX', {
+                                                                        year: 'numeric',
+                                                                        month: 'short',
+                                                                        day: 'numeric'
+                                                                    })}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-dismiss-aviso"
+                                                                    onClick={(e) => handleDescartarAviso(avisoKey, e)}
+                                                                    title="Descartar aviso de mi vista"
+                                                                    aria-label="Descartar aviso"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <p className="aviso-card-body">
+                                                            {aviso.contenido || aviso.mensaje || aviso.descripcion}
+                                                        </p>
+                                                    </article>
+                                                );
+                                            })}
+                                        </div>
                                     ) : (
-                                        <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-                                            {avisos.length > 0 
-                                                ? 'Has descartado todos los avisos recibidos.' 
-                                                : 'No hay avisos nuevos por el momento.'}
-                                        </p>
+                                        <div className="gestion-empty-state">
+                                            <span className="gestion-empty-icon">📭</span>
+                                            <h4>Sin avisos pendientes</h4>
+                                            <p>
+                                                {avisos.length > 0
+                                                    ? 'Has descartado todos los avisos recibidos.'
+                                                    : 'No hay comunicados nuevos por el momento.'}
+                                            </p>
+                                        </div>
                                     )}
                                 </div>
                             ) : activeTab === 'unirse' ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div>
+                                    <div className="panel-section-header">
+                                        <div className="panel-section-title-group">
+                                            <h2>🌍 Explorar y Unirse a un Club</h2>
+                                            <p>Ingresa un código de invitación directo o explora el catálogo de clubes activos en la ESCOM</p>
+                                        </div>
+                                    </div>
+
                                     <AccionesAlumno onUpdate={() => { handleUpdate(); setActiveTab('clubs'); }} mostrar="codigo" />
                                     
-                                    <div className="clubs-list-simple" style={{ marginTop: '10px' }}>
-                                        <h3 style={{ margin: '0 0 15px 0', color: '#003366', borderBottom: '2px solid #e1e5eb', paddingBottom: '10px' }}>🌍 Clubes Activos en la ESCOM</h3>
+                                    <div style={{ marginTop: '28px' }}>
+                                        <h3 style={{ margin: '0 0 18px 0', color: '#0f172a', fontSize: '1.15rem', fontWeight: '800' }}>
+                                            Clubes Activos Disponibles ({allActiveClubs.length})
+                                        </h3>
+
                                         {loadingAllClubs ? (
-                                            <p>Cargando clubes disponibles...</p>
+                                            <div className="gestion-empty-state">
+                                                <p>Cargando directorio de clubes activos...</p>
+                                            </div>
                                         ) : allActiveClubs.length > 0 ? (
-                                            allActiveClubs.map(club => {
-                                                const isMember = userClubs.some(uc => uc.id === club.id);
-                                                return (
-                                                    <div 
-                                                        key={club.id} 
-                                                        className="club-row" 
-                                                        onClick={() => navigate(`/club/${club.id}`, { state: { club, isMember } })}
-                                                        style={{ cursor: 'pointer', borderLeft: isMember ? '4px solid #28a745' : '4px solid #17a2b8', marginBottom: '15px', transition: 'background-color 0.2s ease, transform 0.2s ease' }}
-                                                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
-                                                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                                    >
-                                                        <div className="club-row-info">
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                                <h4 style={{ margin: '0 0 5px 0' }}>{club.nombre}</h4>
-                                                                {isMember ? (
-                                                                    <span style={{ fontSize: '0.8rem', background: '#d4edda', color: '#155724', padding: '3px 8px', borderRadius: '12px', fontWeight: 'bold' }}>✓ Ya eres miembro</span>
-                                                                ) : (
-                                                                    <span style={{ fontSize: '0.8rem', color: '#17a2b8', fontWeight: 'bold' }}>ℹ️ Ver Detalles</span>
+                                            <div className="gestion-clubs-grid">
+                                                {allActiveClubs.map(club => {
+                                                    const isMember = userClubs.some(uc => uc.id === club.id);
+                                                    return (
+                                                        <div 
+                                                            key={club.id} 
+                                                            className={`gestion-club-card ${isMember ? 'member-active' : ''}`}
+                                                            onClick={() => navigate(`/club/${club.id}`, { state: { club, isMember } })}
+                                                        >
+                                                            <div>
+                                                                <div className="club-card-top-bar">
+                                                                    <h4 className="club-card-name">{club.nombre}</h4>
+                                                                    {isMember ? (
+                                                                        <span className="role-badge-chip lider">✓ Ya eres miembro</span>
+                                                                    ) : (
+                                                                        <span className="role-badge-chip profesor">ℹ️ Ver Detalles</span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="club-card-desc" style={{ marginTop: '8px' }}>
+                                                                    {club.descripcion}
+                                                                </p>
+                                                            </div>
+
+                                                            <div className="club-card-meta-list">
+                                                                <div className="club-card-meta-item">
+                                                                    <span>👨‍🏫</span>
+                                                                    <span><strong>Encargado:</strong> {club.profesor_nombres} {club.profesor_apellidos}</span>
+                                                                </div>
+                                                                {club.espacios_tiempos && (
+                                                                    <div className="club-card-meta-item">
+                                                                        <span>🕒</span>
+                                                                        <span><strong>Horario:</strong> {club.espacios_tiempos}</span>
+                                                                    </div>
                                                                 )}
                                                             </div>
-                                                            <p style={{ margin: '5px 0', color: '#555' }}>{club.descripcion}</p>
-                                                            <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', color: '#666' }}>👨‍🏫 Encargado: {club.profesor_nombres} {club.profesor_apellidos}</p>
-                                                            <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', color: '#666' }}>🕒 Horario: {club.espacios_tiempos}</p>
                                                         </div>
-                                                    </div>
-                                                );
-                                            })
+                                                    );
+                                                })}
+                                            </div>
                                         ) : (
-                                            <p>No hay clubes activos en este momento.</p>
+                                            <div className="gestion-empty-state">
+                                                <span className="gestion-empty-icon">🏫</span>
+                                                <h4>No hay clubes activos registrados</h4>
+                                                <p>Aún no se han publicado clubes activos en el catálogo institucional.</p>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
                             ) : activeTab === 'calendario' ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #e1e5eb', paddingBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                                        <h3 style={{ margin: 0, color: '#003366', fontSize: '1.3rem' }}>
-                                            🗓️ Calendario de Eventos y Actividades
-                                        </h3>
-                                        <span style={{ fontSize: '0.88rem', color: '#555' }}>
-                                            Eventos de tus clubes e invitaciones pendientes
-                                        </span>
+                                <div>
+                                    <div className="panel-section-header">
+                                        <div className="panel-section-title-group">
+                                            <h2>🗓️ Calendario de Eventos y Actividades</h2>
+                                            <p>Consulta fechas de entrenamientos, torneos, reuniones y confirma tu asistencia</p>
+                                        </div>
                                     </div>
                                     <CalendarioEventos 
                                         eventos={eventosCalendario}
@@ -490,129 +529,113 @@ const GestionDashboard = () => {
                                     />
                                 </div>
                             ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    <h3 style={{ margin: '0 0 10px 0', color: '#003366', borderBottom: '2px solid #e1e5eb', paddingBottom: '10px' }}>
-                                        🏆 Mis Clubs Inscritos
-                                    </h3>
+                                <div>
+                                    <div className="panel-section-header">
+                                        <div className="panel-section-title-group">
+                                            <h2>Mis Clubes Inscritos</h2>
+                                            <p>Accede al panel de actividades, avisos internos, salas de chat en vivo y gestión de miembros</p>
+                                        </div>
+                                    </div>
+
                                     {loadingClubs ? (
-                                        <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>Cargando tus clubes...</p>
+                                        <div className="gestion-empty-state">
+                                            <p>Cargando tus clubes inscritos...</p>
+                                        </div>
                                     ) : userClubs.length > 0 ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                        <div className="gestion-clubs-grid">
                                             {userClubs.map(club => {
                                                 const canEnterChat = club.estatus === 'activo' && club.inscripcion_estatus === 'activo';
+                                                const rolClass = club.mi_rol_interno === 'encargado_profesor'
+                                                    ? 'profesor'
+                                                    : club.mi_rol_interno === 'encargado_alumno'
+                                                    ? 'lider'
+                                                    : 'miembro';
+
+                                                const rolTexto = club.mi_rol_interno === 'encargado_profesor'
+                                                    ? '👨‍🏫 Profesor Titular'
+                                                    : club.mi_rol_interno === 'encargado_alumno'
+                                                    ? '🎓 Alumno Encargado'
+                                                    : '🏃 Miembro';
+
                                                 return (
                                                     <div 
                                                         key={club.id} 
-                                                        onClick={() => {
-                                                            navigate(`/club/${club.id}`);
-                                                        }}
-                                                        style={{ 
-                                                            background: '#ffffff',
-                                                            border: '1px solid #e1e5eb',
-                                                            borderLeft: '5px solid #003366',
-                                                            borderRadius: '12px',
-                                                            padding: '20px 24px',
-                                                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s ease',
-                                                            display: 'flex',
-                                                            flexDirection: 'column',
-                                                            gap: '12px'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.currentTarget.style.transform = 'translateY(-2px)';
-                                                            e.currentTarget.style.boxShadow = '0 6px 18px rgba(0, 51, 102, 0.12)';
-                                                            e.currentTarget.style.borderColor = '#003366';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.currentTarget.style.transform = 'translateY(0)';
-                                                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)';
-                                                            e.currentTarget.style.borderColor = '#e1e5eb';
-                                                        }}
-                                                        title={club.nombre}
+                                                        className="gestion-club-card"
+                                                        onClick={() => navigate(`/club/${club.id}`)}
+                                                        title={`Abrir detalles de ${club.nombre}`}
                                                     >
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                                                                <h4 style={{ margin: 0, color: '#003366', fontSize: '1.2rem', fontWeight: '700' }}>
-                                                                    🏆 {club.nombre}
-                                                                </h4>
-                                                                {club.mi_rol_interno && (
-                                                                    <span style={{
-                                                                        fontSize: '0.78rem',
-                                                                        padding: '3px 10px',
-                                                                        borderRadius: '12px',
-                                                                        background: club.mi_rol_interno === 'encargado_profesor' ? '#e7f3ff' : club.mi_rol_interno === 'encargado_alumno' ? '#e6f4ea' : '#f0f2f5',
-                                                                        color: club.mi_rol_interno === 'encargado_profesor' ? '#003366' : club.mi_rol_interno === 'encargado_alumno' ? '#1e8449' : '#555',
-                                                                        fontWeight: 'bold'
-                                                                    }}>
-                                                                        {club.mi_rol_interno === 'encargado_profesor' ? '👨‍🏫 Profesor Titular' : club.mi_rol_interno === 'encargado_alumno' ? '🎓 Alumno Encargado' : '🏃 Miembro'}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                                <span className={`club-tag tag-${club.estatus?.toLowerCase()}`} style={{ margin: 0 }}>
+                                                        <div>
+                                                            <div className="club-card-top-bar">
+                                                                <div>
+                                                                    <h4 className="club-card-name">{club.nombre}</h4>
+                                                                    <div className="club-badges-row">
+                                                                        {club.mi_rol_interno && (
+                                                                            <span className={`role-badge-chip ${rolClass}`}>
+                                                                                {rolTexto}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <span className={`club-tag tag-${club.estatus?.toLowerCase()}`} style={{ margin: 0, flexShrink: 0 }}>
                                                                     {club.estatus?.replace('_', ' ')}
                                                                 </span>
                                                             </div>
-                                                        </div>
 
-                                                        <div style={{ fontSize: '0.92rem', color: '#555', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                            <p style={{ margin: 0 }}>
-                                                                👨‍🏫 <strong>Encargado:</strong> {club.profesor_nombres} {club.profesor_apellidos}
-                                                            </p>
                                                             {club.descripcion && (
-                                                                <p style={{ margin: 0, color: '#666', fontSize: '0.88rem' }}>
+                                                                <p className="club-card-desc" style={{ marginTop: '12px' }}>
                                                                     {club.descripcion}
                                                                 </p>
                                                             )}
                                                         </div>
 
-                                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #f0f2f5', paddingTop: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
+                                                        <div className="club-card-meta-list">
+                                                            <div className="club-card-meta-item">
+                                                                <span>👨‍🏫</span>
+                                                                <span><strong>Encargado:</strong> {club.profesor_nombres} {club.profesor_apellidos}</span>
+                                                            </div>
+                                                            {club.espacios_tiempos && (
+                                                                <div className="club-card-meta-item">
+                                                                    <span>🕒</span>
+                                                                    <span><strong>Horario:</strong> {club.espacios_tiempos}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="club-card-actions">
                                                             {canEnterChat && (
                                                                 <button
-                                                                    onClick={(e) => { e.stopPropagation(); navigate(`/chat/${club.id}`); }}
-                                                                    style={{
-                                                                        background: '#003366',
-                                                                        color: '#fff',
-                                                                        border: 'none',
-                                                                        borderRadius: '6px',
-                                                                        padding: '7px 14px',
-                                                                        fontSize: '0.85rem',
-                                                                        fontWeight: 'bold',
-                                                                        cursor: 'pointer',
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: '5px'
+                                                                    type="button"
+                                                                    className="btn-club-action chat"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        navigate(`/chat/${club.id}`);
                                                                     }}
                                                                 >
                                                                     💬 Entrar al Chat
                                                                 </button>
                                                             )}
+
                                                             <button
-                                                                onClick={(e) => { e.stopPropagation(); navigate(`/club/${club.id}`); }}
-                                                                style={{
-                                                                    background: '#e7f3ff',
-                                                                    color: '#003366',
-                                                                    border: '1px solid #cce5ff',
-                                                                    borderRadius: '6px',
-                                                                    padding: '7px 14px',
-                                                                    fontSize: '0.85rem',
-                                                                    fontWeight: 'bold',
-                                                                    cursor: 'pointer',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '5px'
+                                                                type="button"
+                                                                className="btn-club-action details"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigate(`/club/${club.id}`);
                                                                 }}
                                                             >
                                                                 📋 Panel y Detalles
                                                             </button>
+
                                                             {club.mi_rol_interno === 'encargado_profesor' && club.estatus === 'esperando_firmas' && (
                                                                 <button 
-                                                                    onClick={(e) => { e.stopPropagation(); openMembersModal(club); }}
-                                                                    className="btn-review-club"
-                                                                    style={{ padding: '7px 14px', fontSize: '0.85rem' }}
+                                                                    type="button"
+                                                                    className="btn-club-action signatures"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        openMembersModal(club);
+                                                                    }}
                                                                 >
-                                                                    📋 Ver Detalles y Firmas
+                                                                    ✍️ Ver Firmas
                                                                 </button>
                                                             )}
                                                         </div>
@@ -621,7 +644,15 @@ const GestionDashboard = () => {
                                             })}
                                         </div>
                                     ) : (
-                                        <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>No estás inscrito en ningún club activo.</p>
+                                        <div className="gestion-empty-state">
+                                            <span className="gestion-empty-icon">🏅</span>
+                                            <h4>No estás inscrito en ningún club activo</h4>
+                                            <p>
+                                                {esAlumno
+                                                    ? 'Puedes unirte mediante un código de invitación o explorar los clubes activos en la pestaña "Explorar / Unirse a un Club".'
+                                                    : 'Puedes registrar un nuevo club desde el botón superior "Crear Nuevo Club".'}
+                                            </p>
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -629,84 +660,109 @@ const GestionDashboard = () => {
                     </div>
                 </main>
             </div>
-            {isSidebarOpen && <div className="sidebar-overlay" onClick={toggleSidebar}></div>}
 
             {/* Modal de Detalles y Firmas del Club */}
             {showMembersModal && (
                 <div className="club-details-overlay" onClick={() => setShowMembersModal(false)}>
-                    <div className="club-details-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+                    <div
+                        className="club-details-modal"
+                        onClick={e => e.stopPropagation()}
+                        style={{ maxWidth: '820px', width: '92%', maxHeight: '90vh', overflowY: 'auto', borderRadius: '16px' }}
+                    >
                         <button className="close-modal-btn" onClick={() => setShowMembersModal(false)}>✖</button>
-                        <h2 className="modal-title" style={{ marginBottom: '5px' }}>{selectedClubName}</h2>
-                        <p style={{ textAlign: 'center', color: '#666', marginTop: 0, marginBottom: '20px' }}>Estado de Firmas e Integrantes</p>
+                        <h2 className="modal-title" style={{ marginBottom: '4px' }}>{selectedClubName}</h2>
+                        <p style={{ textAlign: 'center', color: '#64748b', marginTop: 0, marginBottom: '22px', fontSize: '0.92rem' }}>
+                            Control de Firmas de Conformidad e Integrantes Registrados
+                        </p>
                         
                         {loadingMembers ? (
-                            <p style={{ textAlign: 'center', padding: '20px' }}>Cargando lista de alumnos...</p>
+                            <p style={{ textAlign: 'center', padding: '30px' }}>Cargando lista de alumnos...</p>
                         ) : (
                             <div>
-                                <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', borderLeft: '4px solid #003366' }}>
-                                    <h4 style={{ margin: '0 0 10px 0', color: '#003366' }}>Resumen de Firmas</h4>
-                                    <p style={{ margin: '0' }}><strong>Total de alumnos en lista:</strong> {clubMembers.length}</p>
-                                    <p style={{ margin: '5px 0 0 0' }}>
-                                        <span style={{ color: '#155724' }}><strong>Firmaron:</strong> {clubMembers.filter(m => m.estatus === 'activo').length}</span> | 
-                                        <span style={{ color: '#856404', marginLeft: '10px' }}><strong>Faltan:</strong> {clubMembers.filter(m => m.estatus === 'pendiente').length}</span>
-                                    </p>
+                                {/* Resumen en 3 tarjetas */}
+                                <div className="signatures-summary-grid">
+                                    <div className="sig-metric-box">
+                                        <span className="sig-metric-val">{clubMembers.length}</span>
+                                        <span className="sig-metric-label">Total en Lista</span>
+                                    </div>
+                                    <div className="sig-metric-box">
+                                        <span className="sig-metric-val" style={{ color: '#16a34a' }}>
+                                            {clubMembers.filter(m => m.estatus === 'activo').length}
+                                        </span>
+                                        <span className="sig-metric-label">Firmados ✓</span>
+                                    </div>
+                                    <div className="sig-metric-box">
+                                        <span className="sig-metric-val" style={{ color: '#d97706' }}>
+                                            {clubMembers.filter(m => m.estatus === 'pendiente').length}
+                                        </span>
+                                        <span className="sig-metric-label">Pendientes ⏳</span>
+                                    </div>
                                 </div>
 
                                 <div style={{ overflowX: 'auto' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
                                         <thead>
                                             <tr style={{ backgroundColor: '#003366', color: '#fff', textAlign: 'left' }}>
-                                                <th style={{ padding: '12px', borderTopLeftRadius: '8px' }}>Alumno</th>
-                                                <th style={{ padding: '12px' }}>Boleta</th>
-                                                <th style={{ padding: '12px' }}>Rol</th>
-                                                <th style={{ padding: '12px', borderTopRightRadius: '8px' }}>Firma</th>
+                                                <th style={{ padding: '12px 16px', borderTopLeftRadius: '8px' }}>Alumno</th>
+                                                <th style={{ padding: '12px 16px' }}>Boleta</th>
+                                                <th style={{ padding: '12px 16px' }}>Rol</th>
+                                                <th style={{ padding: '12px 16px', borderTopRightRadius: '8px' }}>Firma</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {clubMembers.map((miembro, idx) => (
-                                                <tr key={miembro.id} style={{ borderBottom: '1px solid #eee', backgroundColor: idx % 2 === 0 ? '#fff' : '#f9f9f9' }}>
-                                                    <td style={{ padding: '12px', fontWeight: '500', color: '#333' }}>{miembro.nombres} {miembro.apellidos}</td>
-                                                    <td style={{ padding: '12px', color: '#555' }}>{miembro.boleta || 'N/A'}</td>
-                                                    <td style={{ padding: '12px' }}>
-                                                        <span style={{ 
-                                                            fontSize: '0.85rem', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold',
-                                                            backgroundColor: miembro.rol_en_club === 'encargado_alumno' ? '#e1e5eb' : 'transparent',
-                                                            border: miembro.rol_en_club === 'encargado_alumno' ? '1px solid #ccc' : 'none'
-                                                        }}>
+                                                <tr key={miembro.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                                                    <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1e293b' }}>
+                                                        {miembro.nombres} {miembro.apellidos}
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
+                                                        {miembro.boleta || 'N/A'}
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <span className={`role-badge-chip ${miembro.rol_en_club === 'encargado_alumno' ? 'lider' : 'miembro'}`}>
                                                             {miembro.rol_en_club === 'encargado_alumno' ? '🎓 Líder' : 'Miembro'}
                                                         </span>
                                                     </td>
-                                                    <td style={{ padding: '12px' }}>
+                                                    <td style={{ padding: '12px 16px' }}>
                                                         {miembro.estatus === 'activo' ? (
-                                                            <span style={{ color: '#155724', backgroundColor: '#d4edda', padding: '4px 8px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 'bold' }}>✓ Firmado</span>
+                                                            <span style={{ color: '#15803d', backgroundColor: '#dcfce7', padding: '4px 10px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: '700' }}>
+                                                                ✓ Firmado
+                                                            </span>
                                                         ) : (
-                                                            <span style={{ color: '#856404', backgroundColor: '#fff3cd', padding: '4px 8px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 'bold' }}>⏳ Pendiente</span>
+                                                            <span style={{ color: '#b45309', backgroundColor: '#fef3c7', padding: '4px 10px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: '700' }}>
+                                                                ⏳ Pendiente
+                                                            </span>
                                                         )}
                                                     </td>
                                                 </tr>
                                             ))}
                                             {clubMembers.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>No hay miembros inscritos.</td>
+                                                    <td colSpan="4" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+                                                        No hay miembros inscritos.
+                                                    </td>
                                                 </tr>
                                             )}
                                         </tbody>
                                     </table>
 
-                                    {/* Botón para enviar a revisión si el club sigue esperando firmas */}
                                     {selectedClub?.estatus === 'esperando_firmas' && (
-                                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '25px', padding: '10px 0', borderTop: '1px solid #eee' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
                                             <button 
                                                 onClick={handleEnviarRevision}
                                                 disabled={sendingReview}
                                                 style={{ 
-                                                    padding: '12px 25px', backgroundColor: '#28a745', color: 'white', 
-                                                    border: 'none', borderRadius: '8px', fontWeight: 'bold', 
-                                                    cursor: sendingReview ? 'not-allowed' : 'pointer', fontSize: '1rem',
-                                                    boxShadow: '0 4px 6px rgba(40, 167, 69, 0.2)', transition: 'background 0.2s'
+                                                    padding: '12px 28px',
+                                                    backgroundColor: '#16a34a',
+                                                    color: 'white', 
+                                                    border: 'none',
+                                                    borderRadius: '10px',
+                                                    fontWeight: '700', 
+                                                    cursor: sendingReview ? 'not-allowed' : 'pointer',
+                                                    fontSize: '0.96rem',
+                                                    boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                                                    transition: 'all 0.2s ease'
                                                 }}
-                                                onMouseOver={(e) => !sendingReview && (e.target.style.backgroundColor = '#218838')}
-                                                onMouseOut={(e) => !sendingReview && (e.target.style.backgroundColor = '#28a745')}
                                             >
                                                 {sendingReview ? 'Enviando...' : '🚀 Enviar Club a Revisión Institucional'}
                                             </button>

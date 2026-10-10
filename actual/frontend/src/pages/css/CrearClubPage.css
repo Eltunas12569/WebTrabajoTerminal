@@ -1,144 +1,682 @@
-/* Contenedor principal de la página Crear Club */
-.crear-club-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    background-color: #f0f2f5; /* Un fondo claro y suave */
-    padding: 20px;
+/* ==========================================================================
+   CREAR NUEVO CLUB - SISTEMA DE CLUBES ESCOM IPN
+   DISEÑO DE ESCRITORIO EN 2 COLUMNAS MODULARES Y ESTÉTICA INSTITUCIONAL
+   ========================================================================== */
+
+.crear-club-main {
+    background-color: #f0f2f5;
+    background-image: radial-gradient(circle at 50% 0%, #ffffff 0%, #eef2f6 100%);
+    min-height: calc(100vh - 65px);
+    padding: 28px clamp(16px, 3vw, 40px) 48px;
     box-sizing: border-box;
+    position: relative;
 }
 
-/* Tarjeta del formulario */
-.crear-club-card {
-    background-color: #ffffff;
-    padding: 40px;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    width: 100%;
-    max-width: 600px;
-    text-align: center;
+.crear-club-wrapper {
+    max-width: 1220px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* ==========================================================================
+   CABECERA SUPERIOR DE LA PÁGINA
+   ========================================================================== */
+.crear-club-header-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 22px 28px;
+    box-shadow: 
+        0 8px 24px -4px rgba(0, 51, 102, 0.08),
+        0 2px 6px rgba(0, 0, 0, 0.03),
+        0 0 0 1px rgba(0, 51, 102, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.crear-club-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.crear-club-header-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #003366 0%, #004d99 100%);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    box-shadow: 0 4px 12px rgba(0, 51, 102, 0.2);
+    flex-shrink: 0;
+}
+
+.crear-club-eyebrow {
+    margin: 0 0 3px 0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #800020;
 }
 
 .crear-club-title {
-    font-size: 2.2rem;
-    color: #003366; /* Azul IPN */
-    margin-bottom: 10px;
-    font-weight: 700;
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
 }
 
 .crear-club-subtitle {
-    font-size: 1rem;
-    color: #666;
-    margin-bottom: 30px;
+    margin: 4px 0 0 0;
+    font-size: 0.9rem;
+    color: #64748b;
 }
 
-/* Formulario */
+.btn-volver-header {
+    padding: 10px 18px;
+    border-radius: 10px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #003366;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-volver-header:hover {
+    background: #003366;
+    border-color: #003366;
+    color: #ffffff;
+    transform: translateX(-2px);
+    box-shadow: 0 4px 12px rgba(0, 51, 102, 0.15);
+}
+
+/* ==========================================================================
+   DISTRIBUCIÓN DE ESCRITORIO (GRID 2 COLUMNAS)
+   ========================================================================== */
 .crear-club-form {
-    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.crear-club-desktop-grid {
+    display: grid;
+    grid-template-columns: 1.25fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+.crear-club-col {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Tarjetas de Sección */
+.club-section-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 26px 28px;
+    box-shadow: 
+        0 8px 24px -4px rgba(0, 51, 102, 0.06),
+        0 2px 6px rgba(0, 0, 0, 0.02),
+        0 0 0 1px rgba(0, 51, 102, 0.06);
+    box-sizing: border-box;
+}
+
+.section-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 14px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #f1f5f9;
+}
+
+.section-card-badge {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: #eff6ff;
+    color: #003366;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.section-card-badge.guinda {
+    background: #fef2f2;
+    color: #800020;
+}
+
+.section-card-title-group h2 {
+    margin: 0;
+    font-size: 1.12rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.section-card-title-group p {
+    margin: 2px 0 0 0;
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
+/* ==========================================================================
+   CAMPOS DE FORMULARIO
+   ========================================================================== */
+.form-row-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
 }
 
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 18px;
+    text-align: left;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
 }
 
 .form-group label {
-    display: block;
-    font-size: 0.9rem;
-    color: #333;
-    margin-bottom: 8px;
-    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.86rem;
+    color: #334155;
+    margin-bottom: 7px;
+    font-weight: 700;
+}
+
+.label-required {
+    color: #dc2626;
+    margin-left: 3px;
 }
 
 .form-group input[type="text"],
 .form-group input[type="number"],
 .form-group input[type="email"],
-.form-group input[type="password"],
 .form-group textarea {
     width: 100%;
-    padding: 12px 15px;
-    border: 1px solid #dcdcdc;
-    border-radius: 8px;
-    font-size: 1rem;
-    color: #333;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
-    box-sizing: border-box; /* Asegura que padding no aumente el ancho */
+    padding: 11px 14px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 0.93rem;
+    font-family: inherit;
+    color: #0f172a;
+    background-color: #f8fafc;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
 }
 
 .form-group input:focus,
 .form-group textarea:focus {
+    background-color: #ffffff;
     border-color: #003366;
-    box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.2);
+    box-shadow: 0 0 0 3.5px rgba(0, 51, 102, 0.12);
     outline: none;
 }
 
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+    color: #94a3b8;
+}
+
 .form-group textarea {
-    resize: vertical; /* Permite redimensionar verticalmente */
+    resize: vertical;
+    line-height: 1.5;
 }
 
-.form-group input:disabled {
-    background-color: #e9ecef;
-    cursor: not-allowed;
-    color: #6c757d;
+/* Tarjeta informativa del Profesor Titular */
+.profesor-readonly-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #f0f7ff;
+    border: 1.5px solid #bfdbfe;
+    border-radius: 10px;
+    color: #1e3a8a;
 }
 
-/* Botón de envío */
-.btn-crear-club {
-    width: 100%;
-    padding: 14px 20px;
-    background-color: #800020; /* Guinda IPN */
-    color: white;
-    border: none;
+.profesor-readonly-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.profesor-badge-tag {
+    font-size: 0.74rem;
+    background: #003366;
+    color: #ffffff;
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-weight: 700;
+}
+
+/* ==========================================================================
+   CRONOGRAMA (PLAN DE TRABAJO DINÁMICO)
+   ========================================================================== */
+.cronograma-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.cronograma-row {
+    display: grid;
+    grid-template-columns: 140px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    background: #f8fafc;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+
+.cronograma-row input {
+    background: #ffffff !important;
+    margin: 0;
+}
+
+.btn-remove-cronograma {
+    width: 36px;
+    height: 36px;
     border-radius: 8px;
-    font-size: 1.1rem;
-    font-weight: bold;
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
     cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.2s ease;
-    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    font-weight: bold;
+    transition: all 0.15s ease;
+}
+
+.btn-remove-cronograma:hover {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+}
+
+.btn-add-cronograma {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    background: #eff6ff;
+    color: #003366;
+    border: 1px dashed #93c5fd;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.86rem;
+    transition: all 0.2s ease;
+    width: 100%;
+    justify-content: center;
+}
+
+.btn-add-cronograma:hover {
+    background: #dbeafe;
+    border-color: #003366;
+}
+
+/* ==========================================================================
+   BUSCADOR AUTOCOMPLETE Y PLANTILLA DE MIEMBROS
+   ========================================================================== */
+.searchable-select-wrapper {
+    position: relative;
+}
+
+.searchable-input-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.searchable-input-icon {
+    position: absolute;
+    left: 13px;
+    color: #64748b;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+}
+
+.searchable-input-box input {
+    padding-left: 38px !important;
+}
+
+.searchable-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 100%;
+    max-height: 230px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    z-index: 1000;
+    list-style: none;
+    padding: 6px;
+    margin: 0;
+    box-shadow: 0 12px 28px -4px rgba(0, 31, 63, 0.15);
+    box-sizing: border-box;
+}
+
+.searchable-option-item {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    transition: background 0.15s ease;
+    font-size: 0.88rem;
+    color: #1e293b;
+}
+
+.searchable-option-item:hover {
+    background: #f0f7ff;
+    color: #003366;
+}
+
+.option-student-name {
+    font-weight: 600;
+}
+
+.option-boleta-badge {
+    font-size: 0.76rem;
+    background: #f1f5f9;
+    color: #475569;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-family: monospace;
+    flex-shrink: 0;
+}
+
+.searchable-empty {
+    padding: 12px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.86rem;
+}
+
+/* Medidor de Progreso de Alumnos (19 requeridos) */
+.members-progress-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+}
+
+.members-progress-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.members-count-label {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.members-count-badge {
+    font-size: 0.82rem;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 20px;
+}
+
+.members-count-badge.pending {
+    background: #fffbeb;
+    color: #b45309;
+    border: 1px solid #fde68a;
+}
+
+.members-count-badge.complete {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.members-progress-bar-bg {
+    width: 100%;
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.members-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0284c7, #003366);
+    border-radius: 99px;
+    transition: width 0.3s ease, background 0.3s ease;
+}
+
+.members-progress-bar-fill.complete {
+    background: linear-gradient(90deg, #16a34a, #15803d);
+}
+
+/* Lista de chips de alumnos seleccionados */
+.selected-students-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    margin-top: 12px;
+}
+
+.student-chip {
+    background: #ffffff;
+    color: #1e293b;
+    padding: 5px 10px 5px 12px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.student-chip.leader-chip {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    color: #003366;
+}
+
+.student-chip-remove {
+    background: #f1f5f9;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    font-weight: bold;
+    transition: all 0.15s ease;
+    padding: 0;
+}
+
+.student-chip-remove:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* ==========================================================================
+   PIE DE ENVÍO Y ALERTAS
+   ========================================================================== */
+.crear-club-footer-actions {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 20px 28px;
+    box-shadow: 
+        0 8px 24px -4px rgba(0, 51, 102, 0.08),
+        0 0 0 1px rgba(0, 51, 102, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.footer-hint-text {
+    font-size: 0.86rem;
+    color: #64748b;
+    margin: 0;
+}
+
+.footer-buttons-group {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.btn-cancelar-club {
+    padding: 12px 22px;
+    background: #f8fafc;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-cancelar-club:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.btn-crear-club {
+    padding: 13px 28px;
+    background: linear-gradient(135deg, #800020 0%, #600018 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.98rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 14px rgba(128, 0, 32, 0.28);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .btn-crear-club:hover:not(:disabled) {
-    background-color: #600018;
+    background: linear-gradient(135deg, #960026 0%, #70001c 100%);
     transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(128, 0, 32, 0.36);
 }
 
 .btn-crear-club:disabled {
-    background-color: #cccccc;
+    background: #cbd5e1;
+    color: #94a3b8;
     cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
 }
 
-/* Mensajes de error/éxito */
+/* Banners de Error y Éxito */
 .message-banner {
-    padding: 12px;
-    border-radius: 8px;
-    margin-top: 20px;
-    font-size: 0.95rem;
-    font-weight: 500;
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .message-banner.error {
-    background-color: #ffebee;
-    color: #d32f2f;
-    border: 1px solid #ef9a9a;
+    background-color: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
 }
 
 .message-banner.success {
-    background-color: #e8f5e9;
-    color: #2e7d32;
-    border: 1px solid #a5d6a7;
+    background-color: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
 }
 
-.btn-back-to-gestion {
-    background: none;
-    border: none;
-    color: #003366;
-    text-decoration: underline;
-    cursor: pointer;
-    margin-top: 25px;
-    font-size: 0.9rem;
-    transition: color 0.2s ease;
+/* ==========================================================================
+   RESPONSIVIDAD
+   ========================================================================== */
+@media (max-width: 1024px) {
+    .crear-club-desktop-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
-.btn-back-to-gestion:hover {
-    color: #00509e;
+@media (max-width: 640px) {
+    .form-row-2col {
+        grid-template-columns: 1fr;
+    }
+
+    .cronograma-row {
+        grid-template-columns: 1fr;
+    }
+
+    .crear-club-footer-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .footer-buttons-group {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .btn-crear-club,
+    .btn-cancelar-club {
+        width: 100%;
+        justify-content: center;
+    }
 }

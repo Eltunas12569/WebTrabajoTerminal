@@ -223,10 +223,6 @@ const ClubChatPage = () => {
                         <span className="nav-title" style={{ fontSize: '1.15rem', fontWeight: 'bold', lineHeight: '1.2', color: '#fff' }}>
                             {club.nombre}
                         </span>
-                        <span style={{ fontSize: '0.75rem', color: '#d4edda', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#28a745', display: 'inline-block' }}></span>
-                            Chat en vivo del club
-                        </span>
                     </div>
                 </div>
 
@@ -326,15 +322,9 @@ const ClubChatPage = () => {
                         <div className="chat-room-info">
                             <div className="chat-room-title-row">
                                 <h2 className="chat-room-title">
-                                    💬 Sala de Comunicación · {club.nombre}
+                                     {club.nombre}
                                 </h2>
-                                <span className="chat-room-status-badge">
-                                    <span className="chat-status-dot"></span> En vivo
-                                </span>
                             </div>
-                            <p className="chat-room-desc">
-                                Canal exclusivo para miembros registrados y cuerpo directivo del club
-                            </p>
                         </div>
                     </div>
 

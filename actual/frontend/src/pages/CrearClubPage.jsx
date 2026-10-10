@@ -2,61 +2,76 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import './css/CrearClubPage.css'; // Importa el CSS para esta página
-import './css/Dashboards.css'; // Importa el CSS del Dashboard principal
+import './css/CrearClubPage.css';
+import './css/Dashboards.css';
 import Sidebar from '../components/Sidebar';
 
-// Componente interno para selector con búsqueda (Autocomplete)
+// Icono vectorial de búsqueda
+const SearchIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+);
+
+// Componente interno para selector con búsqueda (Autocomplete para Alumno Encargado)
 const SearchableSelect = ({ options, value, onChange, placeholder }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isOpen, setIsOpen] = useState(false);
 
     useEffect(() => {
-        // Sincronizar el texto del input con el valor seleccionado (ID)
         const selected = options.find(o => o.id == value);
         if (selected) {
             setSearchTerm(`${selected.nombres} ${selected.apellidos} (Boleta: ${selected.boleta})`);
         } else if (!isOpen) {
-            // Solo limpiar si no está abierto (el usuario no está escribiendo activamente)
             setSearchTerm('');
         }
     }, [value, options, isOpen]);
 
+    const filteredOptions = options.filter(op =>
+        `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     return (
-        <div style={{ position: 'relative' }}>
-            <input
-                type="text"
-                placeholder={placeholder}
-                value={searchTerm}
-                onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setIsOpen(true);
-                }}
-                onFocus={() => setIsOpen(true)}
-                onBlur={() => setTimeout(() => setIsOpen(false), 200)} // Pequeño retraso para permitir capturar el click en la lista
-                autoComplete="off"
-            />
+        <div className="searchable-select-wrapper">
+            <div className="searchable-input-box">
+                <span className="searchable-input-icon">
+                    <SearchIcon />
+                </span>
+                <input
+                    type="text"
+                    placeholder={placeholder}
+                    value={searchTerm}
+                    onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setIsOpen(true);
+                    }}
+                    onFocus={() => setIsOpen(true)}
+                    onBlur={() => setTimeout(() => setIsOpen(false), 200)}
+                    autoComplete="off"
+                />
+            </div>
             {isOpen && (
-                <ul style={{
-                    position: 'absolute', top: '100%', left: 0, width: '100%',
-                    maxHeight: '200px', overflowY: 'auto', backgroundColor: 'white',
-                    border: '1px solid #ccc', borderRadius: '0 0 8px 8px', zIndex: 1000,
-                    listStyle: 'none', padding: 0, margin: 0, boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                }}>
-                    {options.filter(op => 
-                        `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())
-                    ).map(op => (
-                        <li key={op.id}
-                            style={{ padding: '10px', cursor: 'pointer', borderBottom: '1px solid #eee', color: '#333' }}
-                            onMouseDown={() => { onChange(op.id); setIsOpen(false); }}
-                            onMouseEnter={(e) => e.target.style.backgroundColor = '#f0f2f5'}
-                            onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                <ul className="searchable-dropdown">
+                    {filteredOptions.map(op => (
+                        <li
+                            key={op.id}
+                            className="searchable-option-item"
+                            onMouseDown={() => {
+                                onChange(op.id);
+                                setIsOpen(false);
+                            }}
                         >
-                            {op.nombres} {op.apellidos} (Boleta: {op.boleta})
+                            <span className="option-student-name">
+                                {op.nombres} {op.apellidos}
+                            </span>
+                            <span className="option-boleta-badge">
+                                Boleta: {op.boleta}
+                            </span>
                         </li>
                     ))}
-                    {options.filter(op => `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
-                        <li style={{ padding: '10px', color: '#999' }}>No se encontraron resultados</li>
+                    {filteredOptions.length === 0 && (
+                        <li className="searchable-empty">No se encontraron alumnos con ese criterio</li>
                     )}
                 </ul>
             )}
@@ -66,8 +81,8 @@ const SearchableSelect = ({ options, value, onChange, placeholder }) => {
 
 const MIN_ESTUDIANTES = 19;
 
-// Componente interno para selector múltiple (Autocomplete para múltiples alumnos)
-const MultiSearchableSelect = ({ options, selectedIds, onChange, placeholder, onRemoteSearch }) => {
+// Componente interno para selector múltiple (Autocomplete para plantilla de miembros)
+const MultiSearchableSelect = ({ options, selectedIds, leaderId, onChange, placeholder, onRemoteSearch }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isOpen, setIsOpen] = useState(false);
 
@@ -78,7 +93,7 @@ const MultiSearchableSelect = ({ options, selectedIds, onChange, placeholder, on
     }, [searchTerm, onRemoteSearch]);
 
     const handleSelect = (id) => {
-        if (!selectedIds.includes(id)) {
+        if (!selectedIds.includes(id) && Number(id) !== Number(leaderId)) {
             onChange([...selectedIds, id]);
         }
         setSearchTerm('');
@@ -89,43 +104,88 @@ const MultiSearchableSelect = ({ options, selectedIds, onChange, placeholder, on
         onChange(selectedIds.filter(selectedId => selectedId !== id));
     };
 
-    const availableOptions = options.filter(op => !selectedIds.includes(op.id) && `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase()));
+    const availableOptions = options.filter(op =>
+        !selectedIds.includes(op.id) &&
+        Number(op.id) !== Number(leaderId) &&
+        `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const leaderObj = options.find(o => Number(o.id) === Number(leaderId));
 
     return (
-        <div style={{ position: 'relative' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: selectedIds.length > 0 ? '10px' : '0' }}>
-                {selectedIds.map(id => {
-                    const op = options.find(o => o.id === id);
-                    if (!op) return null;
-                    return (
-                        <span key={id} style={{ background: '#e1e5eb', color: '#1c1e21', padding: '6px 12px', borderRadius: '20px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500', border: '1px solid #d1d5db' }}>
-                            {op.nombres} {op.apellidos}
-                            <button type="button" onClick={() => handleRemove(id)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontWeight: 'bold', padding: '0 2px', fontSize: '1rem', display: 'flex', alignItems: 'center' }}>×</button>
-                        </span>
-                    );
-                })}
+        <div className="searchable-select-wrapper">
+            <div className="searchable-input-box">
+                <span className="searchable-input-icon">
+                    <SearchIcon />
+                </span>
+                <input
+                    type="text"
+                    placeholder={placeholder}
+                    value={searchTerm}
+                    onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setIsOpen(true);
+                    }}
+                    onFocus={() => setIsOpen(true)}
+                    onBlur={() => setTimeout(() => setIsOpen(false), 200)}
+                    autoComplete="off"
+                />
             </div>
-            <input
-                type="text"
-                placeholder={placeholder}
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setIsOpen(true); }}
-                onFocus={() => setIsOpen(true)}
-                onBlur={() => setTimeout(() => setIsOpen(false), 200)}
-                autoComplete="off"
-            />
+
             {isOpen && (
-                <ul style={{ position: 'absolute', top: '100%', left: 0, width: '100%', maxHeight: '200px', overflowY: 'auto', backgroundColor: 'white', border: '1px solid #ccc', borderRadius: '0 0 8px 8px', zIndex: 1000, listStyle: 'none', padding: 0, margin: 0, boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                    {availableOptions.map(op => <li key={op.id} style={{ padding: '10px', cursor: 'pointer', borderBottom: '1px solid #eee', color: '#333' }} onMouseDown={() => handleSelect(op.id)} onMouseEnter={(e) => e.target.style.backgroundColor = '#f0f2f5'} onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}>{op.nombres} {op.apellidos} (Boleta: {op.boleta})</li>)}
-                    {availableOptions.length === 0 && <li style={{ padding: '10px', color: '#999' }}>No se encontraron resultados</li>}
+                <ul className="searchable-dropdown">
+                    {availableOptions.map(op => (
+                        <li
+                            key={op.id}
+                            className="searchable-option-item"
+                            onMouseDown={() => handleSelect(op.id)}
+                        >
+                            <span className="option-student-name">
+                                {op.nombres} {op.apellidos}
+                            </span>
+                            <span className="option-boleta-badge">
+                                Boleta: {op.boleta}
+                            </span>
+                        </li>
+                    ))}
+                    {availableOptions.length === 0 && (
+                        <li className="searchable-empty">No se encontraron resultados disponibles</li>
+                    )}
                 </ul>
+            )}
+
+            {(leaderObj || selectedIds.length > 0) && (
+                <div className="selected-students-container">
+                    {leaderObj && (
+                        <span className="student-chip leader-chip" title="Alumno Encargado del Club">
+                            ⭐ {leaderObj.nombres} {leaderObj.apellidos} (Encargado)
+                        </span>
+                    )}
+                    {selectedIds.map(id => {
+                        const op = options.find(o => o.id === id);
+                        if (!op) return null;
+                        return (
+                            <span key={id} className="student-chip">
+                                {op.nombres} {op.apellidos}
+                                <button
+                                    type="button"
+                                    className="student-chip-remove"
+                                    onClick={() => handleRemove(id)}
+                                    title="Quitar alumno de la lista"
+                                >
+                                    ×
+                                </button>
+                            </span>
+                        );
+                    })}
+                </div>
             )}
         </div>
     );
 };
 
 const CrearClubPage = () => {
-    const { user, logout } = useAuth(); // Importamos el usuario actual y la función de salida
+    const { user } = useAuth();
     const [nombre, setNombre] = useState('');
     const [descripcion, setDescripcion] = useState('');
     const [objetivo, setObjetivo] = useState('');
@@ -134,20 +194,20 @@ const CrearClubPage = () => {
     const [espaciosTiempos, setEspaciosTiempos] = useState('');
     const [impacto, setImpacto] = useState('');
     const [profesorEncargadoId, setProfesorEncargadoId] = useState('');
-    const [alumnoEncargadoId, setAlumnoEncargadoId] = useState(''); // Ahora almacenará el ID del alumno seleccionado
-    const [miembrosIds, setMiembrosIds] = useState([]); // Nuevo estado para los miembros a agregar
-    const [alumnosDisponibles, setAlumnosDisponibles] = useState([]); // Nuevo estado para los alumnos
+    const [alumnoEncargadoId, setAlumnoEncargadoId] = useState('');
+    const [miembrosIds, setMiembrosIds] = useState([]);
+    const [alumnosDisponibles, setAlumnosDisponibles] = useState([]);
     const [alumnosBuscados, setAlumnosBuscados] = useState([]);
-    const [loadingAlumnos, setLoadingAlumnos] = useState(true); // Estado de carga para alumnos
+    const [loadingAlumnos, setLoadingAlumnos] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const navigate = useNavigate();
+
     // Preseleccionar al profesor actual automáticamente si es quien está creando el club
     useEffect(() => {
-        // Cubrimos si viene como role_id o como rol desde el token
         if (user?.role_id === 3 || user?.rol === 3) {
             setProfesorEncargadoId(user.id || user.usuario_id);
         }
@@ -220,13 +280,28 @@ const CrearClubPage = () => {
         return colors[index];
     };
 
+    const handleBack = () => {
+        if (window.history.length > 1) {
+            navigate(-1);
+        } else {
+            navigate(user?.role_id === 1 ? '/admin' : '/gestion');
+        }
+    };
+
+    // Total de alumnos únicos seleccionados (incluyendo al encargado)
+    const totalSeleccionados = Array.from(
+        new Set([Number(alumnoEncargadoId), ...miembrosIds.map(Number)])
+    ).filter(id => id > 0).length;
+
+    const porcentajeProgreso = Math.min(100, Math.round((totalSeleccionados / MIN_ESTUDIANTES) * 100));
+    const metaCumplida = totalSeleccionados >= MIN_ESTUDIANTES;
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
         setSuccess('');
 
-        // Failsafe por si la página se recargó y el estado del profesor quedó vacío
         const finalProfesorId = profesorEncargadoId || user?.id || user?.usuario_id;
 
         if (!finalProfesorId || !alumnoEncargadoId) {
@@ -235,7 +310,6 @@ const CrearClubPage = () => {
             return;
         }
 
-        // Obligar a que la lista total incluya al encargado y cumpla el mínimo del backend
         const alumnosArray = Array.from(new Set([Number(alumnoEncargadoId), ...miembrosIds.map(Number)])).filter(id => id > 0);
         if (alumnosArray.length < MIN_ESTUDIANTES) {
             setError(`Debes registrar al menos ${MIN_ESTUDIANTES} alumnos en total (incluyendo al encargado). Actualmente tienes ${alumnosArray.length}.`);
@@ -243,7 +317,6 @@ const CrearClubPage = () => {
             return;
         }
 
-        // Validar que el cronograma no esté vacío
         if (cronograma.some(item => !item.mes.trim() || !item.actividad.trim())) {
             setError('Por favor, completa todos los campos del cronograma o elimina los que estén vacíos.');
             setLoading(false);
@@ -251,7 +324,6 @@ const CrearClubPage = () => {
         }
 
         try {
-            // Garantizar que todos los IDs sean estrictamente numéricos y sin duplicados
             const response = await api.post('/clubes', {
                 nombre,
                 descripcion,
@@ -260,20 +332,16 @@ const CrearClubPage = () => {
                 detalle_actividades: detalleActividades,
                 espacios_tiempos: espaciosTiempos,
                 impacto,
-                
-                // Enviamos las diferentes variantes de nombre por si el backend busca otra
                 profesor_encargado_id: Number(finalProfesorId),
                 profesor_id: Number(finalProfesorId), 
                 alumno_encargado_id: Number(alumnoEncargadoId),
                 alumno_id: Number(alumnoEncargadoId),
-                
-                miembros_ids: alumnosArray, // ⬅️ CORRECCIÓN: El backend pide 'miembros_ids', no 'alumnos'
-                lista_estudiantes: alumnosArray, // Añadimos esto para coincidir con el backend
-                estatus: 'esperando_firmas', // Se cambia a 'esperando_firmas' para el flujo de recolección
-                archivo_lista_estudiantes: 'pendiente.pdf' // Failsafe si la DB lo exige como NOT NULL
+                miembros_ids: alumnosArray,
+                lista_estudiantes: alumnosArray,
+                estatus: 'esperando_firmas',
+                archivo_lista_estudiantes: 'pendiente.pdf'
             });
             setSuccess('Club creado exitosamente: ' + response.data.message);
-            // Opcional: Redirigir a otra página o limpiar el formulario
             setNombre('');
             setDescripcion('');
             setObjetivo('');
@@ -291,13 +359,15 @@ const CrearClubPage = () => {
         }
     };
 
+    const nombreProfesor = `${user?.nombres || ''} ${user?.apellidos || user?.apellido_paterno || ''}`.trim() || 'Profesor en sesión';
+
     return (
         <div className="web-dashboard">
             {/* NAVBAR SUPERIOR */}
-            <header className="admin-navbar-fixed" style={{backgroundColor: '#003366', color: '#fff'}}>
+            <header className="admin-navbar-fixed" style={{ backgroundColor: '#003366', color: '#fff' }}>
                 <div className="nav-left">
                     <button className="menu-toggle" onClick={toggleSidebar}>☰</button>
-                    <span className="nav-title">🏆 Sistema de Clubs - ESCOM</span>
+                    <span className="nav-title">Sistema de Clubs</span>
                 </div>
                 <div className="nav-right">
                     <div className="profile-container">
@@ -326,148 +396,297 @@ const CrearClubPage = () => {
                     onClose={() => setIsSidebarOpen(false)}
                 />
 
-                <main className="admin-main-scroll" style={{ backgroundColor: '#f4f6f8', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ maxWidth: '900px', width: '100%', marginTop: '20px', display: 'flex', alignItems: 'flex-start', gap: '20px', padding: '0 20px' }}>
-                        <div className="crear-club-card" style={{ flex: 1, marginTop: '0', maxWidth: '100%' }}>
-                <h1 className="crear-club-title">Crear Nuevo Club Deportivo</h1>
-                <p className="crear-club-subtitle">Completa los datos para registrar un nuevo club.</p>
-
-                <form onSubmit={handleSubmit} className="crear-club-form">
-                    <div className="form-group">
-                        <label htmlFor="nombre">Nombre del Club</label>
-                        <input
-                            type="text"
-                            id="nombre"
-                            value={nombre}
-                            onChange={(e) => setNombre(e.target.value)}
-                            placeholder="Ej. Club de Ajedrez ESCOM"
-                            required
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="descripcion">Descripción</label>
-                        <textarea
-                            id="descripcion"
-                            value={descripcion}
-                            onChange={(e) => setDescripcion(e.target.value)}
-                            placeholder="Breve descripción del club, sus actividades y objetivos."
-                            rows="4"
-                            required
-                        ></textarea>
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="objetivo">Objetivo del Club</label>
-                        <textarea
-                            id="objetivo"
-                            value={objetivo}
-                            onChange={(e) => setObjetivo(e.target.value)}
-                            placeholder="¿Cuál es la meta principal de este club?"
-                            rows="2"
-                            required
-                        ></textarea>
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="cronograma">Cronograma (Plan de Trabajo)</label>
-                        {cronograma.map((item, index) => (
-                            <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                                <input
-                                    type="text"
-                                    placeholder="Mes (ej. Agosto)"
-                                    value={item.mes}
-                                    onChange={(e) => handleCronogramaChange(index, 'mes', e.target.value)}
-                                    required
-                                    style={{ flex: 1, padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Actividad (ej. Reclutamiento)"
-                                    value={item.actividad}
-                                    onChange={(e) => handleCronogramaChange(index, 'actividad', e.target.value)}
-                                    required
-                                    style={{ flex: 2, padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}
-                                />
-                                {cronograma.length > 1 && (
-                                    <button 
-                                        type="button" 
-                                        onClick={() => handleRemoveCronogramaItem(index)}
-                                        style={{ padding: '10px', background: '#fce8e6', color: '#e53935', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-                                        title="Eliminar actividad"
-                                    >
-                                        ✖
-                                    </button>
-                                )}
+                <main className="admin-main-scroll crear-club-main">
+                    <div className="crear-club-wrapper">
+                        {/* CABECERA DE LA PÁGINA */}
+                        <div className="crear-club-header-card">
+                            <div className="crear-club-header-left">
+                                <div>
+                                    <p className="crear-club-eyebrow">SISTEMA DE GESTIÓN DEPORTIVA Y CULTURAL · ESCOM IPN</p>
+                                    <h1 className="crear-club-title">Registrar Nuevo Club</h1>
+                                    <p className="crear-club-subtitle">
+                                        Completa el expediente técnico, el plan de trabajo y la plantilla mínima de {MIN_ESTUDIANTES} estudiantes.
+                                    </p>
+                                </div>
                             </div>
-                        ))}
-                        <button 
-                            type="button" 
-                            onClick={handleAddCronogramaItem}
-                            style={{ display: 'inline-block', padding: '8px 12px', background: '#e1e5eb', color: '#333', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
-                        >
-                            ➕ Agregar otra actividad
-                        </button>
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="detalleActividades">Detalle de Actividades</label>
-                        <textarea
-                            id="detalleActividades"
-                            value={detalleActividades}
-                            onChange={(e) => setDetalleActividades(e.target.value)}
-                            placeholder="¿Qué actividades exactas se llevarán a cabo en las sesiones?"
-                            rows="2"
-                            required
-                        ></textarea>
-                    </div>
-                    <div style={{ display: 'flex', gap: '15px' }}>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label htmlFor="espaciosTiempos">Espacios y Horarios propuestos</label>
-                            <textarea id="espaciosTiempos" value={espaciosTiempos} onChange={(e) => setEspaciosTiempos(e.target.value)} placeholder="Lugar y días solicitados (Ej. Cancha Jueves 4pm)" rows="2" required></textarea>
+                            <button type="button" onClick={handleBack} className="btn-volver-header">
+                                ← Volver
+                            </button>
                         </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label htmlFor="impacto">Impacto Esperado</label>
-                            <textarea id="impacto" value={impacto} onChange={(e) => setImpacto(e.target.value)} placeholder="Beneficios para la comunidad escolar" rows="2" required></textarea>
-                        </div>
-                    </div>
 
-                    <div className="form-group">
-                        <label htmlFor="profesorEncargadoId">Profesor Encargado (Tú)</label>
-                        <input 
-                            type="text" 
-                            value={`${user?.nombres || ''} ${user?.apellidos || user?.apellido_paterno || ''}`.trim()} 
-                            disabled 
-                            style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="alumnoEncargadoId">Alumno Encargado</label>
-                        <SearchableSelect 
-                            options={opcionesAlumnos}
-                            value={alumnoEncargadoId}
-                            onChange={(id) => setAlumnoEncargadoId(id)}
-                            placeholder={loadingAlumnos ? "Cargando..." : "Buscar alumno por nombre o boleta..."}
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="miembrosIds">Miembros del Club ({MIN_ESTUDIANTES} alumnos en total, incluyendo encargado)</label>
-                        <MultiSearchableSelect 
-                            options={opcionesAlumnos}
-                            selectedIds={miembrosIds}
-                            onChange={(ids) => setMiembrosIds(ids)}
-                            onRemoteSearch={handleBuscarAlumnos}
-                            placeholder={loadingAlumnos ? "Cargando..." : "Buscar y agregar alumnos (mín. 2 caracteres)..."}
-                        />
-                        <p style={{ margin: '8px 0 0', fontSize: '0.9rem', color: '#666' }}>
-                            Seleccionados: {Array.from(new Set([Number(alumnoEncargadoId), ...miembrosIds.map(Number)])).filter(id => id > 0).length} / {MIN_ESTUDIANTES}
-                        </p>
-                    </div>
-                    <button type="submit" className="btn-crear-club" disabled={loading}>
-                        {loading ? 'Creando...' : 'Registrar Club'}
-                    </button>
-                </form>
+                        {/* BANNERS DE ESTADO */}
+                        {error && (
+                            <div className="message-banner error">
+                                <span>⚠️</span>
+                                <span>{error}</span>
+                            </div>
+                        )}
+                        {success && (
+                            <div className="message-banner success">
+                                <span>✅</span>
+                                <span>{success}</span>
+                            </div>
+                        )}
 
-                {error && <div className="message-banner error">{error}</div>}
-                {success && <div className="message-banner success">{success}</div>}
-                <button onClick={() => navigate(user?.role_id === 1 ? '/admin' : '/gestion')} className="btn-back-to-gestion">🔙 Volver al Dashboard</button>
-                        </div>
+                        {/* FORMULARIO EN GRID DE 2 COLUMNAS PARA ESCRITORIO */}
+                        <form onSubmit={handleSubmit} className="crear-club-form">
+                            <div className="crear-club-desktop-grid">
+                                {/* COLUMNA IZQUIERDA: IDENTIDAD Y PLAN DE TRABAJO */}
+                                <div className="crear-club-col">
+                                    {/* SECCIÓN 1: IDENTIDAD Y PROPUESTA */}
+                                    <section className="club-section-card">
+                                        <div className="section-card-header">
+                                            <div className="section-card-badge">1</div>
+                                            <div className="section-card-title-group">
+                                                <h2>Identidad y Propuesta del Club</h2>
+                                                <p>Información general, propósito, horarios e impacto institucional</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label htmlFor="nombre">
+                                                <span>Nombre Oficial del Club <span className="label-required">*</span></span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                id="nombre"
+                                                value={nombre}
+                                                onChange={(e) => setNombre(e.target.value)}
+                                                placeholder="Ej. Club de Ajedrez o Robótica ESCOM"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div className="form-row-2col">
+                                            <div className="form-group">
+                                                <label htmlFor="descripcion">
+                                                    <span>Descripción General <span className="label-required">*</span></span>
+                                                </label>
+                                                <textarea
+                                                    id="descripcion"
+                                                    value={descripcion}
+                                                    onChange={(e) => setDescripcion(e.target.value)}
+                                                    placeholder="Describe de qué trata el club y su enfoque principal..."
+                                                    rows="3"
+                                                    required
+                                                ></textarea>
+                                            </div>
+
+                                            <div className="form-group">
+                                                <label htmlFor="objetivo">
+                                                    <span>Objetivo del Club <span className="label-required">*</span></span>
+                                                </label>
+                                                <textarea
+                                                    id="objetivo"
+                                                    value={objetivo}
+                                                    onChange={(e) => setObjetivo(e.target.value)}
+                                                    placeholder="¿Cuál es la meta formativa o competitiva del club?"
+                                                    rows="3"
+                                                    required
+                                                ></textarea>
+                                            </div>
+                                        </div>
+
+                                        <div className="form-row-2col">
+                                            <div className="form-group">
+                                                <label htmlFor="espaciosTiempos">
+                                                    <span>Espacios y Horarios Propuestos <span className="label-required">*</span></span>
+                                                </label>
+                                                <textarea
+                                                    id="espaciosTiempos"
+                                                    value={espaciosTiempos}
+                                                    onChange={(e) => setEspaciosTiempos(e.target.value)}
+                                                    placeholder="Ej. Canchas o Salón 1104 · Martes y Jueves 14:00 - 16:00"
+                                                    rows="2"
+                                                    required
+                                                ></textarea>
+                                            </div>
+
+                                            <div className="form-group">
+                                                <label htmlFor="impacto">
+                                                    <span>Impacto Esperado <span className="label-required">*</span></span>
+                                                </label>
+                                                <textarea
+                                                    id="impacto"
+                                                    value={impacto}
+                                                    onChange={(e) => setImpacto(e.target.value)}
+                                                    placeholder="Beneficios para la formación integral de la comunidad..."
+                                                    rows="2"
+                                                    required
+                                                ></textarea>
+                                            </div>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label htmlFor="detalleActividades">
+                                                <span>Detalle de Actividades en Sesiones <span className="label-required">*</span></span>
+                                            </label>
+                                            <textarea
+                                                id="detalleActividades"
+                                                value={detalleActividades}
+                                                onChange={(e) => setDetalleActividades(e.target.value)}
+                                                placeholder="Describe qué dinámicas, entrenamientos o prácticas se llevarán a cabo..."
+                                                rows="2"
+                                                required
+                                            ></textarea>
+                                        </div>
+                                    </section>
+
+                                    {/* SECCIÓN 2: CRONOGRAMA */}
+                                    <section className="club-section-card">
+                                        <div className="section-card-header">
+                                            <div className="section-card-badge">2</div>
+                                            <div className="section-card-title-group">
+                                                <h2>Cronograma de Trabajo</h2>
+                                                <p>Planeación mensual de actividades, torneos o sesiones</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="cronograma-list">
+                                            {cronograma.map((item, index) => (
+                                                <div key={index} className="cronograma-row">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Mes (ej. Septiembre)"
+                                                        value={item.mes}
+                                                        onChange={(e) => handleCronogramaChange(index, 'mes', e.target.value)}
+                                                        required
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Actividad programada (ej. Convocatoria y reclutamiento)"
+                                                        value={item.actividad}
+                                                        onChange={(e) => handleCronogramaChange(index, 'actividad', e.target.value)}
+                                                        required
+                                                    />
+                                                    {cronograma.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            className="btn-remove-cronograma"
+                                                            onClick={() => handleRemoveCronogramaItem(index)}
+                                                            title="Eliminar fila del cronograma"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            className="btn-add-cronograma"
+                                            onClick={handleAddCronogramaItem}
+                                        >
+                                            ➕ Agregar otra actividad al cronograma
+                                        </button>
+                                    </section>
+                                </div>
+
+                                {/* COLUMNA DERECHA: RESPONSABLES Y PLANTILLA DE ALUMNOS */}
+                                <div className="crear-club-col">
+                                    {/* SECCIÓN 3: RESPONSABLES */}
+                                    <section className="club-section-card">
+                                        <div className="section-card-header">
+                                            <div className="section-card-badge guinda">3</div>
+                                            <div className="section-card-title-group">
+                                                <h2>Cuerpo Directivo del Club</h2>
+                                                <p>Docente titular responsable y estudiante representante</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>Profesor Encargado (Titular)</label>
+                                            <div className="profesor-readonly-box">
+                                                <div className="profesor-readonly-info">
+                                                    <span>🎓</span>
+                                                    <span>{nombreProfesor}</span>
+                                                </div>
+                                                <span className="profesor-badge-tag">✓ Titular Asignado</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label htmlFor="alumnoEncargadoId">
+                                                <span>Alumno Encargado (Representante) <span className="label-required">*</span></span>
+                                            </label>
+                                            <SearchableSelect
+                                                options={opcionesAlumnos}
+                                                value={alumnoEncargadoId}
+                                                onChange={(id) => setAlumnoEncargadoId(id)}
+                                                placeholder={loadingAlumnos ? "Cargando padrón de alumnos..." : "Buscar por nombre, apellido o boleta..."}
+                                            />
+                                        </div>
+                                    </section>
+
+                                    {/* SECCIÓN 4: PLANTILLA DE MIEMBROS */}
+                                    <section className="club-section-card">
+                                        <div className="section-card-header">
+                                            <div className="section-card-badge guinda">4</div>
+                                            <div className="section-card-title-group">
+                                                <h2>Plantilla de Estudiantes Integrantes</h2>
+                                                <p>Se requiere un mínimo de {MIN_ESTUDIANTES} alumnos (incluyendo al encargado)</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Barra de progreso interactiva */}
+                                        <div className="members-progress-card">
+                                            <div className="members-progress-top">
+                                                <span className="members-count-label">
+                                                    Progreso de registro de integrantes
+                                                </span>
+                                                <span className={`members-count-badge ${metaCumplida ? 'complete' : 'pending'}`}>
+                                                    {totalSeleccionados} / {MIN_ESTUDIANTES} alumnos {metaCumplida ? '✓' : ''}
+                                                </span>
+                                            </div>
+                                            <div className="members-progress-bar-bg">
+                                                <div
+                                                    className={`members-progress-bar-fill ${metaCumplida ? 'complete' : ''}`}
+                                                    style={{ width: `${porcentajeProgreso}%` }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label htmlFor="miembrosIds">
+                                                <span>Agregar Miembros al Club <span className="label-required">*</span></span>
+                                            </label>
+                                            <MultiSearchableSelect
+                                                options={opcionesAlumnos}
+                                                selectedIds={miembrosIds}
+                                                leaderId={alumnoEncargadoId}
+                                                onChange={(ids) => setMiembrosIds(ids)}
+                                                onRemoteSearch={handleBuscarAlumnos}
+                                                placeholder={loadingAlumnos ? "Cargando..." : "Escribe nombre o boleta para agregar alumnos..."}
+                                            />
+                                        </div>
+                                    </section>
+                                </div>
+                            </div>
+
+                            {/* BARRA INFERIOR DE ACCIONES */}
+                            <div className="crear-club-footer-actions">
+                                <p className="footer-hint-text">
+                                    📋 Al registrar el club, el estatus pasará a <strong>Esperando Firmas</strong> para que los estudiantes confirmen su participación.
+                                </p>
+                                <div className="footer-buttons-group">
+                                    <button
+                                        type="button"
+                                        onClick={handleBack}
+                                        className="btn-cancelar-club"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="btn-crear-club"
+                                        disabled={loading}
+                                    >
+                                        {loading ? 'Registrando Club...' : '🚀 Registrar y Enviar Solicitud'}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </main>
             </div>

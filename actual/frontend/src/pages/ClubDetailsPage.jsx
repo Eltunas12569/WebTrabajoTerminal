@@ -26,8 +26,8 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     const tabFromUrl = searchParams.get('tab') || location.state?.tab || defaultTab;
     const [activeTab, setActiveTab] = useState(tabFromUrl);
 
-    // Sub-pestaña para el apartado de creación: 'ambos', 'aviso', 'evento'
-    const [subTabCreacion, setSubTabCreacion] = useState('ambos');
+    // Sub-pestaña para el apartado de creación: 'aviso', 'evento'
+    const [subTabCreacion, setSubTabCreacion] = useState('aviso');
 
     // Estados del Club y Membresía
     const [club, setClub] = useState(location.state?.club || null);
@@ -49,6 +49,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     const [tituloAviso, setTituloAviso] = useState('');
     const [nuevoAviso, setNuevoAviso] = useState('');
     const [prioridadAviso, setPrioridadAviso] = useState('normal');
+    const [fechaVencimientoAviso, setFechaVencimientoAviso] = useState('');
     const [descartadosAvisos, setDescartadosAvisos] = useState([]);
 
     // Estados de Eventos
@@ -74,6 +75,16 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     const [errorEmergencia, setErrorEmergencia] = useState('');
     const [modalEmergenciaAbierto, setModalEmergenciaAbierto] = useState(false);
     const [telefonoCopiado, setTelefonoCopiado] = useState('');
+
+    // Estado para el Modal de Confirmación de Creación de Avisos y Eventos
+    const [modalConfirmacion, setModalConfirmacion] = useState({
+        abierto: false,
+        tipo: '', // 'aviso' | 'evento'
+        etapa: 'confirmar', // 'confirmar' | 'exito'
+        procesando: false,
+        datos: null,
+        mensajeExito: ''
+    });
 
     // Roles y permisos
     const esAdmin = Number(user?.role_id) === 1 || Number(user?.rol) === 1;
@@ -204,25 +215,37 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     };
 
     // Acciones de Avisos
-    const handlePublicarAviso = async (e) => {
+    const handlePublicarAviso = (e) => {
         e.preventDefault();
         setError('');
         setSuccess('');
-        if (!nuevoAviso.trim()) return;
-        try {
-            await api.post(`/clubes/${id}/avisos`, {
-                titulo: tituloAviso.trim() || undefined,
-                contenido: nuevoAviso.trim(),
-                prioridad: prioridadAviso
-            });
-            setTituloAviso('');
-            setNuevoAviso('');
-            setPrioridadAviso('normal');
-            setSuccess(`✓ Aviso publicado exitosamente con prioridad ${prioridadAviso.toUpperCase()} para todos los miembros.`);
-            fetchAvisos();
-        } catch (err) {
-            setError(err.response?.data?.message || 'Error al publicar el aviso.');
+        if (!nuevoAviso.trim()) {
+            setError('El mensaje o comunicado del aviso es obligatorio.');
+            return;
         }
+        if (!fechaVencimientoAviso) {
+            setError('La fecha de vencimiento del aviso es obligatoria.');
+            return;
+        }
+        const fechaVencObj = new Date(fechaVencimientoAviso);
+        if (isNaN(fechaVencObj.getTime()) || fechaVencObj.getTime() <= Date.now()) {
+            setError('La fecha de vencimiento debe ser posterior a la fecha y hora actual.');
+            return;
+        }
+
+        setModalConfirmacion({
+            abierto: true,
+            tipo: 'aviso',
+            etapa: 'confirmar',
+            procesando: false,
+            datos: {
+                titulo: tituloAviso.trim() || 'Comunicado General del Club',
+                contenido: nuevoAviso.trim(),
+                prioridad: prioridadAviso,
+                fecha_vencimiento: fechaVencimientoAviso
+            },
+            mensajeExito: ''
+        });
     };
 
     const handleDescartarAviso = (avisoId, e) => {
@@ -239,23 +262,90 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     };
 
     // Acciones de Eventos
-    const handleCrearEvento = async (e) => {
+    const handleCrearEvento = (e) => {
         e.preventDefault();
         setError('');
         setSuccess('');
-        try {
-            await api.post(`/clubes/${id}/eventos`, {
+        if (!eventoForm.titulo.trim() || !eventoForm.fecha_evento) return;
+
+        setModalConfirmacion({
+            abierto: true,
+            tipo: 'evento',
+            etapa: 'confirmar',
+            procesando: false,
+            datos: {
                 ...eventoForm,
-                prioridad: eventoForm.prioridad || 'alta',
-                notificarAviso: true
-            });
-            setEventoForm({ titulo: '', descripcion: '', fecha_evento: '', lugar: '', prioridad: 'alta' });
-            setSuccess('✓ Evento agendado y notificado con alta prioridad a todos los integrantes.');
-            fetchEventos();
-            fetchAvisos();
+                prioridad: eventoForm.prioridad || 'alta'
+            },
+            mensajeExito: ''
+        });
+    };
+
+    // Confirmar y ejecutar la creación del Aviso o Evento
+    const confirmarAccionCreacion = async () => {
+        setModalConfirmacion(prev => ({ ...prev, procesando: true }));
+        setError('');
+        setSuccess('');
+
+        try {
+            if (modalConfirmacion.tipo === 'aviso') {
+                await api.post(`/clubes/${id}/avisos`, {
+                    titulo: tituloAviso.trim() || undefined,
+                    contenido: nuevoAviso.trim(),
+                    prioridad: prioridadAviso,
+                    fecha_vencimiento: fechaVencimientoAviso
+                });
+                const msg = `✓ Aviso publicado exitosamente con prioridad ${prioridadAviso.toUpperCase()} para todos los miembros.`;
+                setTituloAviso('');
+                setNuevoAviso('');
+                setPrioridadAviso('normal');
+                setFechaVencimientoAviso('');
+                setSuccess(msg);
+                fetchAvisos();
+
+                setModalConfirmacion(prev => ({
+                    ...prev,
+                    procesando: false,
+                    etapa: 'exito',
+                    mensajeExito: 'El aviso oficial ha sido publicado correctamente y ya se encuentra visible en el Muro de Avisos para todos los miembros del club.'
+                }));
+            } else if (modalConfirmacion.tipo === 'evento') {
+                const prio = eventoForm.prioridad || 'alta';
+                await api.post(`/clubes/${id}/eventos`, {
+                    ...eventoForm,
+                    prioridad: prio,
+                    notificarAviso: true
+                });
+                const msg = `✓ Evento agendado y notificado con prioridad ${prio.toUpperCase()} a todos los integrantes.`;
+                setEventoForm({ titulo: '', descripcion: '', fecha_evento: '', lugar: '', prioridad: 'alta' });
+                setSuccess(msg);
+                fetchEventos();
+                fetchAvisos();
+
+                setModalConfirmacion(prev => ({
+                    ...prev,
+                    procesando: false,
+                    etapa: 'exito',
+                    mensajeExito: 'El evento ha sido registrado en el calendario del club y se ha enviado un aviso automático a todos los integrantes.'
+                }));
+            }
         } catch (err) {
-            setError(err.response?.data?.message || 'Error al crear el evento.');
+            const errMsg = err.response?.data?.message || (modalConfirmacion.tipo === 'aviso' ? 'Error al publicar el aviso.' : 'Error al crear el evento.');
+            setError(errMsg);
+            setModalConfirmacion(prev => ({ ...prev, abierto: false, procesando: false }));
         }
+    };
+
+    const cerrarModalConfirmacion = () => {
+        if (modalConfirmacion.procesando) return;
+        setModalConfirmacion({
+            abierto: false,
+            tipo: '',
+            etapa: 'confirmar',
+            procesando: false,
+            datos: null,
+            mensajeExito: ''
+        });
     };
 
     const handleAsistencia = async (idEvento, asistira) => {
@@ -1138,6 +1228,12 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                     <span style={{ fontSize: '0.8rem', color: '#888' }}>
                                                                         🕒 {new Date(aviso.fecha_envio || aviso.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
                                                                     </span>
+
+                                                                    {aviso.fecha_vencimiento && (
+                                                                        <span style={{ fontSize: '0.78rem', background: '#fff8e1', color: '#b45309', border: '1px solid #fde68a', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                                                                            ⏳ Vence: {new Date(aviso.fecha_vencimiento).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
+                                                                        </span>
+                                                                    )}
                                                                 </div>
 
                                                                 <button
@@ -1683,25 +1779,8 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                 </p>
                                             </div>
 
-                                            {/* Selector de Vista: Ambos, Solo Aviso, Solo Evento */}
+                                            {/* Selector de Vista: Redactar Aviso, Agendar Evento */}
                                             <div style={{ display: 'flex', background: '#f0f2f5', padding: '4px', borderRadius: '8px', gap: '4px' }}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSubTabCreacion('ambos')}
-                                                    style={{
-                                                        padding: '7px 14px',
-                                                        border: 'none',
-                                                        borderRadius: '6px',
-                                                        cursor: 'pointer',
-                                                        fontWeight: 'bold',
-                                                        fontSize: '0.85rem',
-                                                        background: subTabCreacion === 'ambos' ? '#003366' : 'transparent',
-                                                        color: subTabCreacion === 'ambos' ? '#fff' : '#555',
-                                                        transition: 'all 0.2s'
-                                                    }}
-                                                >
-                                                    📋 Ver Ambos
-                                                </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setSubTabCreacion('aviso')}
@@ -1739,16 +1818,16 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                             </div>
                                         </div>
 
-                                        {/* Formulario(s) de Creación */}
+                                        {/* Formulario de Creación */}
                                         <div style={{
                                             display: 'grid',
-                                            gridTemplateColumns: subTabCreacion === 'ambos' ? 'repeat(auto-fit, minmax(480px, 1fr))' : '1fr',
+                                            gridTemplateColumns: '1fr',
                                             gap: '24px',
                                             alignItems: 'start'
                                         }}>
 
                                             {/* PANEL 1: PUBLICAR AVISO INTERNO */}
-                                            {(subTabCreacion === 'ambos' || subTabCreacion === 'aviso') && (
+                                            {subTabCreacion === 'aviso' && (
                                                 <div style={{
                                                     background: '#ffffff',
                                                     padding: '28px',
@@ -1779,24 +1858,47 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                     </p>
 
                                                     <form onSubmit={handlePublicarAviso}>
-                                                        <div style={{ marginBottom: '16px' }}>
-                                                            <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '6px', color: '#333' }}>
-                                                                Título o Asunto del Aviso (Opcional)
-                                                            </label>
-                                                            <input
-                                                                type="text"
-                                                                value={tituloAviso}
-                                                                onChange={(e) => setTituloAviso(e.target.value)}
-                                                                placeholder="Ej. Convocatoria importante / Cambio de horario de práctica"
-                                                                style={{
-                                                                    width: '100%',
-                                                                    padding: '11px 14px',
-                                                                    borderRadius: '6px',
-                                                                    border: '1px solid #ced4da',
-                                                                    boxSizing: 'border-box',
-                                                                    fontSize: '0.92rem'
-                                                                }}
-                                                            />
+                                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+                                                            <div>
+                                                                <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '6px', color: '#333' }}>
+                                                                    Título o Asunto del Aviso (Opcional)
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={tituloAviso}
+                                                                    onChange={(e) => setTituloAviso(e.target.value)}
+                                                                    placeholder="Ej. Convocatoria importante / Cambio de horario"
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        padding: '11px 14px',
+                                                                        borderRadius: '6px',
+                                                                        border: '1px solid #ced4da',
+                                                                        boxSizing: 'border-box',
+                                                                        fontSize: '0.92rem'
+                                                                    }}
+                                                                />
+                                                            </div>
+
+                                                            <div>
+                                                                <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '6px', color: '#333' }}>
+                                                                    Fecha y Hora de Vencimiento *
+                                                                </label>
+                                                                <input
+                                                                    type="datetime-local"
+                                                                    value={fechaVencimientoAviso}
+                                                                    onChange={(e) => setFechaVencimientoAviso(e.target.value)}
+                                                                    min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        padding: '11px 14px',
+                                                                        borderRadius: '6px',
+                                                                        border: '1px solid #ced4da',
+                                                                        boxSizing: 'border-box',
+                                                                        fontSize: '0.92rem'
+                                                                    }}
+                                                                    required
+                                                                />
+                                                            </div>
                                                         </div>
 
                                                         {/* Selector de Prioridad del Aviso */}
@@ -1922,7 +2024,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                             )}
 
                                             {/* PANEL 2: AGENDAR NUEVO EVENTO */}
-                                            {(subTabCreacion === 'ambos' || subTabCreacion === 'evento') && (
+                                            {subTabCreacion === 'evento' && (
                                                 <div style={{
                                                     background: '#ffffff',
                                                     padding: '28px',
@@ -2083,25 +2185,6 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                         <span>🟢</span>
                                                                         <span>Baja Prioridad</span>
                                                                     </button>
-                                                                </div>
-
-                                                                {/* Notificación informativa */}
-                                                                <div style={{
-                                                                    marginTop: '10px',
-                                                                    padding: '10px 14px',
-                                                                    borderRadius: '8px',
-                                                                    background: '#eef6ff',
-                                                                    border: '1px solid #c9e0fa',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '10px',
-                                                                    fontSize: '0.84rem',
-                                                                    color: '#003366'
-                                                                }}>
-                                                                    <span style={{ fontSize: '1.2rem' }}>📢</span>
-                                                                    <span>
-                                                                        Al agendar este evento, se emitirá automáticamente un aviso a todos los miembros inscritos con <strong>{(eventoForm.prioridad || 'alta').toUpperCase()} PRIORIDAD</strong> en sus tableros.
-                                                                    </span>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -2312,6 +2395,250 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                 Cerrar
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL DE CONFIRMACIÓN AL CREAR AVISOS O EVENTOS */}
+            {modalConfirmacion.abierto && (
+                <div className="club-details-overlay" onClick={cerrarModalConfirmacion}>
+                    <div
+                        className="club-details-modal"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            maxWidth: '540px',
+                            width: '92%',
+                            padding: '28px 32px',
+                            borderRadius: '14px',
+                            boxShadow: '0 20px 45px rgba(0, 31, 63, 0.25)',
+                            borderTop: modalConfirmacion.etapa === 'exito'
+                                ? '6px solid #28a745'
+                                : modalConfirmacion.tipo === 'aviso'
+                                    ? '6px solid #003366'
+                                    : '6px solid #28a745'
+                        }}
+                    >
+                        <button
+                            type="button"
+                            className="close-modal-btn"
+                            onClick={cerrarModalConfirmacion}
+                            disabled={modalConfirmacion.procesando}
+                        >
+                            ✕
+                        </button>
+
+                        {modalConfirmacion.etapa === 'confirmar' ? (
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                                    <div style={{
+                                        width: '48px',
+                                        height: '48px',
+                                        borderRadius: '12px',
+                                        background: modalConfirmacion.tipo === 'aviso' ? '#e7f3ff' : '#d4edda',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '1.6rem',
+                                        flexShrink: 0
+                                    }}>
+                                        {modalConfirmacion.tipo === 'aviso' ? '📢' : '📅'}
+                                    </div>
+                                    <div>
+                                        <h3 style={{ margin: 0, color: '#003366', fontSize: '1.25rem', fontWeight: '800' }}>
+                                            {modalConfirmacion.tipo === 'aviso'
+                                                ? 'Confirmar Publicación de Aviso'
+                                                : 'Confirmar Creación de Evento'}
+                                        </h3>
+                                        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                            Verifica los datos antes de notificar a los miembros del club
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div style={{
+                                    background: '#f8fafc',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '10px',
+                                    padding: '16px 18px',
+                                    marginBottom: '18px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '10px'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                        <strong style={{ color: '#0f172a', fontSize: '1rem' }}>
+                                            {modalConfirmacion.datos?.titulo}
+                                        </strong>
+                                        <span style={{
+                                            fontSize: '0.75rem',
+                                            fontWeight: '700',
+                                            padding: '3px 10px',
+                                            borderRadius: '999px',
+                                            background: modalConfirmacion.datos?.prioridad === 'alta'
+                                                ? '#fee2e2'
+                                                : modalConfirmacion.datos?.prioridad === 'baja'
+                                                    ? '#dcfce7'
+                                                    : '#e0f2fe',
+                                            color: modalConfirmacion.datos?.prioridad === 'alta'
+                                                ? '#b91c1c'
+                                                : modalConfirmacion.datos?.prioridad === 'baja'
+                                                    ? '#15803d'
+                                                    : '#0369a1'
+                                        }}>
+                                            PRIORIDAD {(modalConfirmacion.datos?.prioridad || 'normal').toUpperCase()}
+                                        </span>
+                                    </div>
+
+                                    {modalConfirmacion.tipo === 'aviso' && modalConfirmacion.datos?.fecha_vencimiento && (
+                                        <div style={{ fontSize: '0.88rem', color: '#334155' }}>
+                                            ⏳ <strong>Fecha de vencimiento:</strong>{' '}
+                                            {new Date(modalConfirmacion.datos.fecha_vencimiento).toLocaleString('es-MX', { dateStyle: 'full', timeStyle: 'short' })}
+                                        </div>
+                                    )}
+
+                                    {modalConfirmacion.tipo === 'evento' && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.88rem', color: '#334155' }}>
+                                            <span>
+                                                🕒 <strong>Fecha y hora:</strong>{' '}
+                                                {modalConfirmacion.datos?.fecha_evento
+                                                    ? new Date(modalConfirmacion.datos.fecha_evento).toLocaleString('es-MX', { dateStyle: 'full', timeStyle: 'short' })
+                                                    : 'Por definir'}
+                                            </span>
+                                            {modalConfirmacion.datos?.lugar && (
+                                                <span>📍 <strong>Lugar:</strong> {modalConfirmacion.datos.lugar}</span>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {(modalConfirmacion.datos?.contenido || modalConfirmacion.datos?.descripcion) && (
+                                        <p style={{
+                                            margin: 0,
+                                            fontSize: '0.88rem',
+                                            color: '#475569',
+                                            lineHeight: '1.5',
+                                            whiteSpace: 'pre-wrap',
+                                            maxHeight: '130px',
+                                            overflowY: 'auto',
+                                            borderTop: '1px solid #e2e8f0',
+                                            paddingTop: '8px'
+                                        }}>
+                                            {modalConfirmacion.datos?.contenido || modalConfirmacion.datos?.descripcion}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <p style={{ margin: '0 0 22px 0', fontSize: '0.9rem', color: '#475569', lineHeight: '1.5' }}>
+                                    {modalConfirmacion.tipo === 'aviso'
+                                        ? '¿Estás seguro de que deseas publicar este aviso? Se mostrará inmediatamente en el tablero de todos los integrantes.'
+                                        : '¿Estás seguro de que deseas agendar este evento? Se habilitará el registro de asistencia y se notificará a todos los integrantes.'}
+                                </p>
+
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={cerrarModalConfirmacion}
+                                        disabled={modalConfirmacion.procesando}
+                                        style={{
+                                            padding: '10px 18px',
+                                            background: '#f1f5f9',
+                                            color: '#334155',
+                                            border: '1px solid #cbd5e1',
+                                            borderRadius: '8px',
+                                            fontWeight: '700',
+                                            cursor: modalConfirmacion.procesando ? 'not-allowed' : 'pointer'
+                                        }}
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={confirmarAccionCreacion}
+                                        disabled={modalConfirmacion.procesando}
+                                        style={{
+                                            padding: '10px 22px',
+                                            background: modalConfirmacion.tipo === 'aviso' ? '#003366' : '#28a745',
+                                            color: '#fff',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontWeight: '700',
+                                            cursor: modalConfirmacion.procesando ? 'wait' : 'pointer',
+                                            boxShadow: '0 4px 12px rgba(0, 51, 102, 0.2)'
+                                        }}
+                                    >
+                                        {modalConfirmacion.procesando
+                                            ? '⏳ Procesando...'
+                                            : modalConfirmacion.tipo === 'aviso'
+                                                ? '✓ Confirmar y Publicar'
+                                                : '✓ Confirmar y Agendar'}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '8px 4px' }}>
+                                <div style={{
+                                    width: '64px',
+                                    height: '64px',
+                                    borderRadius: '50%',
+                                    background: '#dcfce7',
+                                    color: '#16a34a',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '2rem',
+                                    margin: '0 auto 14px auto',
+                                    boxShadow: '0 6px 16px rgba(22, 163, 74, 0.18)'
+                                }}>
+                                    ✓
+                                </div>
+
+                                <h3 style={{ margin: '0 0 8px 0', color: '#155724', fontSize: '1.35rem', fontWeight: '800' }}>
+                                    {modalConfirmacion.tipo === 'aviso'
+                                        ? '¡Aviso Publicado con Éxito!'
+                                        : '¡Evento Agendado con Éxito!'}
+                                </h3>
+
+                                <p style={{ margin: '0 0 22px 0', color: '#475569', fontSize: '0.92rem', lineHeight: '1.55' }}>
+                                    {modalConfirmacion.mensajeExito}
+                                </p>
+
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const destino = modalConfirmacion.tipo === 'aviso' ? 'avisos' : 'eventos';
+                                            cerrarModalConfirmacion();
+                                            handleTabChange(destino);
+                                        }}
+                                        style={{
+                                            padding: '10px 20px',
+                                            background: '#003366',
+                                            color: '#fff',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontWeight: '700',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        {modalConfirmacion.tipo === 'aviso' ? '📢 Ver Muro de Avisos' : '📅 Ver Eventos del Club'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={cerrarModalConfirmacion}
+                                        style={{
+                                            padding: '10px 22px',
+                                            background: '#28a745',
+                                            color: '#fff',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontWeight: '700',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Aceptar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
