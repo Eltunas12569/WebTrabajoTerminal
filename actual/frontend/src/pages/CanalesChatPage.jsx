@@ -211,7 +211,7 @@ const CanalesChatPage = ({ canalInicial }) => {
                 <div className="nav-left">
                     <button className="menu-toggle" onClick={toggleSidebar}>☰</button>
                     <span className="nav-title">
-                        {canalActivo === 'directivos' ? '🏛️ Sala de Directivos' : '🤝 Sala de Encargados'}
+                        {canalActivo === 'directivos' ? 'Sala de Directivos' : '🤝 Sala de Encargados'}
                     </span>
                 </div>
                 <div className="nav-right" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -280,7 +280,7 @@ const CanalesChatPage = ({ canalInicial }) => {
                                 <div className="chat-room-info">
                                     <div className="chat-room-title-row">
                                         <h2 className="chat-room-title">
-                                            {canalActivo === 'directivos' ? '🏛️ Sala General de Directivos' : '🤝 Sala Exclusiva de Encargados'}
+                                            {canalActivo === 'directivos' ? 'Sala General de Directivos' : '🤝 Sala Exclusiva de Encargados'}
                                         </h2>
                                     </div>
                                     <p className="chat-room-desc">
@@ -298,14 +298,14 @@ const CanalesChatPage = ({ canalInicial }) => {
                                             onClick={() => handleSelectCanal('directivos')}
                                             className={`chat-channel-pill ${canalActivo === 'directivos' ? 'active' : ''}`}
                                         >
-                                            🏛️ Directivos
+                                            Directivos
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => handleSelectCanal('encargados')}
                                             className={`chat-channel-pill ${canalActivo === 'encargados' ? 'active' : ''}`}
                                         >
-                                            🤝 Encargados
+                                            Encargados
                                         </button>
                                     </div>
                                 )}
@@ -355,7 +355,7 @@ const CanalesChatPage = ({ canalInicial }) => {
                                                                 </span>
                                                             ) : msg.etiqueta_encargado ? (
                                                                 <span className="chat-role-badge chat-role-encargado">
-                                                                    ⭐ {msg.etiqueta_encargado}
+                                                                    {msg.etiqueta_encargado}
                                                                 </span>
                                                             ) : null}
                                                         </div>
