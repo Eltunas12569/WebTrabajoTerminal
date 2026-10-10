@@ -176,18 +176,12 @@ const ClubChatPage = () => {
                     </div>
                     <div className="nav-right">
                         <button
+                            type="button"
                             onClick={handleBack}
-                            style={{
-                                background: 'rgba(255,255,255,0.2)',
-                                border: 'none',
-                                color: '#fff',
-                                cursor: 'pointer',
-                                padding: '8px 15px',
-                                borderRadius: '6px',
-                                fontWeight: 'bold'
-                            }}
+                            className="btn-volver-nav"
                         >
-                            ← Volver
+                            <span className="btn-volver-icon">←</span>
+                            <span>Volver</span>
                         </button>
                     </div>
                 </header>
@@ -197,11 +191,13 @@ const ClubChatPage = () => {
                         <h2 style={{ color: '#c53030', margin: '0 0 10px 0', fontSize: '1.4rem' }}>Acceso Denegado</h2>
                         <p style={{ color: '#475569', lineHeight: '1.6', margin: '15px 0' }}>{errorAcceso}</p>
                         <button
+                            type="button"
                             onClick={() => navigate(user?.role_id === 1 ? '/admin' : '/gestion')}
-                            className="btn-crear-club"
+                            className="btn-volver-modern"
                             style={{ marginTop: '10px' }}
                         >
-                            ← Volver
+                            <span className="btn-volver-icon">←</span>
+                            <span>Volver</span>
                         </button>
                     </div>
                 </div>
@@ -295,22 +291,12 @@ const ClubChatPage = () => {
                     )}
 
                     <button
+                        type="button"
                         onClick={handleBack}
-                        style={{
-                            background: 'rgba(255,255,255,0.15)',
-                            border: '1px solid rgba(255,255,255,0.25)',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            padding: '8px 14px',
-                            borderRadius: '6px',
-                            fontWeight: 'bold',
-                            fontSize: '0.86rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                        }}
+                        className="btn-volver-nav"
                     >
-                        ← Volver
+                        <span className="btn-volver-icon">←</span>
+                        <span>Volver</span>
                     </button>
                 </div>
             </header>

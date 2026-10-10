@@ -208,6 +208,54 @@ router.post('/:id/eventos/:idEvento/asistencia', verificarToken, requireVerifica
     } catch (error) { res.status(500).json({ message: "Error al registrar asistencia" }); }
 });
 
+router.get('/:id/eventos/:idEvento/asistentes', verificarToken, requireVerificado, async (req, res) => {
+    const clubId = req.params.id;
+    const idEvento = req.params.idEvento;
+    const idUsuario = req.user.id;
+    const rolUsuario = Number(req.user.rol || req.user.role_id);
+
+    try {
+        // Verificar que el usuario sea administrador o encargado activo de este club
+        if (rolUsuario !== 1) {
+            const [permiso] = await db.query(
+                `SELECT id FROM inscripciones
+                 WHERE club_id = ? AND usuario_id = ?
+                   AND rol_en_club IN ('encargado_profesor', 'encargado_alumno')
+                   AND estatus = 'activo'
+                 LIMIT 1`,
+                [clubId, idUsuario]
+            );
+            if (permiso.length === 0) {
+                return res.status(403).json({ message: "Acceso exclusivo para los encargados del club." });
+            }
+        }
+
+        const [asistentes] = await db.query(
+            `SELECT u.id AS usuario_id,
+                    u.nombres,
+                    u.apellido_paterno,
+                    u.apellido_materno,
+                    CONCAT(u.nombres, ' ', u.apellido_paterno, IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != '', CONCAT(' ', u.apellido_materno), '')) AS nombre_completo,
+                    u.correo,
+                    u.boleta,
+                    u.num_empleado,
+                    IFNULL(i.rol_en_club, 'miembro') AS rol_en_club
+             FROM asistencias_eventos ae
+             JOIN eventos_club e ON ae.evento_id = e.id AND e.club_id = ?
+             JOIN usuarios u ON ae.usuario_id = u.id
+             LEFT JOIN inscripciones i ON i.usuario_id = u.id AND i.club_id = ?
+             WHERE ae.evento_id = ? AND ae.asistira = 1
+             ORDER BY u.apellido_paterno ASC, u.nombres ASC`,
+            [clubId, clubId, idEvento]
+        );
+
+        res.status(200).json({ asistentes });
+    } catch (error) {
+        console.error("Error al obtener asistentes del evento:", error);
+        res.status(500).json({ message: "Error al obtener la lista de asistentes del evento." });
+    }
+});
+
 
 
 // ==========================================

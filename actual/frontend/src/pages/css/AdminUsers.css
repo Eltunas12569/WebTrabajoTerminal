@@ -47,17 +47,23 @@
 .admin-users-toolbar select {
     min-height: 42px;
     box-sizing: border-box;
-    padding: 0 12px;
-    border: 1px solid #cbd5df;
-    border-radius: 6px;
-    background: #fff;
-    color: #1d2935;
-    font-size: 0.95rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    color: #0f172a;
+    font-size: 0.92rem;
 }
 
 .admin-users-toolbar input {
     flex: 1;
     min-width: 220px;
+    padding: 0 14px;
+    background-color: #ffffff;
+}
+
+.admin-users-toolbar select {
+    padding: 0 40px 0 14px;
+    background-color: #f8fafc;
+    font-weight: 600;
 }
 
 .admin-users-table-wrap {

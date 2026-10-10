@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 /**
  * Componente interactivo de Calendario de Eventos con:
@@ -26,6 +27,11 @@ const CalendarioEventos = ({
     const [diaSeleccionado, setDiaSeleccionado] = useState(null);
     const [filtroClub, setFiltroClub] = useState('todos');
     const [guardandoAsistencia, setGuardandoAsistencia] = useState(false);
+
+    // Estados para ver lista de asistentes cuando el usuario es encargado
+    const [mostrarAsistentes, setMostrarAsistentes] = useState(false);
+    const [listaAsistentes, setListaAsistentes] = useState([]);
+    const [cargandoAsistentes, setCargandoAsistentes] = useState(false);
 
     const meses = [
         'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -347,12 +353,13 @@ const CalendarioEventos = ({
                                 value={filtroClub}
                                 onChange={(e) => setFiltroClub(e.target.value)}
                                 style={{
-                                    padding: '6px 10px',
-                                    borderRadius: '8px',
-                                    border: '1px solid #ccc',
-                                    fontSize: '0.85rem',
-                                    color: '#333',
-                                    background: '#fff',
+                                    padding: '8px 38px 8px 12px',
+                                    borderRadius: '9px',
+                                    border: '1.5px solid #cbd5e1',
+                                    fontSize: '0.86rem',
+                                    fontWeight: '600',
+                                    color: '#0f172a',
+                                    backgroundColor: '#f8fafc',
                                     cursor: 'pointer'
                                 }}
                             >
@@ -641,7 +648,11 @@ const CalendarioEventos = ({
             {/* Modal de Detalle Completo del Evento */}
             {eventoSeleccionado && (
                 <div
-                    onClick={() => setEventoSeleccionado(null)}
+                    onClick={() => {
+                        setEventoSeleccionado(null);
+                        setMostrarAsistentes(false);
+                        setListaAsistentes([]);
+                    }}
                     style={{
                         position: 'fixed',
                         top: 0,
@@ -675,7 +686,11 @@ const CalendarioEventos = ({
                     >
                         {/* Botón cerrar */}
                         <button
-                            onClick={() => setEventoSeleccionado(null)}
+                            onClick={() => {
+                                setEventoSeleccionado(null);
+                                setMostrarAsistentes(false);
+                                setListaAsistentes([]);
+                            }}
                             style={{
                                 position: 'absolute',
                                 top: '16px',
@@ -749,9 +764,88 @@ const CalendarioEventos = ({
                                     📍 <strong>Lugar:</strong> {eventoSeleccionado.lugar}
                                 </div>
                             )}
-                            <div>
-                                👥 <strong>Asistentes confirmados:</strong> {eventoSeleccionado.total_asistentes || 0} personas
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                <span>
+                                    👥 <strong>Asistentes confirmados:</strong> {eventoSeleccionado.total_asistentes || 0} personas
+                                </span>
+                                {(eventoSeleccionado.es_encargado || modo === 'admin') && eventoSeleccionado.club_id && (
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (mostrarAsistentes) {
+                                                setMostrarAsistentes(false);
+                                                return;
+                                            }
+                                            setMostrarAsistentes(true);
+                                            setCargandoAsistentes(true);
+                                            try {
+                                                const res = await api.get(`/clubes/${eventoSeleccionado.club_id}/eventos/${eventoSeleccionado.id}/asistentes`);
+                                                setListaAsistentes(res.data?.asistentes || []);
+                                            } catch (err) {
+                                                console.error('Error al cargar asistentes:', err);
+                                                setListaAsistentes([]);
+                                            } finally {
+                                                setCargandoAsistentes(false);
+                                            }
+                                        }}
+                                        style={{
+                                            backgroundColor: '#eff6ff',
+                                            color: '#003366',
+                                            border: '1px solid #bfdbfe',
+                                            borderRadius: '7px',
+                                            padding: '4px 10px',
+                                            fontSize: '0.78rem',
+                                            fontWeight: '700',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        {mostrarAsistentes ? '▲ Ocultar asistentes' : '📋 Ver lista de asistentes'}
+                                    </button>
+                                )}
                             </div>
+
+                            {mostrarAsistentes && (
+                                <div style={{
+                                    marginTop: '6px',
+                                    paddingTop: '10px',
+                                    borderTop: '1px solid #e2e8f0',
+                                    maxHeight: '190px',
+                                    overflowY: 'auto',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '6px'
+                                }}>
+                                    {cargandoAsistentes ? (
+                                        <span style={{ fontSize: '0.84rem', color: '#64748b' }}>⏳ Cargando asistentes...</span>
+                                    ) : listaAsistentes.length === 0 ? (
+                                        <span style={{ fontSize: '0.84rem', color: '#64748b' }}>Aún no hay integrantes confirmados para este evento.</span>
+                                    ) : (
+                                        listaAsistentes.map((asistente, idx) => (
+                                            <div
+                                                key={asistente.usuario_id || idx}
+                                                style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    backgroundColor: '#ffffff',
+                                                    border: '1px solid #e2e8f0',
+                                                    borderRadius: '8px',
+                                                    padding: '7px 10px',
+                                                    fontSize: '0.83rem'
+                                                }}
+                                            >
+                                                <div>
+                                                    <strong style={{ color: '#0f172a' }}>{asistente.nombre_completo}</strong>
+                                                    <span style={{ color: '#64748b', marginLeft: '6px', fontSize: '0.78rem' }}>
+                                                        {asistente.boleta ? `(${asistente.boleta})` : (asistente.num_empleado ? `(${asistente.num_empleado})` : '')}
+                                                    </span>
+                                                </div>
+                                                <span style={{ color: '#166534', fontWeight: '700', fontSize: '0.75rem' }}>✓ Confirmado</span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Descripción */}

@@ -216,23 +216,12 @@ const CanalesChatPage = ({ canalInicial }) => {
                 </div>
                 <div className="nav-right" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                     <button
+                        type="button"
                         onClick={handleBack}
-                        style={{
-                            background: 'rgba(255,255,255,0.15)',
-                            border: '1px solid rgba(255,255,255,0.25)',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            padding: '8px 16px',
-                            borderRadius: '8px',
-                            fontWeight: '600',
-                            fontSize: '0.88rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            transition: 'all 0.2s ease'
-                        }}
+                        className="btn-volver-nav"
                     >
-                        ← Volver
+                        <span className="btn-volver-icon">←</span>
+                        <span>Volver</span>
                     </button>
                     <div className="profile-container">
                         <span className="profile-greeting">Hola, {user?.nombres}</span>

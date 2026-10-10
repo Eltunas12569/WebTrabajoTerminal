@@ -281,18 +281,10 @@ const EditarClubEncargadoPage = () => {
                                 <button
                                     type="button"
                                     onClick={() => navigate(`/club/${id}`)}
-                                    style={{
-                                        padding: '10px 22px',
-                                        backgroundColor: '#003366',
-                                        color: '#ffffff',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        fontWeight: '700',
-                                        fontSize: '0.92rem',
-                                        cursor: 'pointer'
-                                    }}
+                                    className="btn-volver-modern"
                                 >
-                                    ← Volver al Club
+                                    <span className="btn-volver-icon">←</span>
+                                    <span>Volver al Club</span>
                                 </button>
                             </div>
                         ) : (
@@ -338,18 +330,10 @@ const EditarClubEncargadoPage = () => {
                                         <button
                                             type="button"
                                             onClick={() => navigate(`/club/${id}`)}
-                                            style={{
-                                                padding: '8px 16px',
-                                                backgroundColor: '#f1f5f9',
-                                                color: '#334155',
-                                                border: '1px solid #cbd5e1',
-                                                borderRadius: '8px',
-                                                fontWeight: '700',
-                                                fontSize: '0.88rem',
-                                                cursor: 'pointer'
-                                            }}
+                                            className="btn-volver-modern"
                                         >
-                                            ← Volver
+                                            <span className="btn-volver-icon">←</span>
+                                            <span>Volver</span>
                                         </button>
                                     </div>
 
