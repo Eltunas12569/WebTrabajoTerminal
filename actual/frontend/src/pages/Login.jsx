@@ -548,7 +548,7 @@ const Login = () => {
                             onMouseOver={(e) => e.target.style.color = '#0055ff'}
                             onMouseOut={(e) => e.target.style.color = '#003366'}
                         >
-                            Crear una cuenta de atleta
+                            Crear una nueva cuenta
                         </button>
 
                         <div style={{ 
