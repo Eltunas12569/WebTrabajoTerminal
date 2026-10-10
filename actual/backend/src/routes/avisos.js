@@ -102,6 +102,49 @@ router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) =>
     }
 });
 
+// Crear aviso global (Solo Administrador)
+router.post('/', verifyToken, requireVerificado, async (req, res) => {
+    try {
+        const [users] = await db.query('SELECT role_id FROM usuarios WHERE id = ?', [req.user.id]);
+        if (!users.length || Number(users[0].role_id) !== 1) {
+            return res.status(403).json({ message: 'Acceso denegado. Solo administradores pueden publicar avisos globales.' });
+        }
+
+        const { titulo, contenido, prioridad = 'normal', fecha_vencimiento } = req.body;
+        if (!titulo || !contenido) {
+            return res.status(400).json({ message: 'El título y el contenido son obligatorios.' });
+        }
+
+        const prioridadValida = ['alta', 'normal', 'baja'].includes(String(prioridad).toLowerCase()) 
+            ? String(prioridad).toLowerCase() 
+            : 'normal';
+
+        const [resultado] = await db.query(
+            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo) 
+             VALUES (NULL, ?, ?, ?, ?, NOW(), ?, 1)`,
+            [req.user.id, titulo.trim(), contenido.trim(), prioridadValida, fecha_vencimiento || null]
+        );
+
+        const io = req.app.get('socketio');
+        if (io) {
+            io.emit('nuevo_aviso_global', {
+                id: resultado.insertId,
+                titulo: titulo.trim(),
+                contenido: contenido.trim(),
+                prioridad: prioridadValida
+            });
+        }
+
+        res.status(201).json({ 
+            message: 'Aviso global publicado exitosamente.',
+            id: resultado.insertId 
+        });
+    } catch (error) {
+        console.error("Error al crear aviso global:", error);
+        res.status(500).json({ message: "Error interno al crear el aviso global." });
+    }
+});
+
 router.delete('/:tipo/:id', verifyToken, requireVerificado, async (req, res) => {
     const { tipo, id } = req.params;
 

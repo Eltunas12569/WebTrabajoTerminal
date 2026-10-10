@@ -31,7 +31,7 @@
 .modal-politicas-container {
     background: #ffffff;
     width: 100%;
-    max-width: 820px;
+    max-width: 780px;
     max-height: 90vh;
     border-radius: 14px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.08);
@@ -114,38 +114,6 @@
     line-height: 1.45;
 }
 
-/* Tabs */
-.modal-politicas-tabs {
-    display: flex;
-    background: #f1f5f9;
-    border-bottom: 1px solid #cbd5e1;
-    padding: 0 20px;
-    gap: 8px;
-}
-
-.modal-politicas-tab {
-    padding: 12px 18px;
-    background: transparent;
-    border: none;
-    border-bottom: 3px solid transparent;
-    font-size: 13.5px;
-    font-weight: 600;
-    color: #475569;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.modal-politicas-tab:hover {
-    color: #0f172a;
-}
-
-.modal-politicas-tab.active {
-    color: #6b0f1a;
-    border-bottom-color: #6b0f1a;
-    background: #ffffff;
-    font-weight: 700;
-}
-
 /* Contenido scrolleable */
 .modal-politicas-body {
     padding: 24px 28px;
@@ -159,6 +127,7 @@
 .modal-politicas-resumen-box {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
+    border-left: 4px solid #003366;
     border-radius: 8px;
     padding: 16px 20px;
     margin-bottom: 20px;
@@ -168,6 +137,7 @@
     margin: 0 0 8px 0;
     color: #0f172a;
     font-size: 15px;
+    font-weight: 700;
 }
 
 .modal-politicas-resumen-box p {
@@ -175,33 +145,72 @@
     white-space: pre-line;
     color: #334155;
     font-size: 13.5px;
+    line-height: 1.55;
 }
 
-.modal-politicas-doc-box {
+/* Enlaces directos a las páginas completas */
+.modal-politicas-links-banner {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+}
+
+.modal-politicas-links-title {
+    display: block;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 12px;
+}
+
+.modal-politicas-links-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.modal-doc-link-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
     border-radius: 8px;
-    padding: 18px 22px;
-    max-height: 240px;
-    overflow-y: auto;
-    font-size: 13px;
-    line-height: 1.6;
-    margin-bottom: 16px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
 }
 
-.modal-politicas-doc-box h4 {
-    margin: 0 0 10px 0;
+.modal-doc-link-btn:hover {
+    border-color: #003366;
+    background: #eff6ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 51, 102, 0.08);
+}
+
+.modal-doc-icon {
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.modal-doc-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-doc-text strong {
+    font-size: 13.5px;
     color: #003366;
-    font-size: 15px;
+    font-weight: 700;
 }
 
-.modal-politicas-doc-box ul {
-    margin: 8px 0;
-    padding-left: 20px;
-}
-
-.modal-politicas-doc-box li {
-    margin-bottom: 6px;
+.modal-doc-text small {
+    font-size: 11.5px;
+    color: #64748b;
+    margin-top: 2px;
 }
 
 /* Casillas de consentimiento */
@@ -210,10 +219,9 @@
     border: 1px solid #fecaca;
     border-radius: 8px;
     padding: 16px 20px;
-    margin-top: 10px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
 }
 
 .modal-politicas-checkbox-item {
@@ -224,6 +232,7 @@
     font-size: 13.5px;
     color: #1e293b;
     user-select: none;
+    line-height: 1.5;
 }
 
 .modal-politicas-checkbox-item input[type="checkbox"] {
@@ -232,9 +241,21 @@
     height: 18px;
     cursor: pointer;
     accent-color: #6b0f1a;
+    flex-shrink: 0;
 }
 
 .modal-politicas-checkbox-item strong {
+    color: #6b0f1a;
+}
+
+.modal-inline-link {
+    color: #003366;
+    text-decoration: underline;
+    font-weight: 700;
+    transition: color 0.15s ease;
+}
+
+.modal-inline-link:hover {
     color: #6b0f1a;
 }
 
@@ -306,4 +327,19 @@
     cursor: not-allowed;
     box-shadow: none;
     transform: none;
+}
+
+@media (max-width: 600px) {
+    .modal-politicas-links-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-politicas-footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .modal-politicas-footer-actions {
+        justify-content: flex-end;
+    }
 }

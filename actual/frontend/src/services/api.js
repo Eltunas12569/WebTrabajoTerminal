@@ -32,6 +32,14 @@ api.interceptors.response.use(
             // Redirección forzosa para evitar que el usuario vea datos cacheados
             window.location.href = '/';
         }
+
+        // 403 Forbidden por actualización de políticas pendiente (LGPDPPSO)
+        if (error.response && error.response.status === 403 && error.response.data?.code === 'POLITICAS_PENDIENTES') {
+            window.dispatchEvent(new CustomEvent('politicas_requeridas', {
+                detail: error.response.data
+            }));
+        }
+
         return Promise.reject(error);   
     }
 );
