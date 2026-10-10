@@ -49,6 +49,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     const [tituloAviso, setTituloAviso] = useState('');
     const [nuevoAviso, setNuevoAviso] = useState('');
     const [prioridadAviso, setPrioridadAviso] = useState('normal');
+    const [alcanceAviso, setAlcanceAviso] = useState('club');
     const [fechaVencimientoAviso, setFechaVencimientoAviso] = useState('');
     const [descartadosAvisos, setDescartadosAvisos] = useState([]);
 
@@ -60,7 +61,8 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         descripcion: '',
         fecha_evento: '',
         lugar: '',
-        prioridad: 'alta'
+        prioridad: 'alta',
+        alcance: 'club'
     });
 
     // Estados de Miembros y Filtros Web
@@ -248,9 +250,10 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             etapa: 'confirmar',
             procesando: false,
             datos: {
-                titulo: tituloAviso.trim() || 'Comunicado General del Club',
+                titulo: tituloAviso.trim() || (alcanceAviso === 'global' ? `Comunicado Global - ${club?.nombre || 'Club'}` : 'Comunicado General del Club'),
                 contenido: nuevoAviso.trim(),
                 prioridad: prioridadAviso,
+                alcance: alcanceAviso,
                 fecha_vencimiento: fechaVencimientoAviso
             },
             mensajeExito: ''
@@ -284,7 +287,8 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             procesando: false,
             datos: {
                 ...eventoForm,
-                prioridad: eventoForm.prioridad || 'alta'
+                prioridad: eventoForm.prioridad || 'alta',
+                alcance: eventoForm.alcance || 'club'
             },
             mensajeExito: ''
         });
@@ -298,16 +302,22 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
         try {
             if (modalConfirmacion.tipo === 'aviso') {
+                const esGlobalAviso = alcanceAviso === 'global';
                 await api.post(`/clubes/${id}/avisos`, {
                     titulo: tituloAviso.trim() || undefined,
                     contenido: nuevoAviso.trim(),
                     prioridad: prioridadAviso,
+                    alcance: alcanceAviso,
+                    es_global: esGlobalAviso,
                     fecha_vencimiento: fechaVencimientoAviso
                 });
-                const msg = `✓ Aviso publicado exitosamente con prioridad ${prioridadAviso.toUpperCase()} para todos los miembros.`;
+                const msg = esGlobalAviso
+                    ? `✓ Aviso GLOBAL publicado exitosamente con prioridad ${prioridadAviso.toUpperCase()} para toda la comunidad.`
+                    : `✓ Aviso publicado exitosamente con prioridad ${prioridadAviso.toUpperCase()} para los miembros del club.`;
                 setTituloAviso('');
                 setNuevoAviso('');
                 setPrioridadAviso('normal');
+                setAlcanceAviso('club');
                 setFechaVencimientoAviso('');
                 setSuccess(msg);
                 fetchAvisos();
@@ -316,17 +326,25 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                     ...prev,
                     procesando: false,
                     etapa: 'exito',
-                    mensajeExito: 'El aviso oficial ha sido publicado correctamente y ya se encuentra visible en el Muro de Avisos para todos los miembros del club.'
+                    mensajeExito: esGlobalAviso
+                        ? 'El aviso global ha sido publicado correctamente y ya es visible tanto en el tablero general de toda la comunidad como en el Muro de Avisos del club.'
+                        : 'El aviso oficial ha sido publicado correctamente y ya se encuentra visible en el Muro de Avisos para todos los miembros del club.'
                 }));
             } else if (modalConfirmacion.tipo === 'evento') {
                 const prio = eventoForm.prioridad || 'alta';
+                const alcanceEv = eventoForm.alcance || 'club';
+                const esGlobalEvento = alcanceEv === 'global';
                 await api.post(`/clubes/${id}/eventos`, {
                     ...eventoForm,
                     prioridad: prio,
+                    alcance: alcanceEv,
+                    es_global: esGlobalEvento,
                     notificarAviso: true
                 });
-                const msg = `✓ Evento agendado y notificado con prioridad ${prio.toUpperCase()} a todos los integrantes.`;
-                setEventoForm({ titulo: '', descripcion: '', fecha_evento: '', lugar: '', prioridad: 'alta' });
+                const msg = esGlobalEvento
+                    ? `✓ Evento GLOBAL agendado y notificado con prioridad ${prio.toUpperCase()} a toda la comunidad.`
+                    : `✓ Evento agendado y notificado con prioridad ${prio.toUpperCase()} a los integrantes del club.`;
+                setEventoForm({ titulo: '', descripcion: '', fecha_evento: '', lugar: '', prioridad: 'alta', alcance: 'club' });
                 setSuccess(msg);
                 fetchEventos();
                 fetchAvisos();
@@ -335,7 +353,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                     ...prev,
                     procesando: false,
                     etapa: 'exito',
-                    mensajeExito: 'El evento ha sido registrado en el calendario del club y se ha enviado un aviso automático a todos los integrantes.'
+                    mensajeExito: esGlobalEvento
+                        ? 'El evento global ha sido registrado en el calendario general y se ha enviado un aviso automático a toda la comunidad.'
+                        : 'El evento ha sido registrado en el calendario del club y se ha enviado un aviso automático a todos los integrantes.'
                 }));
             }
         } catch (err) {
@@ -1274,6 +1294,17 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                         </span>
                                                                     )}
 
+                                                                    {/* Insignia de Alcance */}
+                                                                    {Number(aviso.es_global) === 1 ? (
+                                                                        <span style={{ fontSize: '0.74rem', background: '#f3e8ff', color: '#6b21a8', border: '1px solid #d8b4fe', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                                             Global (Comunidad)
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span style={{ fontSize: '0.74rem', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                                             Solo Club
+                                                                        </span>
+                                                                    )}
+
                                                                     {/* Insignia de Prioridad */}
                                                                     {esAlta && (
                                                                         <span style={{ fontSize: '0.74rem', background: '#ffeef0', color: '#dc3545', border: '1px solid #f5c6cb', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
@@ -1462,25 +1493,36 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                             {/* Información del Evento y Asistencia */}
                                                             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                                                 <div>
-                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
                                                                         <h4 style={{ margin: 0, color: '#003366', fontSize: '1.1rem' }}>
                                                                             {evento.titulo}
                                                                         </h4>
-                                                                        {esAltaPrioridad && (
-                                                                            <span style={{ fontSize: '0.72rem', background: '#ffeef0', color: '#dc3545', border: '1px solid #f5c6cb', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
-                                                                                🔴 Alta Prioridad
-                                                                            </span>
-                                                                        )}
-                                                                        {esBajaPrioridad && (
-                                                                            <span style={{ fontSize: '0.72rem', background: '#e8f5e9', color: '#2e7d32', border: '1px solid #c8e6c9', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
-                                                                                🟢 Baja Prioridad
-                                                                            </span>
-                                                                        )}
-                                                                        {!esAltaPrioridad && !esBajaPrioridad && (
-                                                                            <span style={{ fontSize: '0.72rem', background: '#e7f3ff', color: '#003366', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
-                                                                                🔵 Normal
-                                                                            </span>
-                                                                        )}
+                                                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                                            {Number(evento.es_global) === 1 ? (
+                                                                                <span style={{ fontSize: '0.72rem', background: '#f3e8ff', color: '#6b21a8', border: '1px solid #d8b4fe', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
+                                                                                    Global
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
+                                                                                 Solo Club
+                                                                                </span>
+                                                                            )}
+                                                                            {esAltaPrioridad && (
+                                                                                <span style={{ fontSize: '0.72rem', background: '#ffeef0', color: '#dc3545', border: '1px solid #f5c6cb', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
+                                                                                    🔴 Alta Prioridad
+                                                                                </span>
+                                                                            )}
+                                                                            {esBajaPrioridad && (
+                                                                                <span style={{ fontSize: '0.72rem', background: '#e8f5e9', color: '#2e7d32', border: '1px solid #c8e6c9', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
+                                                                                    🟢 Baja Prioridad
+                                                                                </span>
+                                                                            )}
+                                                                            {!esAltaPrioridad && !esBajaPrioridad && (
+                                                                                <span style={{ fontSize: '0.72rem', background: '#e7f3ff', color: '#003366', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', flexShrink: 0 }}>
+                                                                                    🔵 Normal
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
 
                                                                     <div style={{ fontSize: '0.85rem', color: '#555', display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '8px' }}>
@@ -1969,6 +2011,67 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                             </div>
                                                         </div>
 
+                                                        {/* Selector de Alcance / Visibilidad del Aviso */}
+                                                        <div style={{ marginBottom: '16px' }}>
+                                                            <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.88rem', marginBottom: '8px', color: '#333' }}>
+                                                                Alcance / Visibilidad del Aviso:
+                                                            </label>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setAlcanceAviso('club')}
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'flex-start',
+                                                                        gap: '10px',
+                                                                        padding: '12px 16px',
+                                                                        borderRadius: '10px',
+                                                                        border: alcanceAviso === 'club' ? '2px solid #003366' : '1px solid #ced4da',
+                                                                        background: alcanceAviso === 'club' ? '#f0f5fa' : '#fff',
+                                                                        color: alcanceAviso === 'club' ? '#003366' : '#475569',
+                                                                        cursor: 'pointer',
+                                                                        textAlign: 'left',
+                                                                        transition: 'all 0.2s'
+                                                                    }}
+                                                                >
+                                                                
+                                                                    <div>
+                                                                        <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>Solo para el Club</div>
+                                                                        <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
+                                                                            Visible únicamente para miembros de {club?.nombre || 'este club'}
+                                                                        </div>
+                                                                    </div>
+                                                                </button>
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setAlcanceAviso('global')}
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'flex-start',
+                                                                        gap: '10px',
+                                                                        padding: '12px 16px',
+                                                                        borderRadius: '10px',
+                                                                        border: alcanceAviso === 'global' ? '2px solid #7c3aed' : '1px solid #ced4da',
+                                                                        background: alcanceAviso === 'global' ? '#faf5ff' : '#fff',
+                                                                        color: alcanceAviso === 'global' ? '#6b21a8' : '#475569',
+                                                                        cursor: 'pointer',
+                                                                        textAlign: 'left',
+                                                                        transition: 'all 0.2s'
+                                                                    }}
+                                                                >
+                                                                    <div>
+                                                                        <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>Global (Toda la Comunidad)</div>
+                                                                        <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
+                                                                            Visible para todos los usuarios del sistema y en el portal general
+                                                                        </div>
+                                                                    </div>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
                                                         {/* Selector de Prioridad del Aviso */}
                                                         <div style={{ marginBottom: '16px' }}>
                                                             <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.88rem', marginBottom: '8px', color: '#333' }}>
@@ -2179,10 +2282,70 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                 />
                                                             </div>
 
+                                                            {/* Selector de Alcance / Visibilidad del Evento */}
+                                                            <div>
+                                                                <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.88rem', marginBottom: '8px', color: '#333' }}>
+                                                                    Alcance / Visibilidad del Evento:
+                                                                </label>
+                                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setEventoForm({ ...eventoForm, alcance: 'club' })}
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'flex-start',
+                                                                            gap: '10px',
+                                                                            padding: '12px 16px',
+                                                                            borderRadius: '10px',
+                                                                            border: (eventoForm.alcance || 'club') === 'club' ? '2px solid #003366' : '1px solid #ced4da',
+                                                                            background: (eventoForm.alcance || 'club') === 'club' ? '#f0f5fa' : '#fff',
+                                                                            color: (eventoForm.alcance || 'club') === 'club' ? '#003366' : '#475569',
+                                                                            cursor: 'pointer',
+                                                                            textAlign: 'left',
+                                                                            transition: 'all 0.2s'
+                                                                        }}
+                                                                    >
+                                                                        <div>
+                                                                            <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>Solo para el Club</div>
+                                                                            <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
+                                                                                Exclusivo para integrantes de {club?.nombre || 'este club'}
+                                                                            </div>
+                                                                        </div>
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setEventoForm({ ...eventoForm, alcance: 'global' })}
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'flex-start',
+                                                                            gap: '10px',
+                                                                            padding: '12px 16px',
+                                                                            borderRadius: '10px',
+                                                                            border: eventoForm.alcance === 'global' ? '2px solid #7c3aed' : '1px solid #ced4da',
+                                                                            background: eventoForm.alcance === 'global' ? '#faf5ff' : '#fff',
+                                                                            color: eventoForm.alcance === 'global' ? '#6b21a8' : '#475569',
+                                                                            cursor: 'pointer',
+                                                                            textAlign: 'left',
+                                                                            transition: 'all 0.2s'
+                                                                        }}
+                                                                    >
+                                                                        <div>
+                                                                            <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>Global (Toda la Comunidad)</div>
+                                                                            <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
+                                                                                Visible en el calendario y avisos de toda la comunidad
+                                                                            </div>
+                                                                        </div>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
                                                             {/* Selector de Prioridad del Evento */}
                                                             <div>
                                                                 <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.88rem', marginBottom: '8px', color: '#333' }}>
-                                                                    Prioridad del Evento y Notificación a Miembros:
+                                                                    Prioridad del Evento y Notificación:
                                                                 </label>
                                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
                                                                     <button
@@ -2518,7 +2681,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                 : 'Confirmar Creación de Evento'}
                                         </h3>
                                         <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                                            Verifica los datos antes de notificar a los miembros del club
+                                            {modalConfirmacion.datos?.alcance === 'global'
+                                                ? 'Verifica los datos antes de publicar para toda la comunidad'
+                                                : 'Verifica los datos antes de notificar a los miembros del club'}
                                         </span>
                                     </div>
                                 </div>
@@ -2537,24 +2702,37 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                         <strong style={{ color: '#0f172a', fontSize: '1rem' }}>
                                             {modalConfirmacion.datos?.titulo}
                                         </strong>
-                                        <span style={{
-                                            fontSize: '0.75rem',
-                                            fontWeight: '700',
-                                            padding: '3px 10px',
-                                            borderRadius: '999px',
-                                            background: modalConfirmacion.datos?.prioridad === 'alta'
-                                                ? '#fee2e2'
-                                                : modalConfirmacion.datos?.prioridad === 'baja'
-                                                    ? '#dcfce7'
-                                                    : '#e0f2fe',
-                                            color: modalConfirmacion.datos?.prioridad === 'alta'
-                                                ? '#b91c1c'
-                                                : modalConfirmacion.datos?.prioridad === 'baja'
-                                                    ? '#15803d'
-                                                    : '#0369a1'
-                                        }}>
-                                            PRIORIDAD {(modalConfirmacion.datos?.prioridad || 'normal').toUpperCase()}
-                                        </span>
+                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                fontWeight: '700',
+                                                padding: '3px 10px',
+                                                borderRadius: '999px',
+                                                background: modalConfirmacion.datos?.alcance === 'global' ? '#f3e8ff' : '#f1f5f9',
+                                                color: modalConfirmacion.datos?.alcance === 'global' ? '#6b21a8' : '#334155',
+                                                border: modalConfirmacion.datos?.alcance === 'global' ? '1px solid #d8b4fe' : '1px solid #cbd5e1'
+                                            }}>
+                                                {modalConfirmacion.datos?.alcance === 'global' ? ' GLOBAL (COMUNIDAD)' : ' SOLO CLUB'}
+                                            </span>
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                fontWeight: '700',
+                                                padding: '3px 10px',
+                                                borderRadius: '999px',
+                                                background: modalConfirmacion.datos?.prioridad === 'alta'
+                                                    ? '#fee2e2'
+                                                    : modalConfirmacion.datos?.prioridad === 'baja'
+                                                        ? '#dcfce7'
+                                                        : '#e0f2fe',
+                                                color: modalConfirmacion.datos?.prioridad === 'alta'
+                                                    ? '#b91c1c'
+                                                    : modalConfirmacion.datos?.prioridad === 'baja'
+                                                        ? '#15803d'
+                                                        : '#0369a1'
+                                            }}>
+                                                PRIORIDAD {(modalConfirmacion.datos?.prioridad || 'normal').toUpperCase()}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     {modalConfirmacion.tipo === 'aviso' && modalConfirmacion.datos?.fecha_vencimiento && (
@@ -2597,8 +2775,12 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
                                 <p style={{ margin: '0 0 22px 0', fontSize: '0.9rem', color: '#475569', lineHeight: '1.5' }}>
                                     {modalConfirmacion.tipo === 'aviso'
-                                        ? '¿Estás seguro de que deseas publicar este aviso? Se mostrará inmediatamente en el tablero de todos los integrantes.'
-                                        : '¿Estás seguro de que deseas agendar este evento? Se habilitará el registro de asistencia y se notificará a todos los integrantes.'}
+                                        ? (modalConfirmacion.datos?.alcance === 'global'
+                                            ? '¿Estás seguro de publicar este aviso como GLOBAL? Será visible para todos los usuarios del sistema y en el portal general.'
+                                            : '¿Estás seguro de que deseas publicar este aviso? Se mostrará inmediatamente en el tablero de los integrantes de este club.')
+                                        : (modalConfirmacion.datos?.alcance === 'global'
+                                            ? '¿Estás seguro de agendar este evento como GLOBAL? Aparecerá en el calendario y avisos de toda la comunidad.'
+                                            : '¿Estás seguro de que deseas agendar este evento? Se habilitará el registro de asistencia y se notificará a los integrantes del club.')}
                                 </p>
 
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>

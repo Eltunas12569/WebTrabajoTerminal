@@ -77,16 +77,24 @@ router.get('/:id/avisos', verificarToken, requireVerificado, async (req, res) =>
         `, [req.params.id]);
 
         const [avisos] = await db.query(`
-            SELECT a.*, CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre
-            FROM avisos a JOIN usuarios u ON a.usuario_id = u.id
-            WHERE a.club_id = ? AND a.activo = 1 ORDER BY a.fecha_envio DESC
+            SELECT a.*,
+                   u.nombres,
+                   CONCAT(u.apellido_paterno, ' ', IFNULL(u.apellido_materno, '')) AS apellidos,
+                   CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre,
+                   u.role_id,
+                   i.rol_en_club
+            FROM avisos a
+            JOIN usuarios u ON a.usuario_id = u.id
+            LEFT JOIN inscripciones i ON i.club_id = a.club_id AND i.usuario_id = u.id
+            WHERE a.club_id = ? AND a.activo = 1
+            ORDER BY a.fecha_envio DESC
         `, [req.params.id]);
         res.status(200).json(avisos);
     } catch (error) { res.status(500).json({ message: "Error al cargar avisos" }); }
 });
 
 router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) => {
-    const { contenido, titulo, prioridad, fecha_vencimiento } = req.body;
+    const { contenido, titulo, prioridad, fecha_vencimiento, alcance, es_global } = req.body;
 
     if (!contenido || !String(contenido).trim()) {
         return res.status(400).json({ message: "El contenido del aviso es obligatorio." });
@@ -105,6 +113,12 @@ router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) =
         ? String(prioridad).toLowerCase() 
         : 'normal';
 
+    const esGlobal = (
+        es_global === true ||
+        es_global === 1 ||
+        String(alcance || '').toLowerCase() === 'global'
+    ) ? 1 : 0;
+
     try {
         const rolUsuario = Number(req.user.rol || req.user.role_id);
         if (rolUsuario !== 1) {
@@ -116,20 +130,53 @@ router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) =
                 return res.status(403).json({ message: "Acceso denegado. Solo los encargados pueden publicar avisos en este club." });
             }
         }
-        await db.query(
-            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1)`,
-            [req.params.id, req.user.id, titulo || null, contenido, prioridadValida, fechaVencimientoConvertida]
+        const [resultado] = await db.query(
+            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo, es_global) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1, ?)`,
+            [req.params.id, req.user.id, titulo || null, contenido, prioridadValida, fechaVencimientoConvertida, esGlobal]
         );
 
         const io = req.app.get('socketio');
         if (io) {
-            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida });
+            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida, es_global: esGlobal });
+            if (esGlobal === 1) {
+                io.emit('nuevo_aviso_global', {
+                    id: resultado.insertId,
+                    titulo: titulo || 'Comunicado Global de Club',
+                    contenido,
+                    prioridad: prioridadValida,
+                    es_global: 1
+                });
+            }
         }
 
-        res.status(201).json({ message: "Aviso publicado exitosamente", prioridad: prioridadValida, fecha_vencimiento: fechaVencimientoConvertida });
+        res.status(201).json({
+            message: esGlobal ? "Aviso global publicado exitosamente" : "Aviso publicado exitosamente para el club",
+            prioridad: prioridadValida,
+            fecha_vencimiento: fechaVencimientoConvertida,
+            es_global: esGlobal
+        });
     } catch (error) { 
         console.error("Error al crear aviso:", error);
         res.status(500).json({ message: "Error al crear aviso" }); 
+    }
+});
+
+router.get('/eventos/globales', verificarToken, requireVerificado, async (req, res) => {
+    try {
+        const [eventos] = await db.query(`
+            SELECT e.*,
+                   c.nombre AS club_nombre,
+                   (SELECT COUNT(*) FROM asistencias_eventos WHERE evento_id = e.id AND asistira = 1) AS total_asistentes,
+                   (SELECT asistira FROM asistencias_eventos WHERE evento_id = e.id AND usuario_id = ?) AS mi_respuesta
+            FROM eventos_club e
+            JOIN clubes c ON e.club_id = c.id
+            WHERE e.es_global = 1 AND c.estatus = 'activo'
+            ORDER BY e.fecha_evento ASC
+        `, [req.user.id]);
+        res.status(200).json(eventos);
+    } catch (error) {
+        console.error("Error al cargar eventos globales:", error);
+        res.status(500).json({ message: "Error al cargar eventos globales" });
     }
 });
 
@@ -148,7 +195,7 @@ router.get('/:id/eventos', verificarToken, requireVerificado, async (req, res) =
 });
 
 router.post('/:id/eventos', verificarToken, requireVerificado, async (req, res) => {
-    const { titulo, descripcion, fecha_evento, lugar, prioridad = 'alta', notificarAviso = true } = req.body;
+    const { titulo, descripcion, fecha_evento, lugar, prioridad = 'alta', notificarAviso = true, alcance, es_global } = req.body;
 
     // Validamos y convertimos la fecha ANTES de tocar la base de datos
     const fechaConvertida = convertirAFechaMySQL(fecha_evento);
@@ -160,14 +207,31 @@ router.post('/:id/eventos', verificarToken, requireVerificado, async (req, res) 
         ? String(prioridad).toLowerCase() 
         : 'alta';
 
+    const esGlobal = (
+        es_global === true ||
+        es_global === 1 ||
+        String(alcance || '').toLowerCase() === 'global'
+    ) ? 1 : 0;
+
     try {
-        // 1. Registrar el evento con su nivel de prioridad
+        const rolUsuario = Number(req.user.rol || req.user.role_id);
+        if (rolUsuario !== 1) {
+            const [permiso] = await db.query(
+                `SELECT id FROM inscripciones WHERE club_id = ? AND usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo'`,
+                [req.params.id, req.user.id]
+            );
+            if (permiso.length === 0) {
+                return res.status(403).json({ message: "Acceso denegado. Solo los encargados pueden agendar eventos en este club." });
+            }
+        }
+
+        // 1. Registrar el evento con su nivel de prioridad y alcance (es_global)
         await db.query(
-            `INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar, prioridad) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [req.params.id, req.user.id, titulo, descripcion, fechaConvertida, lugar, prioridadValida]
+            `INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar, prioridad, es_global) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [req.params.id, req.user.id, titulo, descripcion, fechaConvertida, lugar, prioridadValida, esGlobal]
         );
 
-        // 2. Notificar a los miembros creando un aviso oficial con prioridad alta (o la asignada)
+        // 2. Notificar creando un aviso oficial (del club o global según se haya elegido)
         if (notificarAviso !== false) {
             let fechaLegible = fechaConvertida;
             try {
@@ -175,22 +239,26 @@ router.post('/:id/eventos', verificarToken, requireVerificado, async (req, res) 
                 fechaLegible = f.toLocaleString('es-MX', { dateStyle: 'full', timeStyle: 'short' });
             } catch (e) {}
 
-            const tituloAviso = `📅 Nuevo Evento: ${titulo}`;
-            const contenidoAviso = `Se ha programado una nueva actividad oficial: "${titulo}".\n📅 Fecha: ${fechaLegible}${lugar ? `\n📍 Lugar: ${lugar}` : ''}.\n${descripcion ? `📝 Detalles: ${descripcion}\n` : ''}¡Por favor confirma tu asistencia en la sección de Eventos del Club!`;
+            const tituloAviso = esGlobal ? `🌍 Evento Global: ${titulo}` : `📅 Nuevo Evento: ${titulo}`;
+            const contenidoAviso = `Se ha programado una nueva actividad ${esGlobal ? 'abierta a toda la comunidad' : 'oficial del club'}: "${titulo}".\n📅 Fecha: ${fechaLegible}${lugar ? `\n📍 Lugar: ${lugar}` : ''}.\n${descripcion ? `📝 Detalles: ${descripcion}\n` : ''}¡Por favor confirma tu asistencia en el calendario o sección de Eventos!`;
 
             await db.query(
-                `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1)`,
-                [req.params.id, req.user.id, tituloAviso, contenidoAviso, prioridadValida, fechaConvertida]
+                `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo, es_global) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1, ?)`,
+                [req.params.id, req.user.id, tituloAviso, contenidoAviso, prioridadValida, fechaConvertida, esGlobal]
             );
         }
 
         const io = req.app.get('socketio');
         if (io) {
-            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'evento', prioridad: prioridadValida });
-            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida });
+            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'evento', prioridad: prioridadValida, es_global: esGlobal });
+            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida, es_global: esGlobal });
         }
 
-        res.status(201).json({ message: "Evento creado y aviso notificado con prioridad", prioridad: prioridadValida });
+        res.status(201).json({
+            message: esGlobal ? "Evento global creado y notificado a toda la comunidad" : "Evento creado y notificado a los miembros del club",
+            prioridad: prioridadValida,
+            es_global: esGlobal
+        });
     } catch (error) { 
         console.error("Error al crear evento:", error);
         res.status(500).json({ message: "Error al crear evento" }); 

@@ -163,7 +163,7 @@ const GestionDashboard = () => {
 
             const clubesMap = new Map();
             misClubes.forEach(c => {
-                clubesMap.set(c.id, { id: c.id, nombre: c.nombre, esInvitacion: false });
+                clubesMap.set(c.id, { ...c, id: c.id, nombre: c.nombre, esInvitacion: false });
             });
             invitaciones.forEach(inv => {
                 if (!clubesMap.has(inv.club_id)) {
@@ -194,8 +194,29 @@ const GestionDashboard = () => {
                 }
             });
 
-            const resultados = await Promise.all(eventosPromises);
-            setEventosCalendario(resultados.flat());
+            const [resultadosClubes, resGlobales] = await Promise.all([
+                Promise.all(eventosPromises),
+                api.get('/clubes/eventos/globales').catch(() => ({ data: [] }))
+            ]);
+
+            const eventosPorId = new Map();
+            resultadosClubes.flat().forEach(ev => {
+                eventosPorId.set(ev.id, ev);
+            });
+
+            (resGlobales.data || []).forEach(evGlobal => {
+                if (!eventosPorId.has(evGlobal.id)) {
+                    eventosPorId.set(evGlobal.id, {
+                        ...evGlobal,
+                        club_nombre: evGlobal.club_nombre || 'Evento Global',
+                        es_invitacion: false,
+                        es_encargado: false,
+                        es_global: 1
+                    });
+                }
+            });
+
+            setEventosCalendario(Array.from(eventosPorId.values()));
         } catch (error) {
             console.error("Error general al obtener eventos para el calendario:", error);
         } finally {

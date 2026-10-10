@@ -9,22 +9,34 @@ router.get('/', async (req, res) => {
         await db.query(`
             UPDATE avisos 
             SET activo = 0 
-            WHERE club_id IS NULL 
+            WHERE (club_id IS NULL OR es_global = 1)
               AND (fecha_vencimiento < NOW() OR (fecha_vencimiento IS NULL AND fecha_envio < DATE_SUB(NOW(), INTERVAL 7 DAY)))
         `);
 
         await db.query(`
             UPDATE avisos 
             SET activo = 1 
-            WHERE club_id IS NULL 
+            WHERE (club_id IS NULL OR es_global = 1)
               AND (fecha_vencimiento >= NOW() OR (fecha_vencimiento IS NULL AND fecha_envio >= DATE_SUB(NOW(), INTERVAL 7 DAY)))
         `);
 
         const [rows] = await db.query(`
-            SELECT id, titulo, contenido AS descripcion, prioridad, fecha_envio AS tiempo, 'global' AS tipo 
-            FROM avisos 
-            WHERE activo = 1 AND club_id IS NULL
-            ORDER BY fecha_envio DESC
+            SELECT a.id, 
+                   CASE 
+                       WHEN c.nombre IS NOT NULL AND a.titulo IS NOT NULL THEN CONCAT('[', c.nombre, '] ', a.titulo)
+                       WHEN c.nombre IS NOT NULL THEN CONCAT('Aviso Global - ', c.nombre)
+                       ELSE a.titulo
+                   END AS titulo, 
+                   a.contenido AS descripcion, 
+                   COALESCE(a.prioridad, 'normal') AS prioridad, 
+                   a.fecha_envio AS tiempo, 
+                   'global' AS tipo,
+                   1 AS es_global,
+                   c.nombre AS nombre_club
+            FROM avisos a
+            LEFT JOIN clubes c ON a.club_id = c.id
+            WHERE a.activo = 1 AND (a.club_id IS NULL OR a.es_global = 1)
+            ORDER BY a.fecha_envio DESC
         `);
         
         res.status(200).json(rows);
@@ -44,9 +56,22 @@ router.get('/user/:userId', verifyToken, requireVerificado, async (req, res) => 
         `);
 
         const [globales] = await db.query(`
-            SELECT id, titulo, contenido AS mensaje, prioridad, fecha_envio, fecha_vencimiento, 'global' AS tipo 
-            FROM avisos 
-            WHERE activo = 1 AND club_id IS NULL
+            SELECT a.id, 
+                   CASE 
+                       WHEN c.nombre IS NOT NULL AND a.titulo IS NOT NULL THEN CONCAT('[', c.nombre, '] ', a.titulo)
+                       WHEN c.nombre IS NOT NULL THEN CONCAT('Aviso Global de ', c.nombre)
+                       ELSE a.titulo
+                   END AS titulo, 
+                   a.contenido AS mensaje, 
+                   COALESCE(a.prioridad, 'normal') AS prioridad, 
+                   a.fecha_envio, 
+                   a.fecha_vencimiento, 
+                   'global' AS tipo,
+                   1 AS es_global,
+                   c.nombre AS nombre_club
+            FROM avisos a
+            LEFT JOIN clubes c ON a.club_id = c.id
+            WHERE a.activo = 1 AND (a.club_id IS NULL OR a.es_global = 1)
         `);
 
         const [clubes] = await db.query(`
@@ -56,11 +81,13 @@ router.get('/user/:userId', verifyToken, requireVerificado, async (req, res) => 
                    COALESCE(a.prioridad, 'normal') AS prioridad, 
                    a.fecha_envio, 
                    a.fecha_vencimiento,
-                   'club' AS tipo
+                   'club' AS tipo,
+                   0 AS es_global,
+                   c.nombre AS nombre_club
             FROM avisos a
             JOIN clubes c ON a.club_id = c.id
             JOIN inscripciones i ON c.id = i.club_id
-            WHERE a.activo = 1 AND a.club_id IS NOT NULL AND i.usuario_id = ? AND i.estatus = 'activo'
+            WHERE a.activo = 1 AND a.club_id IS NOT NULL AND IFNULL(a.es_global, 0) = 0 AND i.usuario_id = ? AND i.estatus = 'activo'
         `, [userId]);
 
         const todos = [...globales, ...clubes].sort((a, b) => new Date(b.fecha_envio) - new Date(a.fecha_envio));
@@ -82,8 +109,8 @@ router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) =>
 
         const [globales] = await db.query(`
             SELECT 
-                id, titulo, contenido AS mensaje, prioridad, activo, 
-                fecha_envio, fecha_vencimiento, 'global' AS tipo
+                id, NULL AS nombre_club, titulo, contenido AS mensaje, prioridad, activo, 
+                fecha_envio, fecha_vencimiento, 'global' AS tipo, 1 AS es_global
             FROM avisos
             WHERE club_id IS NULL
         `);
@@ -94,7 +121,9 @@ router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) =>
                 COALESCE(a.titulo, CONCAT('Aviso de ', c.nombre)) AS titulo,
                 a.contenido AS mensaje, 
                 COALESCE(a.prioridad, 'normal') AS prioridad,
-                a.activo, a.fecha_envio, a.fecha_vencimiento, 'club' AS tipo
+                a.activo, a.fecha_envio, a.fecha_vencimiento, 
+                IF(a.es_global = 1, 'global', 'club') AS tipo,
+                IFNULL(a.es_global, 0) AS es_global
             FROM avisos a
             JOIN clubes c ON a.club_id = c.id
             WHERE a.club_id IS NOT NULL
@@ -127,8 +156,8 @@ router.post('/', verifyToken, requireVerificado, async (req, res) => {
             : 'normal';
 
         const [resultado] = await db.query(
-            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo) 
-             VALUES (NULL, ?, ?, ?, ?, NOW(), ?, 1)`,
+            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo, es_global) 
+             VALUES (NULL, ?, ?, ?, ?, NOW(), ?, 1, 1)`,
             [req.user.id, titulo.trim(), contenido.trim(), prioridadValida, fecha_vencimiento]
         );
 
