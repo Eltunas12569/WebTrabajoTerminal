@@ -14,6 +14,7 @@ import CambiarPasswordPage from './pages/CambiarPasswordPage';
 import ClubChatPage from './pages/ClubChatPage';
 import ClubDetailsPage from './pages/ClubDetailsPage';
 import ClubPanelPage from './pages/ClubPanelPage';
+import EditarClubEncargadoPage from './pages/EditarClubEncargadoPage';
 import ClubEmergenciasPage from './pages/ClubEmergenciasPage';
 import VerificarCuentaPage from './pages/VerificarCuentaPage';
 import AvisoPrivacidadPage from './pages/AvisoPrivacidadPage';
@@ -95,6 +96,13 @@ function App() {
           <Route path="/club/:id" element={
             <ProtectedRoute rolesPermitidos={[1, 2, 3, 4]}>
               <ClubDetailsPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Edición de Información del Club (Encargados del Club) */}
+          <Route path="/club/:id/editar" element={
+            <ProtectedRoute rolesPermitidos={[2, 3, 4]}>
+              <EditarClubEncargadoPage />
             </ProtectedRoute>
           } />
 

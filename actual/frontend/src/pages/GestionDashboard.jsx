@@ -626,6 +626,19 @@ const GestionDashboard = () => {
                                                                 📋 Panel y Detalles
                                                             </button>
 
+                                                            {['encargado_profesor', 'encargado_alumno'].includes(club.mi_rol_interno) && club.inscripcion_estatus === 'activo' && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-club-action details"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        navigate(`/club/${club.id}/editar`);
+                                                                    }}
+                                                                >
+                                                                    ✏️ Editar Información
+                                                                </button>
+                                                            )}
+
                                                             {club.mi_rol_interno === 'encargado_profesor' && club.estatus === 'esperando_firmas' && (
                                                                 <button 
                                                                     type="button"

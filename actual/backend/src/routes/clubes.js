@@ -307,7 +307,12 @@ router.get('/', verificarToken, requireVerificado, async (req, res) => {
             LEFT JOIN inscripciones ia ON c.id = ia.club_id AND ia.rol_en_club = 'encargado_alumno' AND ia.estatus = 'activo'
             LEFT JOIN usuarios a ON ia.usuario_id = a.id
         `);
-        const clubesTratados = filas.map(club => ({ ...club, cronograma: club.cronograma ? JSON.stringify(club.cronograma) : null }));
+        const clubesTratados = filas.map(club => ({
+            ...club,
+            cronograma: club.cronograma
+                ? (typeof club.cronograma === 'string' ? club.cronograma : JSON.stringify(club.cronograma))
+                : null
+        }));
         res.status(200).json(clubesTratados);
     } catch (error) { 
         res.status(500).json({ message: "Error interno" }); 
@@ -333,7 +338,12 @@ router.get('/user/:idUsuario', verificarToken, requireVerificado, async (req, re
             LEFT JOIN usuarios a ON ia.usuario_id = a.id
         `, [idUsuario]);
 
-        const clubesTratados = filas.map(club => ({ ...club, cronograma: club.cronograma ? JSON.stringify(club.cronograma) : null }));
+        const clubesTratados = filas.map(club => ({
+            ...club,
+            cronograma: club.cronograma
+                ? (typeof club.cronograma === 'string' ? club.cronograma : JSON.stringify(club.cronograma))
+                : null
+        }));
         res.status(200).json(clubesTratados);
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
@@ -401,8 +411,31 @@ router.post('/', verificarToken, requireVerificado, async (req, res) => {
 router.put('/:id', verificarToken, requireVerificado, async (req, res) => {
     const { id } = req.params;
     const { nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, nuevo_profesor_id, nuevo_alumno_id } = req.body;
-    
+    const rolUsuario = Number(req.user.rol || req.user.role_id);
+    const esAdmin = rolUsuario === 1;
+
     try {
+        if (!esAdmin) {
+            const [permiso] = await db.query(
+                `SELECT id FROM inscripciones WHERE club_id = ? AND usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo' LIMIT 1`,
+                [id, req.user.id]
+            );
+            if (permiso.length === 0) {
+                return res.status(403).json({ message: "Acceso denegado. Solo los encargados activos de este club o un administrador pueden modificar la información." });
+            }
+        }
+
+        const [clubesActuales] = await db.query(`SELECT * FROM clubes WHERE id = ?`, [id]);
+        if (clubesActuales.length === 0) {
+            return res.status(404).json({ message: "Club no encontrado." });
+        }
+        const clubActual = clubesActuales[0];
+
+        const nombreFinal = esAdmin && nombre !== undefined ? nombre : clubActual.nombre;
+        const cronogramaFinal = cronograma !== undefined
+            ? (typeof cronograma === 'string' ? cronograma : JSON.stringify(cronograma))
+            : (clubActual.cronograma ? (typeof clubActual.cronograma === 'string' ? clubActual.cronograma : JSON.stringify(clubActual.cronograma)) : null);
+
         await db.query(
             `UPDATE clubes 
              SET nombre = ?, descripcion = ?, objetivo = ?, cronograma = ?, 
@@ -410,24 +443,35 @@ router.put('/:id', verificarToken, requireVerificado, async (req, res) => {
                  estatus = IF(estatus = 'rechazado', 'en_revision', estatus), 
                  motivo_rechazo = IF(estatus = 'rechazado', NULL, motivo_rechazo) 
              WHERE id = ?`,
-            [nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, id]
+            [
+                nombreFinal,
+                descripcion !== undefined ? descripcion : clubActual.descripcion,
+                objetivo !== undefined ? objetivo : clubActual.objetivo,
+                cronogramaFinal,
+                detalle_actividades !== undefined ? detalle_actividades : clubActual.detalle_actividades,
+                espacios_tiempos !== undefined ? espacios_tiempos : clubActual.espacios_tiempos,
+                impacto !== undefined ? impacto : clubActual.impacto,
+                id
+            ]
         );
 
-        const [profesoresActuales] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_profesor'`, [id]);
-        const [alumnosActuales] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_alumno'`, [id]);
+        if (esAdmin && nuevo_profesor_id && nuevo_alumno_id) {
+            const [profesoresActuales] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_profesor'`, [id]);
+            const [alumnosActuales] = await db.query(`SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_alumno'`, [id]);
 
-        const idProfesorAnterior = profesoresActuales.length > 0 ? profesoresActuales[0].usuario_id : null;
-        const idAlumnoAnterior = alumnosActuales.length > 0 ? alumnosActuales[0].usuario_id : null;
+            const idProfesorAnterior = profesoresActuales.length > 0 ? profesoresActuales[0].usuario_id : null;
+            const idAlumnoAnterior = alumnosActuales.length > 0 ? alumnosActuales[0].usuario_id : null;
 
-        if (idProfesorAnterior && idProfesorAnterior !== nuevo_profesor_id) {
-            await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, idProfesorAnterior]);
+            if (idProfesorAnterior && idProfesorAnterior !== nuevo_profesor_id) {
+                await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, idProfesorAnterior]);
+            }
+            if (idAlumnoAnterior && idAlumnoAnterior !== nuevo_alumno_id) {
+                await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, idAlumnoAnterior]);
+            }
+
+            await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_profesor', estatus = 'activo'`, [nuevo_profesor_id, id]);
+            await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_alumno', estatus = 'activo'`, [nuevo_alumno_id, id]);
         }
-        if (idAlumnoAnterior && idAlumnoAnterior !== nuevo_alumno_id) {
-            await db.query(`UPDATE inscripciones SET rol_en_club = 'miembro' WHERE club_id = ? AND usuario_id = ?`, [id, idAlumnoAnterior]);
-        }
-
-        await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_profesor', estatus = 'activo'`, [nuevo_profesor_id, id]);
-        await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_alumno', estatus = 'activo'`, [nuevo_alumno_id, id]);
        
         res.status(200).json({ message: "Editado y actualizado correctamente" });
     } catch (error) {

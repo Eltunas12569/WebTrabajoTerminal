@@ -88,9 +88,10 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
     // Roles y permisos
     const esAdmin = Number(user?.role_id) === 1 || Number(user?.rol) === 1;
-    const canManage = esAdmin || (
+    const esEncargadoClub = Boolean(
         club && ['encargado_profesor', 'encargado_alumno'].includes(miRolInterno) && inscripcionEstatus === 'activo'
-    ) || (
+    );
+    const canManage = esAdmin || esEncargadoClub || (
         club && (club.profesor_encargado_id === user?.id || club.alumno_encargado_id === user?.id)
     );
 
@@ -106,15 +107,11 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         }
     }, [user]);
 
-    // Cargar información del club y membresía
+    // Verificar rol en el club y cargar información del club
     useEffect(() => {
         const fetchClubData = async () => {
+            setLoading(true);
             try {
-                const response = await api.get('/clubes');
-                const clubEncontrado = response.data.find(c => String(c.id) === String(id));
-                if (!clubEncontrado) throw new Error('Club no encontrado');
-                setClub(clubEncontrado);
-
                 if (user?.id) {
                     const userClubsRes = await api.get(`/clubes/user/${user.id}`);
                     const miRegistro = userClubsRes.data.find(uc => String(uc.id) === String(id));
@@ -126,6 +123,11 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                         setIsMember(true);
                     }
                 }
+
+                const response = await api.get('/clubes');
+                const clubEncontrado = response.data.find(c => String(c.id) === String(id));
+                if (!clubEncontrado) throw new Error('Club no encontrado');
+                setClub(clubEncontrado);
             } catch (err) {
                 if (!club) setError('Error al cargar la información del club.');
             } finally {
@@ -457,7 +459,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     // Cronograma formateado
     let cronogramaItems = [];
     try {
-        cronogramaItems = typeof club.cronograma === 'string' ? JSON.parse(club.cronograma) : (club.cronograma || []);
+        let parsed = typeof club.cronograma === 'string' ? JSON.parse(club.cronograma) : (club.cronograma || []);
+        if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+        cronogramaItems = Array.isArray(parsed) ? parsed : [];
     } catch (e) {
         cronogramaItems = [];
     }
@@ -689,6 +693,30 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
                                 {/* Lado Derecho: Acciones Rápidas */}
                                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    {esEncargadoClub && (
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate(`/club/${id}/editar`)}
+                                            style={{
+                                                background: '#f8fafc',
+                                                border: '1px solid #cbd5e1',
+                                                color: '#003366',
+                                                cursor: 'pointer',
+                                                padding: '10px 16px',
+                                                borderRadius: '8px',
+                                                fontWeight: 'bold',
+                                                fontSize: '0.9rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            title="Modificar la información general del club"
+                                        >
+                                            ✏️ Editar Información
+                                        </button>
+                                    )}
+
                                     {canManage && (
                                         <button
                                             type="button"
@@ -860,9 +888,32 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                     
                                     {/* Tarjeta de Descripción y Objetivos */}
                                     <div style={{ background: '#ffffff', padding: '26px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
-                                        <h3 style={{ margin: '0 0 16px 0', fontSize: '1.25rem', color: '#003366', borderBottom: '2px solid #f0f2f5', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            📖 Acerca del Club
-                                        </h3>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f0f2f5', paddingBottom: '10px', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                                            <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#003366', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                📖 Acerca del Club
+                                            </h3>
+                                            {esEncargadoClub && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => navigate(`/club/${id}/editar`)}
+                                                    style={{
+                                                        background: '#eff6ff',
+                                                        border: '1px solid #bfdbfe',
+                                                        color: '#003366',
+                                                        cursor: 'pointer',
+                                                        padding: '6px 14px',
+                                                        borderRadius: '6px',
+                                                        fontWeight: '700',
+                                                        fontSize: '0.84rem',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px'
+                                                    }}
+                                                >
+                                                    ✏️ Editar Información
+                                                </button>
+                                            )}
+                                        </div>
                                         <p style={{ fontSize: '1rem', color: '#333', lineHeight: '1.65', margin: '0 0 20px 0' }}>
                                             {club.descripcion || 'Sin descripción registrada por el momento.'}
                                         </p>
