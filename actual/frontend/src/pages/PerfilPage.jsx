@@ -255,7 +255,7 @@ const PerfilPage = () => {
             <header className="admin-navbar-fixed" style={{backgroundColor: '#003366', color: '#fff'}}>
                 <div className="nav-left">
                     <button className="menu-toggle" onClick={toggleSidebar}>☰</button>
-                    <span className="nav-title">🏆 Sistema de Clubs - ESCOM</span>
+                    <span className="nav-title">Sistema de Clubs</span>
                 </div>
                 <div className="nav-right">
                     <div className="profile-container">
@@ -295,63 +295,6 @@ const PerfilPage = () => {
                             <h1 className="crear-club-title">⚙️ Configuración de Perfil</h1>
                             <p className="crear-club-subtitle">Actualiza tu información personal y datos médicos.</p>
 
-                            {/* Tarjeta de Identidad Institucional IPN / ESCOM */}
-                            {(institutionalInfo.boleta || institutionalInfo.num_empleado || institutionalInfo.carrera || institutionalInfo.nss) && (
-                                <div style={{
-                                    background: 'linear-gradient(135deg, #003366 0%, #002244 100%)',
-                                    color: '#fff',
-                                    padding: '20px',
-                                    borderRadius: '10px',
-                                    marginBottom: '25px',
-                                    boxShadow: '0 4px 12px rgba(0,51,102,0.15)'
-                                }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <span style={{ fontSize: '1.5rem' }}>🏛️</span>
-                                            <div>
-                                                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#fff', fontWeight: 'bold' }}>Identidad Institucional Politécnica</h3>
-                                                <p style={{ margin: 0, fontSize: '0.85rem', color: '#e0e6ed' }}>Información oficial vinculada a tu expediente IPN - ESCOM</p>
-                                            </div>
-                                        </div>
-                                        {institutionalInfo.verificado ? (
-                                            <span style={{ background: '#28a745', color: '#fff', padding: '5px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                                                ✓ Cuenta Verificada
-                                            </span>
-                                        ) : (
-                                            <span style={{ background: '#ffc107', color: '#333', padding: '5px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                                                ⏳ Verificación Pendiente
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', background: 'rgba(255,255,255,0.08)', padding: '15px', borderRadius: '8px' }}>
-                                        {institutionalInfo.boleta && (
-                                            <div>
-                                                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#a0c4ff' }}>Número de Boleta</span>
-                                                <p style={{ margin: '4px 0 0 0', fontSize: '1.05rem', fontWeight: 'bold', fontFamily: 'monospace' }}>{institutionalInfo.boleta}</p>
-                                            </div>
-                                        )}
-                                        {institutionalInfo.num_empleado && (
-                                            <div>
-                                                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#a0c4ff' }}>Número de Empleado</span>
-                                                <p style={{ margin: '4px 0 0 0', fontSize: '1.05rem', fontWeight: 'bold', fontFamily: 'monospace' }}>{institutionalInfo.num_empleado}</p>
-                                            </div>
-                                        )}
-                                        {institutionalInfo.carrera && (
-                                            <div>
-                                                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#a0c4ff' }}>Programa Académico / Carrera</span>
-                                                <p style={{ margin: '4px 0 0 0', fontSize: '1rem', fontWeight: '600' }}>{institutionalInfo.carrera}</p>
-                                            </div>
-                                        )}
-                                        {institutionalInfo.nss && (
-                                            <div>
-                                                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#a0c4ff' }}>NSS (Seguro Facultativo)</span>
-                                                <p style={{ margin: '4px 0 0 0', fontSize: '1.05rem', fontWeight: 'bold', fontFamily: 'monospace' }}>{institutionalInfo.nss}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
 
                             <div className="crear-club-form">
                                 <div style={{ display: 'flex', gap: '30px' }}>
@@ -501,6 +444,59 @@ const PerfilPage = () => {
                                 {medicalError && <div className="message-banner error" style={{ marginTop: '15px' }}>{medicalError}</div>}
                                 {medicalSuccess && <div className="message-banner success" style={{ marginTop: '15px' }}>{medicalSuccess}</div>}
                                 </form>
+
+                                {/* Pie discreto: Aviso de Privacidad y Términos y Condiciones */}
+                                <div style={{
+                                    marginTop: '28px',
+                                    paddingTop: '16px',
+                                    borderTop: '1px solid #eef1f5',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    flexWrap: 'wrap',
+                                    gap: '12px',
+                                    fontSize: '0.82rem',
+                                    color: '#64748b'
+                                }}>
+                                    <span>Información legal y privacidad de tu cuenta</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/aviso-privacidad')}
+                                            style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                padding: 0,
+                                                color: '#00509e',
+                                                fontSize: '0.82rem',
+                                                fontWeight: '600',
+                                                cursor: 'pointer',
+                                                textDecoration: 'underline',
+                                                textUnderlineOffset: '3px'
+                                            }}
+                                        >
+                                            Aviso de Privacidad
+                                        </button>
+                                        <span style={{ color: '#cbd5e1' }}>•</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/terminos-condiciones')}
+                                            style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                padding: 0,
+                                                color: '#00509e',
+                                                fontSize: '0.82rem',
+                                                fontWeight: '600',
+                                                cursor: 'pointer',
+                                                textDecoration: 'underline',
+                                                textUnderlineOffset: '3px'
+                                            }}
+                                        >
+                                            Términos y Condiciones
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                             </div>
                         </div>

@@ -52,7 +52,7 @@ const AdminUsersPage = () => {
             <header className="admin-navbar-fixed" style={{ backgroundColor: '#003366', color: '#fff' }}>
                 <div className="nav-left">
                     <button className="menu-toggle" onClick={toggleSidebar}>☰</button>
-                    <span className="nav-title">🏆 Sistema de Clubs - ESCOM</span>
+                    <span className="nav-title">Sistema de Clubs</span>
                 </div>
                 <div className="nav-right">
                     <div className="profile-container">

@@ -3,40 +3,97 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import './css/Dashboards.css';
 
-// Reutilizamos tu componente de búsqueda
+// Componente de búsqueda desplegable estilizado para escritorio
 const SearchableSelect = ({ options, value, onChange, placeholder }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isOpen, setIsOpen] = useState(false);
 
+    const formatOptionLabel = (item) => {
+        if (!item) return '';
+        const extra = item.boleta
+            ? ` (Boleta: ${item.boleta})`
+            : item.num_empleado
+                ? ` (Núm. Empleado: ${item.num_empleado})`
+                : '';
+        return `${item.nombres || ''} ${item.apellidos || ''}${extra}`.trim();
+    };
+
     useEffect(() => {
         const selected = options.find(o => o.id == value);
-        if (selected) setSearchTerm(`${selected.nombres} ${selected.apellidos} (Boleta: ${selected.boleta})`);
+        if (selected) setSearchTerm(formatOptionLabel(selected));
         else if (!isOpen) setSearchTerm('');
     }, [value, options, isOpen]);
+
+    const filteredOptions = options.filter(op =>
+        `${op.nombres || ''} ${op.apellidos || ''} ${op.boleta || ''} ${op.num_empleado || ''}`
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())
+    );
 
     return (
         <div style={{ position: 'relative' }}>
             <input
                 type="text"
-                className="login-input"
                 placeholder={placeholder}
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setIsOpen(true); }}
                 onFocus={() => setIsOpen(true)}
                 onBlur={() => setTimeout(() => setIsOpen(false), 200)}
                 autoComplete="off"
-                style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
+                style={{
+                    width: '100%',
+                    padding: '11px 14px',
+                    borderRadius: '8px',
+                    border: isOpen ? '1.5px solid #003366' : '1px solid #cbd5e1',
+                    backgroundColor: '#f8fafc',
+                    fontSize: '0.95rem',
+                    color: '#0f172a',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                    transition: 'border-color 0.2s, background-color 0.2s'
+                }}
             />
             {isOpen && (
                 <ul style={{
-                    position: 'absolute', top: '100%', left: 0, width: '100%', maxHeight: '200px', overflowY: 'auto', backgroundColor: 'white',
-                    border: '1px solid #ccc', borderRadius: '0 0 8px 8px', zIndex: 1000, listStyle: 'none', padding: 0, margin: 0, boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                    position: 'absolute',
+                    top: 'calc(100% + 4px)',
+                    left: 0,
+                    width: '100%',
+                    maxHeight: '220px',
+                    overflowY: 'auto',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    zIndex: 1000,
+                    listStyle: 'none',
+                    padding: '4px 0',
+                    margin: 0,
+                    boxShadow: '0 10px 25px rgba(15, 23, 42, 0.12)'
                 }}>
-                    {options.filter(op => `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())).map(op => (
-                        <li key={op.id} style={{ padding: '10px', cursor: 'pointer', borderBottom: '1px solid #eee' }} onMouseDown={() => { onChange(op.id); setIsOpen(false); }} onMouseEnter={(e) => e.target.style.backgroundColor = '#f0f2f5'} onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}>
-                            {op.nombres} {op.apellidos}{op.boleta ? ` (Boleta: ${op.boleta})` : ''}
+                    {filteredOptions.length > 0 ? (
+                        filteredOptions.map(op => (
+                            <li
+                                key={op.id}
+                                style={{
+                                    padding: '10px 14px',
+                                    cursor: 'pointer',
+                                    borderBottom: '1px solid #f1f5f9',
+                                    fontSize: '0.92rem',
+                                    color: '#1e293b',
+                                    transition: 'background-color 0.15s'
+                                }}
+                                onMouseDown={() => { onChange(op.id); setIsOpen(false); }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#eff6ff'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ffffff'; }}
+                            >
+                                {formatOptionLabel(op)}
+                            </li>
+                        ))
+                    ) : (
+                        <li style={{ padding: '12px 14px', color: '#64748b', fontSize: '0.9rem', textAlign: 'center' }}>
+                            Sin resultados disponibles
                         </li>
-                    ))}
+                    )}
                 </ul>
             )}
         </div>
@@ -201,34 +258,164 @@ const ClubDetailsAdminPage = () => {
         <div style={{ minHeight: '100vh', width: '100vw', position: 'absolute', top: 0, left: 0, backgroundColor: '#f0f2f5', fontFamily: 'system-ui, -apple-system, sans-serif', overflowX: 'hidden' }}>
             
             {/* Contenedor Principal (Abarca todo el ancho) */}
-            <div style={{ width: '100%', minHeight: '100vh', backgroundColor: 'white', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: '100%', minHeight: '100vh', backgroundColor: '#f0f2f5', display: 'flex', flexDirection: 'column' }}>
                 
                 {/* Barra de Navegación Interna Fija */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', boxSizing: 'border-box', borderBottom: '1px solid #e4e6eb', backgroundColor: '#003366', color: '#fff', position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 1000 }}>
-                    <h1 style={{ margin: 0, color: '#fff', fontSize: '1.4rem', fontWeight: '600' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 28px', boxSizing: 'border-box', borderBottom: '1px solid rgba(255,255,255,0.1)', backgroundColor: '#003366', color: '#fff', position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 1000, boxShadow: '0 2px 10px rgba(0,0,0,0.12)' }}>
+                    <h1 style={{ margin: 0, color: '#fff', fontSize: '1.3rem', fontWeight: '700' }}>
                         {isEditing ? '✏️ Editar Configuración del Club' : '🛡️ Perfil del Club'}
                     </h1>
-                    <button onClick={() => navigate('/admin')} style={{ background: '#e4e6eb', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#1c1e21', transition: 'background 0.2s' }}>
-                        🔙 Volver
+                    <button
+                        onClick={() => isEditing ? setIsEditing(false) : navigate('/admin')}
+                        style={{ background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.25)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#fff', fontSize: '0.9rem', transition: 'background 0.2s' }}
+                    >
+                        ← Volver
                     </button>
                 </div>
 
-                {actionError && <div style={{ backgroundColor: '#f8d7da', color: '#721c24', padding: '15px', margin: '20px 5% 0', borderRadius: '8px' }}>{actionError}</div>}
+                {actionError && (
+                    <div style={{ backgroundColor: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '14px 18px', margin: '85px auto 0 auto', maxWidth: '820px', width: '90%', borderRadius: '10px', fontWeight: '500' }}>
+                        {actionError}
+                    </div>
+                )}
 
                 {isEditing ? (
-                    <div style={{ padding: '40px 5%', display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-                        <div><label style={{ fontWeight: 'bold' }}>Nombre</label>
-                            <input type="text" value={editData.nombre} onChange={(e) => setEditData({...editData, nombre: e.target.value})} style={{ width: '100%', padding: '10px', marginTop: '5px', border: '1px solid #ccc', borderRadius: '5px' }} /></div>
-                        <div><label style={{ fontWeight: 'bold' }}>Descripción</label>
-                            <textarea rows="4" value={editData.descripcion} onChange={(e) => setEditData({...editData, descripcion: e.target.value})} style={{ width: '100%', padding: '10px', marginTop: '5px', border: '1px solid #ccc', borderRadius: '5px' }} /></div>
-                        <div><label style={{ fontWeight: 'bold' }}>Profesor Encargado</label>
-                            <SearchableSelect options={profesores} value={editData.profesor_encargado_id} onChange={(id) => setEditData({...editData, profesor_encargado_id: id})} placeholder="Buscar..." /></div>
-                        <div><label style={{ fontWeight: 'bold' }}>Alumno Encargado</label>
-                            <SearchableSelect options={alumnos} value={editData.alumno_encargado_id} onChange={(id) => setEditData({...editData, alumno_encargado_id: id})} placeholder="Buscar..." /></div>
-                        
-                        <div style={{ display: 'flex', gap: '15px', marginTop: '20px' }}>
-                            <button onClick={handleSaveChanges} disabled={saving} style={{ flex: 1, padding: '12px', background: '#003366', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>{saving ? 'Guardando...' : '💾 Guardar Cambios'}</button>
-                            <button onClick={() => setIsEditing(false)} style={{ flex: 1, padding: '12px', background: '#6c757d', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>❌ Cancelar</button>
+                    <div style={{ marginTop: actionError ? '20px' : '92px', marginBottom: '40px', padding: '0 24px', display: 'flex', justifyContent: 'center', width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{
+                            width: '100%',
+                            maxWidth: '820px',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '14px',
+                            border: '1px solid #e2e8f0',
+                            boxShadow: '0 8px 28px rgba(15, 23, 42, 0.06)',
+                            overflow: 'hidden'
+                        }}>
+                            <div style={{ height: '6px', background: 'linear-gradient(90deg, #003366 0%, #800020 50%, #00509e 100%)' }} />
+
+                            <div style={{ padding: '32px 36px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                                <div style={{ borderBottom: '1px solid #eef2f6', paddingBottom: '16px' }}>
+                                    <h2 style={{ margin: 0, fontSize: '1.45rem', color: '#003366', fontWeight: '800' }}>
+                                        {club.nombre}
+                                    </h2>
+                                </div>
+
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: '700', fontSize: '0.9rem', color: '#1e293b', marginBottom: '7px' }}>
+                                        Nombre
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editData.nombre}
+                                        onChange={(e) => setEditData({ ...editData, nombre: e.target.value })}
+                                        style={{
+                                            width: '100%',
+                                            padding: '11px 14px',
+                                            border: '1px solid #cbd5e1',
+                                            borderRadius: '8px',
+                                            backgroundColor: '#f8fafc',
+                                            fontSize: '0.95rem',
+                                            color: '#0f172a',
+                                            boxSizing: 'border-box',
+                                            outline: 'none'
+                                        }}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: '700', fontSize: '0.9rem', color: '#1e293b', marginBottom: '7px' }}>
+                                        Descripción
+                                    </label>
+                                    <textarea
+                                        rows="4"
+                                        value={editData.descripcion}
+                                        onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 14px',
+                                            border: '1px solid #cbd5e1',
+                                            borderRadius: '8px',
+                                            backgroundColor: '#f8fafc',
+                                            fontSize: '0.95rem',
+                                            color: '#0f172a',
+                                            fontFamily: 'inherit',
+                                            lineHeight: '1.5',
+                                            resize: 'vertical',
+                                            boxSizing: 'border-box',
+                                            outline: 'none'
+                                        }}
+                                    />
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontWeight: '700', fontSize: '0.9rem', color: '#1e293b', marginBottom: '7px' }}>
+                                            Profesor Encargado
+                                        </label>
+                                        <SearchableSelect
+                                            options={profesores}
+                                            value={editData.profesor_encargado_id}
+                                            onChange={(id) => setEditData({ ...editData, profesor_encargado_id: id })}
+                                            placeholder="Buscar profesor..."
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label style={{ display: 'block', fontWeight: '700', fontSize: '0.9rem', color: '#1e293b', marginBottom: '7px' }}>
+                                            Alumno Encargado
+                                        </label>
+                                        <SearchableSelect
+                                            options={alumnos}
+                                            value={editData.alumno_encargado_id}
+                                            onChange={(id) => setEditData({ ...editData, alumno_encargado_id: id })}
+                                            placeholder="Buscar alumno..."
+                                        />
+                                    </div>
+                                </div>
+
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'flex-end',
+                                    gap: '12px',
+                                    marginTop: '8px',
+                                    paddingTop: '20px',
+                                    borderTop: '1px solid #eef2f6'
+                                }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditing(false)}
+                                        style={{
+                                            padding: '11px 22px',
+                                            background: '#f1f5f9',
+                                            color: '#334155',
+                                            border: '1px solid #cbd5e1',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            fontWeight: '700',
+                                            fontSize: '0.92rem'
+                                        }}
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveChanges}
+                                        disabled={saving}
+                                        style={{
+                                            padding: '11px 26px',
+                                            background: '#003366',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            cursor: saving ? 'wait' : 'pointer',
+                                            fontWeight: '700',
+                                            fontSize: '0.92rem',
+                                            boxShadow: '0 4px 12px rgba(0, 51, 102, 0.2)'
+                                        }}
+                                    >
+                                        {saving ? 'Guardando...' : '💾 Guardar Cambios'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 ) : (

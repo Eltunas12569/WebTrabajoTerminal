@@ -1,0 +1,654 @@
+/* ==========================================================================
+   GESTIÓN DASHBOARD - SISTEMA DE CLUBES ESCOM IPN
+   DISEÑO MODERNO OPTIMIZADO PARA COMPUTADORAS (DESKTOP FIRST)
+   ========================================================================== */
+
+.gestion-main-scroll {
+    background-color: #f0f2f5 !important;
+    background-image: radial-gradient(circle at 50% 0%, #ffffff 0%, #eef2f6 100%);
+    padding: 28px clamp(20px, 3.5vw, 44px) 52px !important;
+}
+
+.gestion-desktop-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* ==========================================================================
+   1. BANNER SUPERIOR DE BIENVENIDA Y MÉTRICAS RÁPIDAS
+   ========================================================================== */
+.gestion-hero-banner {
+    background: linear-gradient(135deg, #002244 0%, #003366 65%, #004080 100%);
+    border-radius: 18px;
+    padding: 26px 32px;
+    color: #ffffff;
+    box-shadow: 0 12px 30px -6px rgba(0, 51, 102, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+    position: relative;
+    overflow: hidden;
+}
+
+.gestion-hero-left {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 1;
+}
+
+.gestion-hero-eyebrow {
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #93c5fd;
+    margin: 0;
+}
+
+.gestion-hero-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.gestion-hero-title {
+    margin: 0;
+    font-size: 1.7rem;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    color: #ffffff;
+}
+
+.gestion-role-pill {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    backdrop-filter: blur(4px);
+}
+
+.gestion-hero-subtitle {
+    margin: 2px 0 0 0;
+    font-size: 0.92rem;
+    color: #cbd5e1;
+}
+
+/* KPIs rápidos a la derecha del banner */
+.gestion-hero-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    z-index: 1;
+}
+
+.gestion-kpi-group {
+    display: flex;
+    gap: 12px;
+}
+
+.gestion-kpi-box {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
+    padding: 10px 18px;
+    min-width: 95px;
+    text-align: center;
+    backdrop-filter: blur(6px);
+    transition: transform 0.2s ease, background 0.2s ease;
+    cursor: pointer;
+}
+
+.gestion-kpi-box:hover {
+    background: rgba(255, 255, 255, 0.16);
+    transform: translateY(-2px);
+}
+
+.gestion-kpi-num {
+    display: block;
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.1;
+}
+
+.gestion-kpi-label {
+    font-size: 0.74rem;
+    color: #cbd5e1;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.btn-hero-action {
+    padding: 11px 20px;
+    border-radius: 10px;
+    border: none;
+    background: #800020;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(128, 0, 32, 0.35);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-hero-action:hover {
+    background: #9b0027;
+    transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   2. BARRA DE PESTAÑAS MODERNA (DESKTOP TABS)
+   ========================================================================== */
+.gestion-nav-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+    padding: 8px 10px;
+    border-radius: 14px;
+    box-shadow: 
+        0 4px 16px rgba(0, 51, 102, 0.06),
+        0 0 0 1px rgba(0, 51, 102, 0.06);
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.gestion-tabs-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.gestion-tab-btn {
+    padding: 11px 22px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: #475569;
+    font-size: 0.93rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gestion-tab-btn:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.gestion-tab-btn.active {
+    background: #003366;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 51, 102, 0.22);
+}
+
+.gestion-tab-badge {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 99px;
+    background: #e2e8f0;
+    color: #334155;
+    font-weight: 800;
+}
+
+.gestion-tab-btn.active .gestion-tab-badge {
+    background: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+}
+
+/* Accesos rápidos a salas de chat si es encargado */
+.gestion-quick-chats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-right: 6px;
+}
+
+.btn-quick-channel {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #003366;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.btn-quick-channel:hover {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   3. CONTENEDOR DE SECCIÓN PRINCIPAL
+   ========================================================================== */
+.gestion-content-panel {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 28px 32px;
+    box-shadow: 
+        0 10px 30px -5px rgba(0, 51, 102, 0.07),
+        0 2px 8px rgba(0, 0, 0, 0.03),
+        0 0 0 1px rgba(0, 51, 102, 0.06);
+    min-height: 420px;
+    box-sizing: border-box;
+}
+
+.panel-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 18px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid #f1f5f9;
+    flex-wrap: wrap;
+}
+
+.panel-section-title-group h2 {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.panel-section-title-group p {
+    margin: 4px 0 0 0;
+    font-size: 0.88rem;
+    color: #64748b;
+}
+
+/* ==========================================================================
+   4. TARJETAS DE AVISOS (DISEÑO DE ESCRITORIO)
+   ========================================================================== */
+.avisos-grid-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.gestion-aviso-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-left: 5px solid #003366;
+    border-radius: 12px;
+    padding: 18px 22px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.gestion-aviso-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 51, 102, 0.07);
+}
+
+.gestion-aviso-card.priority-alta {
+    border-left-color: #dc2626;
+    background: linear-gradient(to right, rgba(254, 242, 242, 0.45), #ffffff 15%);
+}
+
+.gestion-aviso-card.priority-normal {
+    border-left-color: #0284c7;
+    background: linear-gradient(to right, rgba(240, 249, 255, 0.45), #ffffff 15%);
+}
+
+.gestion-aviso-card.priority-baja {
+    border-left-color: #16a34a;
+    background: linear-gradient(to right, rgba(240, 253, 244, 0.45), #ffffff 15%);
+}
+
+.aviso-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.aviso-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.aviso-type-tag {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.aviso-type-tag.global {
+    background: #eff6ff;
+    color: #003366;
+}
+
+.aviso-type-tag.club {
+    background: #f1f5f9;
+    color: #334155;
+}
+
+.aviso-card-title {
+    margin: 0;
+    font-size: 1.06rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.aviso-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.aviso-date-badge {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.btn-dismiss-aviso {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: #f1f5f9;
+    color: #64748b;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: bold;
+    transition: all 0.15s ease;
+}
+
+.btn-dismiss-aviso:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.aviso-card-body {
+    margin: 0;
+    font-size: 0.93rem;
+    color: #334155;
+    line-height: 1.6;
+}
+
+/* ==========================================================================
+   5. GRID DE CLUBES EN ESCRITORIO (2 COLUMNAS AMPLIAS)
+   ========================================================================== */
+.gestion-clubs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 20px;
+}
+
+.gestion-club-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-top: 4px solid #003366;
+    border-radius: 14px;
+    padding: 22px 24px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.gestion-club-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px -4px rgba(0, 51, 102, 0.14);
+    border-color: #cbd5e1;
+}
+
+.gestion-club-card.member-active {
+    border-top-color: #16a34a;
+}
+
+.club-card-top-bar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.club-card-name {
+    margin: 0 0 6px 0;
+    font-size: 1.18rem;
+    font-weight: 800;
+    color: #003366;
+    line-height: 1.25;
+}
+
+.club-badges-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.role-badge-chip {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 99px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.role-badge-chip.profesor {
+    background: #eff6ff;
+    color: #003366;
+    border: 1px solid #bfdbfe;
+}
+
+.role-badge-chip.lider {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.role-badge-chip.miembro {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.club-card-desc {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #475569;
+    line-height: 1.55;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.club-card-meta-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    color: #334155;
+}
+
+.club-card-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.club-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+    flex-wrap: wrap;
+}
+
+.btn-club-action {
+    padding: 8px 15px;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.18s ease;
+    border: none;
+}
+
+.btn-club-action.chat {
+    background: #003366;
+    color: #ffffff;
+}
+
+.btn-club-action.chat:hover {
+    background: #002244;
+}
+
+.btn-club-action.details {
+    background: #eff6ff;
+    color: #003366;
+    border: 1px solid #bfdbfe;
+}
+
+.btn-club-action.details:hover {
+    background: #dbeafe;
+}
+
+.btn-club-action.signatures {
+    background: #800020;
+    color: #ffffff;
+}
+
+.btn-club-action.signatures:hover {
+    background: #600018;
+}
+
+/* ==========================================================================
+   6. ESTADOS VACÍOS (EMPTY STATES)
+   ========================================================================== */
+.gestion-empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 14px;
+    color: #64748b;
+}
+
+.gestion-empty-icon {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.gestion-empty-state h4 {
+    margin: 0 0 6px 0;
+    font-size: 1.08rem;
+    color: #1e293b;
+}
+
+.gestion-empty-state p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* ==========================================================================
+   7. MODAL DE FIRMAS MODERNIZADO
+   ========================================================================== */
+.signatures-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.sig-metric-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 16px;
+    text-align: center;
+}
+
+.sig-metric-val {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #003366;
+}
+
+.sig-metric-label {
+    font-size: 0.78rem;
+    color: #64748b;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+/* ==========================================================================
+   8. RESPONSIVIDAD
+   ========================================================================== */
+@media (max-width: 900px) {
+    .gestion-clubs-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .gestion-hero-banner {
+        padding: 22px;
+    }
+
+    .gestion-content-panel {
+        padding: 20px;
+    }
+
+    .signatures-summary-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
