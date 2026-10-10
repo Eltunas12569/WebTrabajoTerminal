@@ -22,6 +22,7 @@ const ClubEmergenciasPage = () => {
     const [filtroAlergias, setFiltroAlergias] = useState('todos');
     const [filtroContactos, setFiltroContactos] = useState('todos');
     const [filtroRol, setFiltroRol] = useState('todos');
+    const [modalKpiTipo, setModalKpiTipo] = useState(null); // 'alergias' | 'sin_contactos' | null
 
     const esAdmin = Number(user?.role_id) === 1 || Number(user?.rol) === 1;
 
@@ -67,14 +68,22 @@ const ClubEmergenciasPage = () => {
         setFiltroRol('todos');
     };
 
+    // Listas específicas para modales de KPIs
+    const miembrosConAlergias = useMemo(() => {
+        return miembros.filter(m => m.alergias && m.alergias.trim() && m.alergias.trim().toLowerCase() !== 'ninguna');
+    }, [miembros]);
+
+    const miembrosSinContactos = useMemo(() => {
+        return miembros.filter(m => !m.contactos || m.contactos.length === 0);
+    }, [miembros]);
+
     // Métricas para los KPIs
     const kpiData = useMemo(() => {
         const total = miembros.length;
-        const conSangre = miembros.filter(m => m.tipo_sangre && m.tipo_sangre.trim()).length;
-        const conAlergias = miembros.filter(m => m.alergias && m.alergias.trim() && m.alergias.trim().toLowerCase() !== 'ninguna').length;
-        const sinContactos = miembros.filter(m => !m.contactos || m.contactos.length === 0).length;
-        return { total, conSangre, conAlergias, sinContactos };
-    }, [miembros]);
+        const conAlergias = miembrosConAlergias.length;
+        const sinContactos = miembrosSinContactos.length;
+        return { total, conAlergias, sinContactos };
+    }, [miembros.length, miembrosConAlergias.length, miembrosSinContactos.length]);
 
     // Filtrado interactivo
     const miembrosFiltrados = useMemo(() => {
@@ -162,10 +171,12 @@ const ClubEmergenciasPage = () => {
                     </div>
                     <div className="nav-right">
                         <button
+                            type="button"
                             onClick={() => navigate(esAdmin ? '/admin' : `/club/${clubId}/panel`)}
-                            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', cursor: 'pointer', padding: '8px 15px', borderRadius: '5px', fontWeight: 'bold' }}
+                            className="btn-volver-nav"
                         >
-                            🔙 Volver
+                            <span className="btn-volver-icon">←</span>
+                            <span>Volver</span>
                         </button>
                     </div>
                 </header>
@@ -247,40 +258,17 @@ const ClubEmergenciasPage = () => {
                     </button>
 
                     <button
+                        type="button"
                         onClick={() => navigate(-1)}
-                        style={{
-                            background: 'rgba(255,255,255,0.2)',
-                            border: 'none',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            padding: '8px 14px',
-                            borderRadius: '6px',
-                            fontWeight: 'bold',
-                            fontSize: '0.86rem'
-                        }}
+                        className="btn-volver-nav"
                     >
-                        🔙 Volver
+                        <span className="btn-volver-icon">←</span>
+                        <span>Volver</span>
                     </button>
                 </div>
             </header>
 
             <main className="emergencias-content">
-                {/* Hero Banner */}
-                <div className="emergencias-hero">
-                    <div className="emergencias-hero-text">
-                        <h1>
-                            <span>🚨</span> Información Médica y de Emergencia
-                        </h1>
-                        <p>
-                            Fichas de salud, tipo de sangre, alergias, NSS y contactos de auxilio para los integrantes de <strong>{club?.nombre}</strong>.
-                        </p>
-                    </div>
-                    <div>
-                        <span className="emergencias-hero-badge">
-                            🔒 Exclusivo para Encargados
-                        </span>
-                    </div>
-                </div>
 
                 {/* Tarjetas KPI de Resumen */}
                 <div className="emergencias-kpis">
@@ -292,128 +280,163 @@ const ClubEmergenciasPage = () => {
                         </div>
                     </div>
 
-                    <div className="kpi-card kpi-success">
-                        <div className="kpi-icon">🩸</div>
-                        <div className="kpi-info">
-                            <h4>Con Tipo de Sangre</h4>
-                            <div className="kpi-number">{kpiData.conSangre} <small style={{ fontSize: '0.85rem', color: '#64748b' }}>/ {kpiData.total}</small></div>
-                        </div>
-                    </div>
-
-                    <div className="kpi-card kpi-warning">
+                    <div
+                        className="kpi-card kpi-warning"
+                        onClick={() => {
+                            if (kpiData.conAlergias > 0) setModalKpiTipo('alergias');
+                        }}
+                        style={{
+                            cursor: kpiData.conAlergias > 0 ? 'pointer' : 'default',
+                            position: 'relative'
+                        }}
+                        title={kpiData.conAlergias > 0 ? 'Haz clic para ver integrantes con alergias o condiciones' : 'Ningún integrante con alergias o condiciones'}
+                    >
                         <div className="kpi-icon">⚠️</div>
-                        <div className="kpi-info">
+                        <div className="kpi-info" style={{ flex: 1 }}>
                             <h4>Con Alergias / Condiciones</h4>
-                            <div className="kpi-number">{kpiData.conAlergias}</div>
+                            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
+                                <div className="kpi-number">{kpiData.conAlergias}</div>
+                                {kpiData.conAlergias > 0 && (
+                                    <span style={{ fontSize: '0.76rem', fontWeight: '700', color: '#d97706' }}>
+                                        Ver listado →
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    <div className={`kpi-card ${kpiData.sinContactos > 0 ? 'kpi-danger' : 'kpi-success'}`}>
+                    <div
+                        className={`kpi-card ${kpiData.sinContactos > 0 ? 'kpi-danger' : 'kpi-success'}`}
+                        onClick={() => {
+                            if (kpiData.sinContactos > 0) setModalKpiTipo('sin_contactos');
+                        }}
+                        style={{
+                            cursor: kpiData.sinContactos > 0 ? 'pointer' : 'default',
+                            position: 'relative'
+                        }}
+                        title={kpiData.sinContactos > 0 ? 'Haz clic para ver integrantes sin contacto de emergencia' : 'Todos los integrantes cuentan con contacto de emergencia'}
+                    >
                         <div className="kpi-icon">{kpiData.sinContactos > 0 ? '🚨' : '✅'}</div>
-                        <div className="kpi-info">
+                        <div className="kpi-info" style={{ flex: 1 }}>
                             <h4>Sin Contacto de Emergencia</h4>
-                            <div className="kpi-number" style={{ color: kpiData.sinContactos > 0 ? '#dc3545' : '#10b981' }}>
-                                {kpiData.sinContactos}
+                            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
+                                <div className="kpi-number" style={{ color: kpiData.sinContactos > 0 ? '#dc3545' : '#10b981' }}>
+                                    {kpiData.sinContactos}
+                                </div>
+                                {kpiData.sinContactos > 0 && (
+                                    <span style={{ fontSize: '0.76rem', fontWeight: '700', color: '#dc3545' }}>
+                                        Ver faltantes →
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Panel de Filtros Interactivos */}
+                {/* Panel de Control y Filtros de Accesibilidad Rápida (Sticky) */}
                 <div className="emergencias-filtros-card no-print">
-                    <div className="filtros-header">
-                        <h3>
-                            <span>🔍</span> Filtros y Búsqueda de Integrantes
-                        </h3>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600' }}>
-                                Mostrando {miembrosFiltrados.length} de {miembros.length}
-                            </span>
-                            {(busqueda || filtroSangre !== 'todos' || filtroAlergias !== 'todos' || filtroContactos !== 'todos' || filtroRol !== 'todos') && (
-                                <button onClick={limpiarFiltros} className="btn-reset-filtros">
-                                    🔄 Restablecer Filtros
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="filtros-grid">
-                        <div className="filtro-item" style={{ gridColumn: 'span 2' }}>
-                            <label htmlFor="busqueda">Búsqueda rápida</label>
+                    <div className="filtros-toolbar-top">
+                        {/* Buscador instantáneo amplio */}
+                        <div className="busqueda-rapida-wrapper">
+                            <span className="busqueda-rapida-icon">🔍</span>
                             <input
                                 id="busqueda"
                                 type="text"
+                                className="busqueda-rapida-input"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
-                                placeholder="Buscar por nombre, boleta, teléfono, familiar o alergia..."
+                                placeholder="Buscar al instante por nombre, boleta, teléfono, familiar o alergia..."
                             />
+                            {busqueda && (
+                                <button
+                                    type="button"
+                                    className="busqueda-clear-btn"
+                                    onClick={() => setBusqueda('')}
+                                    title="Limpiar búsqueda"
+                                >
+                                    ✕
+                                </button>
+                            )}
                         </div>
 
-                        <div className="filtro-item">
-                            <label htmlFor="filtroSangre">🩸 Tipo de Sangre</label>
-                            <select
-                                id="filtroSangre"
-                                value={filtroSangre}
-                                onChange={(e) => setFiltroSangre(e.target.value)}
+                        {/* Accesos rápidos a 1 clic */}
+                        <div className="quick-pills-group">
+                            <button
+                                type="button"
+                                onClick={limpiarFiltros}
+                                className={`quick-pill ${filtroAlergias === 'todos' && filtroContactos === 'todos' && filtroSangre === 'todos' && filtroRol === 'todos' && !busqueda ? 'active-default' : ''}`}
                             >
-                                <option value="todos">Todos los grupos</option>
-                                <option value="O+">O Positivo (O+)</option>
-                                <option value="O-">O Negativo (O-)</option>
-                                <option value="A+">A Positivo (A+)</option>
-                                <option value="A-">A Negativo (A-)</option>
-                                <option value="B+">B Positivo (B+)</option>
-                                <option value="B-">B Negativo (B-)</option>
-                                <option value="AB+">AB Positivo (AB+)</option>
-                                <option value="AB-">AB Negativo (AB-)</option>
-                                <option value="sin_especificar">⚠️ Sin especificar</option>
-                            </select>
-                        </div>
+                                👥 Todos ({miembros.length})
+                            </button>
 
-                        <div className="filtro-item">
-                            <label htmlFor="filtroAlergias">⚠️ Alergias / Condiciones</label>
-                            <select
-                                id="filtroAlergias"
-                                value={filtroAlergias}
-                                onChange={(e) => setFiltroAlergias(e.target.value)}
+                            <button
+                                type="button"
+                                onClick={() => setFiltroAlergias(filtroAlergias === 'con_alergias' ? 'todos' : 'con_alergias')}
+                                className={`quick-pill ${filtroAlergias === 'con_alergias' ? 'active-warning' : ''}`}
                             >
-                                <option value="todos">Todas las condiciones</option>
-                                <option value="con_alergias">⚠️ Con alergias reportadas</option>
-                                <option value="sin_alergias">✅ Sin alergias / limpio</option>
-                            </select>
-                        </div>
+                                ⚠️ Con Alergias ({kpiData.conAlergias})
+                            </button>
 
-                        <div className="filtro-item">
-                            <label htmlFor="filtroContactos">📞 Contacto de Emergencia</label>
-                            <select
-                                id="filtroContactos"
-                                value={filtroContactos}
-                                onChange={(e) => setFiltroContactos(e.target.value)}
+                            <button
+                                type="button"
+                                onClick={() => setFiltroContactos(filtroContactos === 'sin_contactos' ? 'todos' : 'sin_contactos')}
+                                className={`quick-pill ${filtroContactos === 'sin_contactos' ? 'active-danger' : ''}`}
                             >
-                                <option value="todos">Todos los registros</option>
-                                <option value="con_contactos">✅ Con contactos registrados</option>
-                                <option value="sin_contactos">🚨 Sin contactos registrados</option>
-                            </select>
+                                🚨 Sin Contacto ({kpiData.sinContactos})
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="filtros-toolbar-bottom">
+                        {/* Chips de acceso rápido por Tipo de Sangre */}
+                        <div className="sangre-chips-bar">
+                            <span className="sangre-chips-label">🩸 Sangre:</span>
+                            {['todos', 'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'sin_especificar'].map((grupo) => {
+                                const etiqueta = grupo === 'todos' ? 'Todos' : (grupo === 'sin_especificar' ? 'Sin reg.' : grupo);
+                                return (
+                                    <button
+                                        key={grupo}
+                                        type="button"
+                                        onClick={() => setFiltroSangre(filtroSangre === grupo ? 'todos' : grupo)}
+                                        className={`sangre-chip ${filtroSangre === grupo ? 'active' : ''}`}
+                                    >
+                                        {etiqueta}
+                                    </button>
+                                );
+                            })}
                         </div>
 
-                        <div className="filtro-item">
-                            <label htmlFor="filtroRol">👥 Rol en el Club</label>
+                        {/* Selector de Rol, Contador y Botón de Restablecer */}
+                        <div className="filtros-selects-inline">
                             <select
                                 id="filtroRol"
+                                className="select-compacto"
                                 value={filtroRol}
                                 onChange={(e) => setFiltroRol(e.target.value)}
+                                title="Filtrar por rol en el club"
                             >
-                                <option value="todos">Todos los roles</option>
+                                <option value="todos">👥 Todos los roles</option>
                                 <option value="encargado_profesor">🎓 Profesor Titular</option>
                                 <option value="encargado_alumno">⭐ Alumno Representante</option>
                                 <option value="miembro">👤 Miembro</option>
                             </select>
+
+                            <span style={{ fontSize: '0.83rem', color: '#475569', fontWeight: '700' }}>
+                                Mostrando {miembrosFiltrados.length} de {miembros.length}
+                            </span>
+
+                            {(busqueda || filtroSangre !== 'todos' || filtroAlergias !== 'todos' || filtroContactos !== 'todos' || filtroRol !== 'todos') && (
+                                <button type="button" onClick={limpiarFiltros} className="btn-reset-filtros">
+                                    🔄 Limpiar
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* Directorio / Tarjetas de Integrantes */}
+                {/* Directorio / Tarjetas de Integrantes en Cuadrícula de Escritorio */}
                 {miembrosFiltrados.length === 0 ? (
-                    <div style={{ background: '#fff', padding: '40px 20px', borderRadius: '12px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                    <div style={{ background: '#fff', padding: '40px 20px', borderRadius: '14px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
                         <span style={{ fontSize: '3rem' }}>🔍</span>
                         <h3 style={{ color: '#003366', marginTop: '10px' }}>No se encontraron coincidencias</h3>
                         <p style={{ color: '#666', maxWidth: '500px', margin: '8px auto 16px auto' }}>
@@ -431,7 +454,7 @@ const ClubEmergenciasPage = () => {
                             const tieneAlergias = m.alergias && m.alergias.trim() && m.alergias.trim().toLowerCase() !== 'ninguna';
 
                             return (
-                                <div key={m.usuario_id} className="integrante-card">
+                                <div key={m.usuario_id} className={`integrante-card ${tieneAlergias ? 'card-alerta-medica' : ''}`}>
                                     {/* Cabecera del Integrante */}
                                     <div className="integrante-card-header">
                                         <div className="integrante-identidad">
@@ -455,67 +478,62 @@ const ClubEmergenciasPage = () => {
                                     <div className="integrante-card-body">
                                         {/* Columna Izquierda: Información Médica y Personal */}
                                         <div className="ficha-seccion">
-                                            <h4>🩺 Información Médica y Personal</h4>
-                                            
-                                            <div className="info-fila">
-                                                <span className="info-label">Tipo de Sangre:</span>
-                                                <span className="info-valor">
-                                                    {m.tipo_sangre ? (
-                                                        <strong style={{ color: '#b91c1c' }}>{m.tipo_sangre}</strong>
-                                                    ) : (
-                                                        <em style={{ color: '#94a3b8' }}>Sin registrar</em>
-                                                    )}
-                                                </span>
+                                            <h4>🩺 Datos Médicos y Personales</h4>
+
+                                            <div className="datos-vitales-grid">
+                                                <div className="dato-vital-box">
+                                                    <span className="dato-vital-label">Tipo de Sangre</span>
+                                                    <span className="dato-vital-valor" style={{ color: m.tipo_sangre ? '#b91c1c' : '#94a3b8' }}>
+                                                        {m.tipo_sangre ? `🩸 ${m.tipo_sangre}` : 'Sin registrar'}
+                                                    </span>
+                                                </div>
+                                                <div className="dato-vital-box">
+                                                    <span className="dato-vital-label">NSS (Seguro)</span>
+                                                    <span className="dato-vital-valor" style={{ color: m.nss ? '#0f172a' : '#94a3b8' }}>
+                                                        {m.nss || 'No registrado'}
+                                                    </span>
+                                                </div>
                                             </div>
 
                                             <div className="info-fila">
-                                                <span className="info-label">NSS (Seguro Médico):</span>
-                                                <span className="info-valor">
-                                                    {m.nss ? m.nss : <em style={{ color: '#94a3b8' }}>No registrado</em>}
-                                                </span>
-                                            </div>
-
-                                            <div className="info-fila">
-                                                <span className="info-label">Teléfono Personal:</span>
+                                                <span className="info-label">Tel. Personal:</span>
                                                 <span className="info-valor">
                                                     {m.telefono ? (
                                                         <>
-                                                            <a href={`tel:${m.telefono}`} style={{ color: '#00509e', textDecoration: 'none' }}>
+                                                            <a href={`tel:${m.telefono}`} style={{ color: '#00509e', textDecoration: 'none', fontWeight: '700' }}>
                                                                 📞 {m.telefono}
                                                             </a>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleCopiar(m.telefono)}
-                                                                className="btn-copiar no-print"
-                                                                title="Copiar teléfono"
+                                                                className={`btn-copiar no-print ${telefonoCopiado === m.telefono ? 'copiado' : ''}`}
+                                                                style={{ padding: '4px 10px', fontSize: '0.76rem' }}
+                                                                title="Copiar teléfono personal"
                                                             >
-                                                                {telefonoCopiado === m.telefono ? '✓ Copiado' : 'Copiar'}
+                                                                {telefonoCopiado === m.telefono ? '✓ Copiado' : '📋 Copiar'}
                                                             </button>
                                                         </>
                                                     ) : (
-                                                        <em style={{ color: '#94a3b8' }}>Sin teléfono registrado</em>
+                                                        <em style={{ color: '#94a3b8', fontWeight: '500' }}>Sin registrar</em>
                                                     )}
                                                 </span>
                                             </div>
 
                                             <div className="info-fila">
                                                 <span className="info-label">Correo:</span>
-                                                <span className="info-valor" style={{ wordBreak: 'break-all' }}>
+                                                <span className="info-valor" style={{ wordBreak: 'break-all', fontSize: '0.82rem' }}>
                                                     {m.correo || '—'}
                                                 </span>
                                             </div>
 
-                                            <div style={{ marginTop: '10px' }}>
-                                                <strong style={{ fontSize: '0.82rem', color: '#475569', display: 'block', marginBottom: '4px' }}>
-                                                    Alergias / Condiciones Preexistentes:
-                                                </strong>
+                                            <div style={{ marginTop: '4px' }}>
                                                 {tieneAlergias ? (
                                                     <div className="alergias-box">
                                                         <strong>⚠️ ALERTA MÉDICA:</strong> {m.alergias}
                                                     </div>
                                                 ) : (
                                                     <div className="alergias-limpio">
-                                                        ✅ Ninguna condición médica o alergia reportada.
+                                                        ✅ Sin alergias o condiciones reportadas.
                                                     </div>
                                                 )}
                                             </div>
@@ -523,15 +541,15 @@ const ClubEmergenciasPage = () => {
 
                                         {/* Columna Derecha: Contactos de Emergencia */}
                                         <div className="ficha-seccion">
-                                            <h4>📞 Contactos de Emergencia y Auxilio</h4>
+                                            <h4>📞 Contactos de Emergencia</h4>
                                             
                                             {(!m.contactos || m.contactos.length === 0) ? (
                                                 <div className="sin-contactos-alerta">
-                                                    <span>⚠️</span>
+                                                    <span style={{ fontSize: '1.2rem' }}>🚨</span>
                                                     <div>
                                                         <strong>Sin contactos registrados</strong>
-                                                        <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem' }}>
-                                                            El integrante no ha ingresado números de familiares o tutores en su perfil.
+                                                        <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem' }}>
+                                                            No cuenta con teléfonos de emergencia en su perfil.
                                                         </p>
                                                     </div>
                                                 </div>
@@ -547,7 +565,9 @@ const ClubEmergenciasPage = () => {
                                                                     {contacto.nombre}
                                                                 </div>
                                                                 <div className="contacto-telefono">
-                                                                    <span>📞</span> {contacto.telefono}
+                                                                    <a href={`tel:${contacto.telefono}`} style={{ color: '#003366', textDecoration: 'none' }}>
+                                                                        📞 {contacto.telefono}
+                                                                    </a>
                                                                 </div>
                                                             </div>
                                                             <div className="no-print" style={{ display: 'flex', alignItems: 'center' }}>
@@ -557,7 +577,7 @@ const ClubEmergenciasPage = () => {
                                                                     className={`btn-copiar ${telefonoCopiado === contacto.telefono ? 'copiado' : ''}`}
                                                                     title="Copiar número de emergencia"
                                                                 >
-                                                                    {telefonoCopiado === contacto.telefono ? '✓ ¡Número Copiado!' : '📋 Copiar Teléfono'}
+                                                                    {telefonoCopiado === contacto.telefono ? '✓ Copiado' : '📋 Copiar'}
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -569,6 +589,222 @@ const ClubEmergenciasPage = () => {
                                 </div>
                             );
                         })}
+                    </div>
+                )}
+
+                {/* Modal de Detalle para Alergias / Condiciones o Sin Contactos de Emergencia */}
+                {modalKpiTipo && (
+                    <div
+                        className="no-print"
+                        onClick={() => setModalKpiTipo(null)}
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+                            backdropFilter: 'blur(3px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1100,
+                            padding: '20px'
+                        }}
+                    >
+                        <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                                background: '#ffffff',
+                                borderRadius: '14px',
+                                width: '100%',
+                                maxWidth: '680px',
+                                maxHeight: '82vh',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                boxShadow: '0 20px 45px rgba(15, 23, 42, 0.25)',
+                                border: '1px solid #e2e8f0',
+                                overflow: 'hidden'
+                            }}
+                        >
+                            {/* Encabezado del Modal */}
+                            <div
+                                style={{
+                                    padding: '18px 24px',
+                                    borderBottom: '1px solid #e2e8f0',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '12px',
+                                    background: modalKpiTipo === 'alergias' ? '#fffbeb' : '#fef2f2'
+                                }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <span style={{ fontSize: '1.6rem' }}>
+                                        {modalKpiTipo === 'alergias' ? '⚠️' : '🚨'}
+                                    </span>
+                                    <div>
+                                        <h3 style={{
+                                            margin: 0,
+                                            fontSize: '1.1rem',
+                                            fontWeight: '700',
+                                            color: modalKpiTipo === 'alergias' ? '#92400e' : '#991b1b'
+                                        }}>
+                                            {modalKpiTipo === 'alergias'
+                                                ? 'Integrantes con Alergias o Condiciones Médicas'
+                                                : 'Integrantes sin Contacto de Emergencia'}
+                                        </h3>
+                                        <p style={{ margin: '2px 0 0 0', fontSize: '0.84rem', color: '#64748b' }}>
+                                            {modalKpiTipo === 'alergias'
+                                                ? `${miembrosConAlergias.length} persona(s) con datos médicos reportados`
+                                                : `${miembrosSinContactos.length} persona(s) pendientes de registrar contacto de emergencia`}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setModalKpiTipo(null)}
+                                    style={{
+                                        background: '#ffffff',
+                                        border: '1px solid #cbd5e1',
+                                        borderRadius: '8px',
+                                        width: '32px',
+                                        height: '32px',
+                                        cursor: 'pointer',
+                                        fontWeight: '700',
+                                        color: '#475569',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                    title="Cerrar ventana"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            {/* Cuerpo del Modal */}
+                            <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {modalKpiTipo === 'alergias' ? (
+                                    miembrosConAlergias.map((m) => {
+                                        const inicial = (m.nombre_completo || 'U').charAt(0).toUpperCase();
+                                        const identificador = m.boleta ? `Boleta: ${m.boleta}` : (m.num_empleado ? `No. Emp: ${m.num_empleado}` : 'Sin identificador');
+                                        return (
+                                            <div
+                                                key={m.usuario_id}
+                                                style={{
+                                                    border: '1px solid #fde68a',
+                                                    borderRadius: '10px',
+                                                    padding: '14px 16px',
+                                                    background: '#ffffff',
+                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                        <div className="integrante-avatar" style={{ width: '36px', height: '36px', fontSize: '0.95rem' }}>
+                                                            {inicial}
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.96rem' }}>
+                                                                {m.nombre_completo}
+                                                            </div>
+                                                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                                                {identificador}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        {getRolBadge(m.rol_en_club)}
+                                                        {m.tipo_sangre && (
+                                                            <span className="badge-sangre">🩸 {m.tipo_sangre}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="alergias-box" style={{ marginTop: '10px' }}>
+                                                    <strong>⚠️ Condición / Alergia:</strong> {m.alergias}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    miembrosSinContactos.map((m) => {
+                                        const inicial = (m.nombre_completo || 'U').charAt(0).toUpperCase();
+                                        const identificador = m.boleta ? `Boleta: ${m.boleta}` : (m.num_empleado ? `No. Emp: ${m.num_empleado}` : 'Sin identificador');
+                                        return (
+                                            <div
+                                                key={m.usuario_id}
+                                                style={{
+                                                    border: '1px solid #fecaca',
+                                                    borderRadius: '10px',
+                                                    padding: '14px 16px',
+                                                    background: '#ffffff',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    flexWrap: 'wrap',
+                                                    gap: '10px'
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <div className="integrante-avatar" style={{ width: '36px', height: '36px', fontSize: '0.95rem', background: '#dc2626' }}>
+                                                        {inicial}
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.96rem' }}>
+                                                            {m.nombre_completo}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                                            {identificador} {m.telefono ? `• 📞 ${m.telefono}` : ''} {m.correo ? `• ✉️ ${m.correo}` : ''}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    {getRolBadge(m.rol_en_club)}
+                                                    <span style={{
+                                                        backgroundColor: '#fef2f2',
+                                                        color: '#b91c1c',
+                                                        border: '1px solid #fecaca',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '20px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: '700'
+                                                    }}>
+                                                        Sin contactos
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            {/* Pie del Modal */}
+                            <div
+                                style={{
+                                    padding: '14px 24px',
+                                    borderTop: '1px solid #e2e8f0',
+                                    background: '#f8fafc',
+                                    display: 'flex',
+                                    justifyContent: 'flex-end'
+                                }}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => setModalKpiTipo(null)}
+                                    style={{
+                                        backgroundColor: '#0f172a',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        padding: '8px 18px',
+                                        fontSize: '0.88rem',
+                                        fontWeight: '600',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
             </main>

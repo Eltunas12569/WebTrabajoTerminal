@@ -409,8 +409,9 @@ const CrearClubPage = () => {
                                     </p>
                                 </div>
                             </div>
-                            <button type="button" onClick={handleBack} className="btn-volver-header">
-                                ← Volver
+                            <button type="button" onClick={handleBack} className="btn-volver-modern">
+                                <span className="btn-volver-icon">←</span>
+                                <span>Volver</span>
                             </button>
                         </div>
 
