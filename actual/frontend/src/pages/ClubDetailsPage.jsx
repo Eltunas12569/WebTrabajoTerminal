@@ -38,9 +38,10 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
-    // Estados del Código de Unión
+    // Estados del Código de Unión y Salida del Club
     const [copied, setCopied] = useState(false);
     const [joining, setJoining] = useState(false);
+    const [leaving, setLeaving] = useState(false);
     const [joinMessage, setJoinMessage] = useState({ text: '', type: '' });
 
     // Estados de Avisos
@@ -441,6 +442,27 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         }
     };
 
+    const handleExpulsarMiembro = async (miembro) => {
+        if (!canManage || !miembro?.id) return;
+        const nombreCompleto = `${miembro.nombres || ''} ${miembro.apellidos || ''}`.trim() || 'este integrante';
+        const confirmar = window.confirm(
+            `¿Estás seguro de que deseas expulsar a "${nombreCompleto}" del club "${club?.nombre || ''}"?\n\nPerderá su membresía y el acceso al chat y eventos internos del club.`
+        );
+        if (!confirmar) return;
+
+        setError('');
+        setSuccess('');
+        try {
+            const res = await api.delete(`/clubes/${id}/miembros/${miembro.id}`);
+            setMiembros(prev => prev.filter(m => Number(m.id) !== Number(miembro.id)));
+            setSuccess(res.data?.message || `Se ha expulsado a ${nombreCompleto} del club.`);
+        } catch (err) {
+            const errMsg = err.response?.data?.message || 'Error al intentar expulsar al miembro del club.';
+            setError(errMsg);
+            alert(errMsg);
+        }
+    };
+
     const handleCopiarTelefono = (tel) => {
         if (!tel) return;
         navigator.clipboard.writeText(tel);
@@ -465,6 +487,8 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             const res = await api.post('/clubes/unirse', { codigo: club.codigo_union });
             setJoinMessage({ text: res.data.message || '¡Te has unido exitosamente al club!', type: 'success' });
             setIsMember(true);
+            setMiRolInterno('miembro');
+            setInscripcionEstatus('activo');
         } catch (err) {
             setJoinMessage({
                 text: err.response?.data?.message || 'Error al unirte al club con este código.',
@@ -472,6 +496,37 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             });
         } finally {
             setJoining(false);
+        }
+    };
+
+    const handleSalirDelClub = async () => {
+        if (!club?.id) return;
+        const confirmar = window.confirm(
+            `¿Estás seguro de que deseas salir del club "${club.nombre}"?\n\nDejarás de tener acceso al chat y a los avisos exclusivos de este club.`
+        );
+        if (!confirmar) return;
+
+        setLeaving(true);
+        setJoinMessage({ text: '', type: '' });
+        try {
+            const res = await api.delete(`/clubes/${id}/salir`);
+            setIsMember(false);
+            setMiRolInterno(null);
+            setInscripcionEstatus(null);
+            setActiveTab('detalles');
+            setJoinMessage({
+                text: res.data?.message || 'Has salido del club exitosamente.',
+                type: 'success'
+            });
+        } catch (err) {
+            const msg = err.response?.data?.message || 'Error al intentar salir del club.';
+            setJoinMessage({
+                text: msg,
+                type: 'error'
+            });
+            alert(msg);
+        } finally {
+            setLeaving(false);
         }
     };
 
@@ -789,27 +844,53 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                     )}
 
                                     {isMember ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => navigate(`/chat/${id}`)}
-                                            style={{
-                                                background: '#003366',
-                                                border: 'none',
-                                                color: '#fff',
-                                                cursor: 'pointer',
-                                                padding: '10px 18px',
-                                                borderRadius: '8px',
-                                                fontWeight: 'bold',
-                                                fontSize: '0.9rem',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px',
-                                                boxShadow: '0 2px 6px rgba(0, 51, 102, 0.25)',
-                                                transition: 'all 0.2s'
-                                            }}
-                                        >
-                                            💬 Entrar al Chat
-                                        </button>
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate(`/chat/${id}`)}
+                                                style={{
+                                                    background: '#003366',
+                                                    border: 'none',
+                                                    color: '#fff',
+                                                    cursor: 'pointer',
+                                                    padding: '10px 18px',
+                                                    borderRadius: '8px',
+                                                    fontWeight: 'bold',
+                                                    fontSize: '0.9rem',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    boxShadow: '0 2px 6px rgba(0, 51, 102, 0.25)',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                💬 Entrar al Chat
+                                            </button>
+                                            {!canManage && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSalirDelClub}
+                                                    disabled={leaving}
+                                                    style={{
+                                                        background: '#fff5f5',
+                                                        border: '1px solid #feb2b2',
+                                                        color: '#c53030',
+                                                        cursor: leaving ? 'not-allowed' : 'pointer',
+                                                        padding: '10px 16px',
+                                                        borderRadius: '8px',
+                                                        fontWeight: 'bold',
+                                                        fontSize: '0.9rem',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    title="Darse de baja de este club"
+                                                >
+                                                    {leaving ? '⏳ Saliendo...' : '🚪 Salir del Club'}
+                                                </button>
+                                            )}
+                                        </>
                                     ) : (
                                         <button
                                             type="button"
@@ -1661,9 +1742,19 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                     {filteredMiembros.length} de {miembros.length} integrantes listados
                                                 </span>
                                             </div>
-
-                                            
                                         </div>
+
+                                        {error && (
+                                            <div style={{ background: '#f8d7da', color: '#721c24', border: '1px solid #f5c6cb', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', fontWeight: '600' }}>
+                                                ⚠️ {error}
+                                            </div>
+                                        )}
+
+                                        {success && (
+                                            <div style={{ background: '#d4edda', color: '#155724', border: '1px solid #c3e6cb', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', fontWeight: '600' }}>
+                                                ✓ {success}
+                                            </div>
+                                        )}
 
                                         {/* Filtros y Buscador en Tiempo Real */}
                                         <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '20px' }}>
@@ -1806,25 +1897,53 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                 </td>
                                                                 {canManage && (
                                                                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleVerEmergencia(miembro)}
-                                                                            style={{
-                                                                                background: '#e7f3ff',
-                                                                                color: '#003366',
-                                                                                border: '1px solid #b6ddff',
-                                                                                padding: '6px 12px',
-                                                                                borderRadius: '6px',
-                                                                                cursor: 'pointer',
-                                                                                fontWeight: 'bold',
-                                                                                fontSize: '0.82rem',
-                                                                                display: 'inline-flex',
-                                                                                alignItems: 'center',
-                                                                                gap: '5px'
-                                                                            }}
-                                                                        >
-                                                                            🩺 Ficha Médica
-                                                                        </button>
+                                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleVerEmergencia(miembro)}
+                                                                                style={{
+                                                                                    background: '#e7f3ff',
+                                                                                    color: '#003366',
+                                                                                    border: '1px solid #b6ddff',
+                                                                                    padding: '6px 12px',
+                                                                                    borderRadius: '6px',
+                                                                                    cursor: 'pointer',
+                                                                                    fontWeight: 'bold',
+                                                                                    fontSize: '0.82rem',
+                                                                                    display: 'inline-flex',
+                                                                                    alignItems: 'center',
+                                                                                    gap: '5px'
+                                                                                }}
+                                                                            >
+                                                                                🩺 Ficha Médica
+                                                                            </button>
+
+                                                                            {!['encargado_profesor', 'encargado_alumno'].includes(miembro.rol_en_club) &&
+                                                                                Number(miembro.id) !== Number(club.profesor_encargado_id) &&
+                                                                                Number(miembro.id) !== Number(club.alumno_encargado_id) &&
+                                                                                Number(miembro.id) !== Number(user?.id) && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleExpulsarMiembro(miembro)}
+                                                                                    style={{
+                                                                                        background: '#fff5f5',
+                                                                                        color: '#c53030',
+                                                                                        border: '1px solid #feb2b2',
+                                                                                        padding: '6px 12px',
+                                                                                        borderRadius: '6px',
+                                                                                        cursor: 'pointer',
+                                                                                        fontWeight: 'bold',
+                                                                                        fontSize: '0.82rem',
+                                                                                        display: 'inline-flex',
+                                                                                        alignItems: 'center',
+                                                                                        gap: '5px'
+                                                                                    }}
+                                                                                    title="Expulsar a este integrante del club"
+                                                                                >
+                                                                                    🚫 Expulsar
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
                                                                     </td>
                                                                 )}
                                                             </tr>
