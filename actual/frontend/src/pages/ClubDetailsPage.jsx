@@ -274,7 +274,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         }
     };
 
-    // Acciones de Eventos
+    // Acciones de Eventos (Siempre exclusivos para miembros del club)
     const handleCrearEvento = (e) => {
         e.preventDefault();
         setError('');
@@ -289,7 +289,8 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             datos: {
                 ...eventoForm,
                 prioridad: eventoForm.prioridad || 'alta',
-                alcance: eventoForm.alcance || 'club'
+                alcance: 'club',
+                es_global: false
             },
             mensajeExito: ''
         });
@@ -333,18 +334,14 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                 }));
             } else if (modalConfirmacion.tipo === 'evento') {
                 const prio = eventoForm.prioridad || 'alta';
-                const alcanceEv = eventoForm.alcance || 'club';
-                const esGlobalEvento = alcanceEv === 'global';
                 await api.post(`/clubes/${id}/eventos`, {
                     ...eventoForm,
                     prioridad: prio,
-                    alcance: alcanceEv,
-                    es_global: esGlobalEvento,
+                    alcance: 'club',
+                    es_global: false,
                     notificarAviso: true
                 });
-                const msg = esGlobalEvento
-                    ? `✓ Evento GLOBAL agendado y notificado con prioridad ${prio.toUpperCase()} a toda la comunidad.`
-                    : `✓ Evento agendado y notificado con prioridad ${prio.toUpperCase()} a los integrantes del club.`;
+                const msg = `✓ Evento agendado y notificado con prioridad ${prio.toUpperCase()} a los integrantes del club.`;
                 setEventoForm({ titulo: '', descripcion: '', fecha_evento: '', lugar: '', prioridad: 'alta', alcance: 'club' });
                 setSuccess(msg);
                 fetchEventos();
@@ -354,9 +351,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                     ...prev,
                     procesando: false,
                     etapa: 'exito',
-                    mensajeExito: esGlobalEvento
-                        ? 'El evento global ha sido registrado en el calendario general y se ha enviado un aviso automático a toda la comunidad.'
-                        : 'El evento ha sido registrado en el calendario del club y se ha enviado un aviso automático a todos los integrantes.'
+                    mensajeExito: 'El evento ha sido registrado en el calendario del club y se ha enviado un aviso automático a todos los integrantes.'
                 }));
             }
         } catch (err) {
@@ -2401,65 +2396,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                 />
                                                             </div>
 
-                                                            {/* Selector de Alcance / Visibilidad del Evento */}
-                                                            <div>
-                                                                <label style={{ display: 'block', fontWeight: 'bold', fontSize: '0.88rem', marginBottom: '8px', color: '#333' }}>
-                                                                    Alcance / Visibilidad del Evento:
-                                                                </label>
-                                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setEventoForm({ ...eventoForm, alcance: 'club' })}
-                                                                        style={{
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            justifyContent: 'flex-start',
-                                                                            gap: '10px',
-                                                                            padding: '12px 16px',
-                                                                            borderRadius: '10px',
-                                                                            border: (eventoForm.alcance || 'club') === 'club' ? '2px solid #003366' : '1px solid #ced4da',
-                                                                            background: (eventoForm.alcance || 'club') === 'club' ? '#f0f5fa' : '#fff',
-                                                                            color: (eventoForm.alcance || 'club') === 'club' ? '#003366' : '#475569',
-                                                                            cursor: 'pointer',
-                                                                            textAlign: 'left',
-                                                                            transition: 'all 0.2s'
-                                                                        }}
-                                                                    >
-                                                                        <div>
-                                                                            <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>Solo para el Club</div>
-                                                                            <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
-                                                                                Exclusivo para integrantes de {club?.nombre || 'este club'}
-                                                                            </div>
-                                                                        </div>
-                                                                    </button>
 
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setEventoForm({ ...eventoForm, alcance: 'global' })}
-                                                                        style={{
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            justifyContent: 'flex-start',
-                                                                            gap: '10px',
-                                                                            padding: '12px 16px',
-                                                                            borderRadius: '10px',
-                                                                            border: eventoForm.alcance === 'global' ? '2px solid #7c3aed' : '1px solid #ced4da',
-                                                                            background: eventoForm.alcance === 'global' ? '#faf5ff' : '#fff',
-                                                                            color: eventoForm.alcance === 'global' ? '#6b21a8' : '#475569',
-                                                                            cursor: 'pointer',
-                                                                            textAlign: 'left',
-                                                                            transition: 'all 0.2s'
-                                                                        }}
-                                                                    >
-                                                                        <div>
-                                                                            <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>Global (Toda la Comunidad)</div>
-                                                                            <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
-                                                                                Visible en el calendario y avisos de toda la comunidad
-                                                                            </div>
-                                                                        </div>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
 
                                                             {/* Selector de Prioridad del Evento */}
                                                             <div>
@@ -2897,9 +2834,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                         ? (modalConfirmacion.datos?.alcance === 'global'
                                             ? '¿Estás seguro de publicar este aviso como GLOBAL? Será visible para todos los usuarios del sistema y en el portal general.'
                                             : '¿Estás seguro de que deseas publicar este aviso? Se mostrará inmediatamente en el tablero de los integrantes de este club.')
-                                        : (modalConfirmacion.datos?.alcance === 'global'
-                                            ? '¿Estás seguro de agendar este evento como GLOBAL? Aparecerá en el calendario y avisos de toda la comunidad.'
-                                            : '¿Estás seguro de que deseas agendar este evento? Se habilitará el registro de asistencia y se notificará a los integrantes del club.')}
+                                        : '¿Estás seguro de que deseas agendar este evento? Se habilitará el registro de asistencia y se notificará exclusivamente a los integrantes del club.'}
                                 </p>
 
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
