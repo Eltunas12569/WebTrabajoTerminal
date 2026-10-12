@@ -2,21 +2,21 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const verifyToken = require('../middlewares/authMiddleware');
-const requireVerificado = require('../middlewares/verificarCuentaMiddleware'); 
+const requireVerificado = require('../middlewares/verificarCuentaMiddleware');
 
 router.get('/', async (req, res) => {
     try {
         await db.query(`
             UPDATE avisos 
             SET activo = 0 
-            WHERE (club_id IS NULL OR es_global = 1)
+            WHERE club_id IS NULL
               AND (fecha_vencimiento < NOW() OR (fecha_vencimiento IS NULL AND fecha_envio < DATE_SUB(NOW(), INTERVAL 7 DAY)))
         `);
 
         await db.query(`
             UPDATE avisos 
             SET activo = 1 
-            WHERE (club_id IS NULL OR es_global = 1)
+            WHERE club_id IS NULL
               AND (fecha_vencimiento >= NOW() OR (fecha_vencimiento IS NULL AND fecha_envio >= DATE_SUB(NOW(), INTERVAL 7 DAY)))
         `);
 
@@ -31,14 +31,13 @@ router.get('/', async (req, res) => {
                    COALESCE(a.prioridad, 'normal') AS prioridad, 
                    a.fecha_envio AS tiempo, 
                    'global' AS tipo,
-                   1 AS es_global,
                    c.nombre AS nombre_club
             FROM avisos a
             LEFT JOIN clubes c ON a.club_id = c.id
-            WHERE a.activo = 1 AND (a.club_id IS NULL OR a.es_global = 1)
+            WHERE a.activo = 1 AND a.club_id IS NULL
             ORDER BY a.fecha_envio DESC
         `);
-        
+
         res.status(200).json(rows);
     } catch (error) {
         console.error("DB Error:", error.message);
@@ -67,11 +66,10 @@ router.get('/user/:userId', verifyToken, requireVerificado, async (req, res) => 
                    a.fecha_envio, 
                    a.fecha_vencimiento, 
                    'global' AS tipo,
-                   1 AS es_global,
                    c.nombre AS nombre_club
             FROM avisos a
             LEFT JOIN clubes c ON a.club_id = c.id
-            WHERE a.activo = 1 AND (a.club_id IS NULL OR a.es_global = 1)
+            WHERE a.activo = 1 AND a.club_id IS NULL
         `);
 
         const [clubes] = await db.query(`
@@ -82,12 +80,11 @@ router.get('/user/:userId', verifyToken, requireVerificado, async (req, res) => 
                    a.fecha_envio, 
                    a.fecha_vencimiento,
                    'club' AS tipo,
-                   0 AS es_global,
                    c.nombre AS nombre_club
             FROM avisos a
             JOIN clubes c ON a.club_id = c.id
             JOIN inscripciones i ON c.id = i.club_id
-            WHERE a.activo = 1 AND a.club_id IS NOT NULL AND IFNULL(a.es_global, 0) = 0 AND i.usuario_id = ? AND i.estatus = 'activo'
+            WHERE a.activo = 1 AND a.club_id IS NOT NULL AND i.usuario_id = ? AND i.estatus = 'activo'
         `, [userId]);
 
         const todos = [...globales, ...clubes].sort((a, b) => new Date(b.fecha_envio) - new Date(a.fecha_envio));
@@ -102,7 +99,7 @@ router.get('/user/:userId', verifyToken, requireVerificado, async (req, res) => 
 router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) => {
     try {
         const [users] = await db.query('SELECT role_id FROM usuarios WHERE id = ?', [req.user.id]);
-        
+
         if (!users.length || Number(users[0].role_id) !== 1) {
             return res.status(403).json({ message: 'Acceso denegado. Solo para administradores.' });
         }
@@ -110,7 +107,7 @@ router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) =>
         const [globales] = await db.query(`
             SELECT 
                 id, NULL AS nombre_club, titulo, contenido AS mensaje, prioridad, activo, 
-                fecha_envio, fecha_vencimiento, 'global' AS tipo, 1 AS es_global
+                fecha_envio, fecha_vencimiento, 'global' AS tipo
             FROM avisos
             WHERE club_id IS NULL
         `);
@@ -122,8 +119,7 @@ router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) =>
                 a.contenido AS mensaje, 
                 COALESCE(a.prioridad, 'normal') AS prioridad,
                 a.activo, a.fecha_envio, a.fecha_vencimiento, 
-                IF(a.es_global = 1, 'global', 'club') AS tipo,
-                IFNULL(a.es_global, 0) AS es_global
+                'club' AS tipo
             FROM avisos a
             JOIN clubes c ON a.club_id = c.id
             WHERE a.club_id IS NOT NULL
@@ -151,13 +147,13 @@ router.post('/', verifyToken, requireVerificado, async (req, res) => {
             return res.status(400).json({ message: 'El título, el contenido y la fecha de vencimiento son obligatorios.' });
         }
 
-        const prioridadValida = ['alta', 'normal', 'baja'].includes(String(prioridad).toLowerCase()) 
-            ? String(prioridad).toLowerCase() 
+        const prioridadValida = ['alta', 'normal', 'baja'].includes(String(prioridad).toLowerCase())
+            ? String(prioridad).toLowerCase()
             : 'normal';
 
         const [resultado] = await db.query(
-            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo, es_global) 
-             VALUES (NULL, ?, ?, ?, ?, NOW(), ?, 1, 1)`,
+            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo) 
+             VALUES (NULL, ?, ?, ?, ?, NOW(), ?, 1)`,
             [req.user.id, titulo.trim(), contenido.trim(), prioridadValida, fecha_vencimiento]
         );
 
@@ -171,9 +167,9 @@ router.post('/', verifyToken, requireVerificado, async (req, res) => {
             });
         }
 
-        res.status(201).json({ 
+        res.status(201).json({
             message: 'Aviso global publicado exitosamente.',
-            id: resultado.insertId 
+            id: resultado.insertId
         });
     } catch (error) {
         console.error("Error al crear aviso global:", error);
