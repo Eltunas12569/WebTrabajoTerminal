@@ -858,4 +858,156 @@ router.get('/:idClub/emergencias', verificarToken, requireVerificado, async (req
     }
 });
 
+// ==========================================
+// SALIR DE UN CLUB POR CUENTA PROPIA (Miembros)
+// ==========================================
+router.delete('/:id/salir', verificarToken, requireVerificado, async (req, res) => {
+    const idClub = req.params.id;
+    const idUsuario = req.user.id;
+
+    try {
+        const [clubes] = await db.query(
+            'SELECT id, nombre, profesor_encargado_id, alumno_encargado_id FROM clubes WHERE id = ?',
+            [idClub]
+        );
+        if (clubes.length === 0) {
+            return res.status(404).json({ message: 'El club especificado no existe.' });
+        }
+        const club = clubes[0];
+
+        const [inscripciones] = await db.query(
+            'SELECT id, rol_en_club, estatus FROM inscripciones WHERE club_id = ? AND usuario_id = ?',
+            [idClub, idUsuario]
+        );
+        if (inscripciones.length === 0) {
+            return res.status(404).json({ message: 'No te encuentras inscrito en este club.' });
+        }
+
+        const inscripcion = inscripciones[0];
+        const esEncargadoClub = (
+            ['encargado_profesor', 'encargado_alumno'].includes(inscripcion.rol_en_club) ||
+            Number(club.profesor_encargado_id) === Number(idUsuario) ||
+            Number(club.alumno_encargado_id) === Number(idUsuario)
+        );
+
+        if (esEncargadoClub && inscripcion.estatus === 'activo') {
+            return res.status(400).json({
+                message: 'Como encargado titular del club no puedes darte de baja directamente. Solicita primero a un Administrador el relevo de tu cargo.'
+            });
+        }
+
+        await db.query(
+            `DELETE ae FROM asistencias_eventos ae
+             INNER JOIN eventos_club ec ON ae.evento_id = ec.id
+             WHERE ec.club_id = ? AND ae.usuario_id = ?`,
+            [idClub, idUsuario]
+        );
+
+        await db.query(
+            'DELETE FROM inscripciones WHERE club_id = ? AND usuario_id = ?',
+            [idClub, idUsuario]
+        );
+
+        res.status(200).json({
+            message: `Has salido del club "${club.nombre}" exitosamente.`
+        });
+    } catch (error) {
+        console.error("Error al salir del club:", error);
+        res.status(500).json({ message: "Error interno al procesar tu salida del club." });
+    }
+});
+
+// ==========================================
+// EXPULSAR A UN MIEMBRO DEL CLUB (Solo Encargados del Club y Admin)
+// ==========================================
+router.delete('/:idClub/miembros/:idUsuario', verificarToken, requireVerificado, async (req, res) => {
+    const { idClub, idUsuario } = req.params;
+    const solicitanteId = req.user.id;
+    const solicitanteRol = Number(req.user.rol || req.user.role_id);
+
+    try {
+        // 1. Verificar que el club exista
+        const [clubes] = await db.query(
+            'SELECT id, nombre, profesor_encargado_id, alumno_encargado_id FROM clubes WHERE id = ?',
+            [idClub]
+        );
+        if (clubes.length === 0) {
+            return res.status(404).json({ message: 'El club especificado no existe.' });
+        }
+        const club = clubes[0];
+
+        // 2. Verificar permisos: Administrador o Encargado Activo de este club
+        let tienePermiso = solicitanteRol === 1 ||
+            Number(club.profesor_encargado_id) === Number(solicitanteId) ||
+            Number(club.alumno_encargado_id) === Number(solicitanteId);
+
+        if (!tienePermiso) {
+            const [esEncargado] = await db.query(
+                `SELECT id FROM inscripciones
+                 WHERE club_id = ? AND usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo'
+                 LIMIT 1`,
+                [idClub, solicitanteId]
+            );
+            if (esEncargado.length > 0) {
+                tienePermiso = true;
+            }
+        }
+
+        if (!tienePermiso) {
+            return res.status(403).json({
+                message: 'Acceso denegado. Solo los encargados de este club o un administrador pueden expulsar miembros.'
+            });
+        }
+
+        // 3. Evitar que el encargado se expulse a sí mismo
+        if (Number(solicitanteId) === Number(idUsuario)) {
+            return res.status(400).json({
+                message: 'No puedes expulsarte a ti mismo del club.'
+            });
+        }
+
+        // 4. Verificar que el usuario objetivo pertenezca al club
+        const [inscripciones] = await db.query(
+            'SELECT id, rol_en_club, estatus FROM inscripciones WHERE club_id = ? AND usuario_id = ?',
+            [idClub, idUsuario]
+        );
+        if (inscripciones.length === 0) {
+            return res.status(404).json({ message: 'El usuario especificado no pertenece a este club.' });
+        }
+
+        const inscripcionObjetivo = inscripciones[0];
+        const objetivoEsEncargado = (
+            ['encargado_profesor', 'encargado_alumno'].includes(inscripcionObjetivo.rol_en_club) ||
+            Number(club.profesor_encargado_id) === Number(idUsuario) ||
+            Number(club.alumno_encargado_id) === Number(idUsuario)
+        );
+
+        if (objetivoEsEncargado) {
+            return res.status(400).json({
+                message: 'No es posible expulsar directamente a un encargado titular del club. Solicita a un Administrador el cambio de encargado.'
+            });
+        }
+
+        // 5. Eliminar asistencias a eventos del club y la inscripción del miembro
+        await db.query(
+            `DELETE ae FROM asistencias_eventos ae
+             INNER JOIN eventos_club ec ON ae.evento_id = ec.id
+             WHERE ec.club_id = ? AND ae.usuario_id = ?`,
+            [idClub, idUsuario]
+        );
+
+        await db.query(
+            'DELETE FROM inscripciones WHERE club_id = ? AND usuario_id = ?',
+            [idClub, idUsuario]
+        );
+
+        res.status(200).json({
+            message: 'El integrante ha sido expulsado del club exitosamente.'
+        });
+    } catch (error) {
+        console.error('Error al expulsar miembro del club:', error);
+        res.status(500).json({ message: 'Error interno al intentar expulsar al miembro del club.' });
+    }
+});
+
 module.exports = router;
