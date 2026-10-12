@@ -617,10 +617,8 @@ router.post('/unirse', verificarToken, requireVerificado, async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
 
-// ==========================================
-// --- OBTENER ESTADO DE FIRMAS (PROFESOR) ---
-// ==========================================
-router.get('/:id/miembros', verificarToken, requireVerificado, async (req, res) => {
+
+router.get('/:id/miembros', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR]), async (req, res) => {
     try {
         const [miembros] = await db.query(`
             SELECT u.id, u.nombres, CONCAT(u.apellido_paterno, ' ', IFNULL(u.apellido_materno, '')) AS apellidos,
@@ -638,16 +636,13 @@ router.get('/:id/miembros', verificarToken, requireVerificado, async (req, res) 
     }
 });
 
-// ==========================================
-// --- INFORMACIÓN DE EMERGENCIA DE UN MIEMBRO (SOLO ENCARGADOS Y ADMIN) ---
-// ==========================================
-router.get('/:idClub/miembros/:idUsuario/emergencia', verificarToken, requireVerificado, async (req, res) => {
+
+router.get('/:idClub/miembros/:idUsuario/emergencia', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR, ROLES.ALUMNO, ROLES.ALUMNO_REPRESENTANTE]), async (req, res) => {
     const { idClub, idUsuario } = req.params;
     const solicitanteId = req.user.id;
     const solicitanteRol = Number(req.user.rol);
 
     try {
-        // 1. Barrera de Seguridad: Verificar que el solicitante sea Administrador (rol 1) o Encargado Activo de ESTE club
         if (solicitanteRol !== 1) {
             const [esEncargado] = await db.query(`
                 SELECT id FROM inscripciones 
@@ -660,7 +655,6 @@ router.get('/:idClub/miembros/:idUsuario/emergencia', verificarToken, requireVer
             }
         }
 
-        // 2. Verificar que el miembro pertenezca al club especificado
         const [perteneceAlClub] = await db.query(`
             SELECT id, rol_en_club, estatus FROM inscripciones 
             WHERE club_id = ? AND usuario_id = ?
@@ -671,7 +665,6 @@ router.get('/:idClub/miembros/:idUsuario/emergencia', verificarToken, requireVer
             return res.status(404).json({ message: "El usuario no pertenece a este club." });
         }
 
-        // 3. Consultar datos del usuario
         const [filasUsuario] = await db.query(`
             SELECT id, nombres, CONCAT(apellido_paterno, ' ', IFNULL(apellido_materno, '')) AS apellidos,
                    boleta, num_empleado, correo, nss, tipo_sangre, condiciones_preexistentes
@@ -685,7 +678,6 @@ router.get('/:idClub/miembros/:idUsuario/emergencia', verificarToken, requireVer
 
         const usuario = filasUsuario[0];
 
-        // 4. Consultar contactos de emergencia
         const [contactos] = await db.query(`
             SELECT id, nombre, telefono, parentesco
             FROM contactos_emergencia
@@ -712,10 +704,8 @@ router.get('/:idClub/miembros/:idUsuario/emergencia', verificarToken, requireVer
     }
 });
 
-// ==========================================
-// --- INFORMACIÓN DE EMERGENCIA DE TODOS LOS MIEMBROS (SOLO ENCARGADOS Y ADMIN) ---
-// ==========================================
-router.get('/:idClub/emergencias', verificarToken, requireVerificado, async (req, res) => {
+
+router.get('/:idClub/emergencias', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR, ROLES.ALUMNO, ROLES.ALUMNO_REPRESENTANTE]), async (req, res) => {
     const { idClub } = req.params;
     const solicitanteId = req.user.id;
     const solicitanteRol = Number(req.user.rol || req.user.role_id);
@@ -729,7 +719,6 @@ router.get('/:idClub/emergencias', verificarToken, requireVerificado, async (req
             }
         }
 
-        // 1. Barrera de Seguridad: Verificar que el solicitante sea Administrador (rol 1) o Encargado Activo de ESTE club
         if (!esAdmin) {
             const [esEncargado] = await db.query(`
                 SELECT id FROM inscripciones 
@@ -742,14 +731,13 @@ router.get('/:idClub/emergencias', verificarToken, requireVerificado, async (req
             }
         }
 
-        // 2. Obtener datos del club
+
         const [clubes] = await db.query(`SELECT id, nombre FROM clubes WHERE id = ?`, [idClub]);
         if (clubes.length === 0) {
             return res.status(404).json({ message: "Club no encontrado." });
         }
         const club = clubes[0];
 
-        // 3. Obtener todos los miembros activos del club
         const [miembros] = await db.query(`
             SELECT 
                 u.id AS usuario_id,
@@ -779,7 +767,6 @@ router.get('/:idClub/emergencias', verificarToken, requireVerificado, async (req
             return res.status(200).json({ club, miembros: [] });
         }
 
-        // 4. Obtener contactos de emergencia de los miembros
         const memberIds = miembros.map(m => m.usuario_id);
         const [contactos] = await db.query(`
             SELECT id, usuario_id, nombre, telefono, parentesco
@@ -788,7 +775,7 @@ router.get('/:idClub/emergencias', verificarToken, requireVerificado, async (req
             ORDER BY id ASC
         `, [memberIds]);
 
-        // Mapear contactos por usuario_id
+
         const contactosMap = {};
         for (const c of contactos) {
             if (!contactosMap[c.usuario_id]) {
@@ -826,18 +813,13 @@ router.get('/:idClub/emergencias', verificarToken, requireVerificado, async (req
     }
 });
 
-// ==========================================
-// SALIR DE UN CLUB POR CUENTA PROPIA (Miembros)
-// ==========================================
-router.delete('/:id/salir', verificarToken, requireVerificado, async (req, res) => {
+
+router.delete('/:id/salir', verificarToken, requireVerificado, checkRole([ROLES.ALUMNO, ROLES.PROFESOR, ROLES.ALUMNO_REPRESENTANTE]), async (req, res) => {
     const idClub = req.params.id;
     const idUsuario = req.user.id;
 
     try {
-        const [clubes] = await db.query(
-            'SELECT id, nombre, profesor_encargado_id, alumno_encargado_id FROM clubes WHERE id = ?',
-            [idClub]
-        );
+        const [clubes] = await db.query('SELECT id, nombre FROM clubes WHERE id = ?', [idClub]);
         if (clubes.length === 0) {
             return res.status(404).json({ message: 'El club especificado no existe.' });
         }
@@ -852,11 +834,7 @@ router.delete('/:id/salir', verificarToken, requireVerificado, async (req, res) 
         }
 
         const inscripcion = inscripciones[0];
-        const esEncargadoClub = (
-            ['encargado_profesor', 'encargado_alumno'].includes(inscripcion.rol_en_club) ||
-            Number(club.profesor_encargado_id) === Number(idUsuario) ||
-            Number(club.alumno_encargado_id) === Number(idUsuario)
-        );
+        const esEncargadoClub = ['encargado_profesor', 'encargado_alumno'].includes(inscripcion.rol_en_club);
 
         if (esEncargadoClub && inscripcion.estatus === 'activo') {
             return res.status(400).json({
@@ -871,43 +849,28 @@ router.delete('/:id/salir', verificarToken, requireVerificado, async (req, res) 
             [idClub, idUsuario]
         );
 
-        await db.query(
-            'DELETE FROM inscripciones WHERE club_id = ? AND usuario_id = ?',
-            [idClub, idUsuario]
-        );
+        await db.query('DELETE FROM inscripciones WHERE club_id = ? AND usuario_id = ?', [idClub, idUsuario]);
 
-        res.status(200).json({
-            message: `Has salido del club "${club.nombre}" exitosamente.`
-        });
+        res.status(200).json({ message: `Has salido del club "${club.nombre}" exitosamente.` });
     } catch (error) {
-        console.error("Error al salir del club:", error);
+        console.error(error);
         res.status(500).json({ message: "Error interno al procesar tu salida del club." });
     }
 });
 
-// ==========================================
-// EXPULSAR A UN MIEMBRO DEL CLUB (Solo Encargados del Club y Admin)
-// ==========================================
-router.delete('/:idClub/miembros/:idUsuario', verificarToken, requireVerificado, async (req, res) => {
+
+router.delete('/:idClub/miembros/:idUsuario', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR, ROLES.ALUMNO, ROLES.ALUMNO_REPRESENTANTE]), async (req, res) => {
     const { idClub, idUsuario } = req.params;
     const solicitanteId = req.user.id;
     const solicitanteRol = Number(req.user.rol || req.user.role_id);
 
     try {
-        // 1. Verificar que el club exista
-        const [clubes] = await db.query(
-            'SELECT id, nombre, profesor_encargado_id, alumno_encargado_id FROM clubes WHERE id = ?',
-            [idClub]
-        );
+        const [clubes] = await db.query('SELECT id, nombre FROM clubes WHERE id = ?', [idClub]);
         if (clubes.length === 0) {
             return res.status(404).json({ message: 'El club especificado no existe.' });
         }
-        const club = clubes[0];
 
-        // 2. Verificar permisos: Administrador o Encargado Activo de este club
-        let tienePermiso = solicitanteRol === 1 ||
-            Number(club.profesor_encargado_id) === Number(solicitanteId) ||
-            Number(club.alumno_encargado_id) === Number(solicitanteId);
+        let tienePermiso = solicitanteRol === 1;
 
         if (!tienePermiso) {
             const [esEncargado] = await db.query(
@@ -927,14 +890,10 @@ router.delete('/:idClub/miembros/:idUsuario', verificarToken, requireVerificado,
             });
         }
 
-        // 3. Evitar que el encargado se expulse a sí mismo
         if (Number(solicitanteId) === Number(idUsuario)) {
-            return res.status(400).json({
-                message: 'No puedes expulsarte a ti mismo del club.'
-            });
+            return res.status(400).json({ message: 'No puedes expulsarte a ti mismo del club.' });
         }
 
-        // 4. Verificar que el usuario objetivo pertenezca al club
         const [inscripciones] = await db.query(
             'SELECT id, rol_en_club, estatus FROM inscripciones WHERE club_id = ? AND usuario_id = ?',
             [idClub, idUsuario]
@@ -944,11 +903,7 @@ router.delete('/:idClub/miembros/:idUsuario', verificarToken, requireVerificado,
         }
 
         const inscripcionObjetivo = inscripciones[0];
-        const objetivoEsEncargado = (
-            ['encargado_profesor', 'encargado_alumno'].includes(inscripcionObjetivo.rol_en_club) ||
-            Number(club.profesor_encargado_id) === Number(idUsuario) ||
-            Number(club.alumno_encargado_id) === Number(idUsuario)
-        );
+        const objetivoEsEncargado = ['encargado_profesor', 'encargado_alumno'].includes(inscripcionObjetivo.rol_en_club);
 
         if (objetivoEsEncargado) {
             return res.status(400).json({
@@ -956,7 +911,6 @@ router.delete('/:idClub/miembros/:idUsuario', verificarToken, requireVerificado,
             });
         }
 
-        // 5. Eliminar asistencias a eventos del club y la inscripción del miembro
         await db.query(
             `DELETE ae FROM asistencias_eventos ae
              INNER JOIN eventos_club ec ON ae.evento_id = ec.id
@@ -964,16 +918,11 @@ router.delete('/:idClub/miembros/:idUsuario', verificarToken, requireVerificado,
             [idClub, idUsuario]
         );
 
-        await db.query(
-            'DELETE FROM inscripciones WHERE club_id = ? AND usuario_id = ?',
-            [idClub, idUsuario]
-        );
+        await db.query('DELETE FROM inscripciones WHERE club_id = ? AND usuario_id = ?', [idClub, idUsuario]);
 
-        res.status(200).json({
-            message: 'El integrante ha sido expulsado del club exitosamente.'
-        });
+        res.status(200).json({ message: 'El integrante ha sido expulsado del club exitosamente.' });
     } catch (error) {
-        console.error('Error al expulsar miembro del club:', error);
+        console.error(error);
         res.status(500).json({ message: 'Error interno al intentar expulsar al miembro del club.' });
     }
 });
