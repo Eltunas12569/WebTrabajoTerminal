@@ -109,8 +109,8 @@ router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) =
         return res.status(400).json({ message: "La fecha de vencimiento no es válida." });
     }
 
-    const prioridadValida = ['alta', 'normal', 'baja'].includes(String(prioridad).toLowerCase()) 
-        ? String(prioridad).toLowerCase() 
+    const prioridadValida = ['alta', 'normal', 'baja'].includes(String(prioridad).toLowerCase())
+        ? String(prioridad).toLowerCase()
         : 'normal';
 
     const esGlobal = (
@@ -123,7 +123,7 @@ router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) =
         const rolUsuario = Number(req.user.rol || req.user.role_id);
         if (rolUsuario !== 1) {
             const [permiso] = await db.query(
-                `SELECT id FROM inscripciones WHERE club_id = ? AND usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo'`, 
+                `SELECT id FROM inscripciones WHERE club_id = ? AND usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo'`,
                 [req.params.id, req.user.id]
             );
             if (permiso.length === 0) {
@@ -131,52 +131,23 @@ router.post('/:id/avisos', verificarToken, requireVerificado, async (req, res) =
             }
         }
         const [resultado] = await db.query(
-            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo, es_global) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1, ?)`,
-            [req.params.id, req.user.id, titulo || null, contenido, prioridadValida, fechaVencimientoConvertida, esGlobal]
+            `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1)`,
+            [req.params.id, req.user.id, titulo || null, contenido, prioridadValida, fechaVencimientoConvertida]
         );
 
         const io = req.app.get('socketio');
         if (io) {
-            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida, es_global: esGlobal });
-            if (esGlobal === 1) {
-                io.emit('nuevo_aviso_global', {
-                    id: resultado.insertId,
-                    titulo: titulo || 'Comunicado Global de Club',
-                    contenido,
-                    prioridad: prioridadValida,
-                    es_global: 1
-                });
-            }
+            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida });
         }
 
         res.status(201).json({
-            message: esGlobal ? "Aviso global publicado exitosamente" : "Aviso publicado exitosamente para el club",
+            message: "Aviso publicado exitosamente para el club",
             prioridad: prioridadValida,
-            fecha_vencimiento: fechaVencimientoConvertida,
-            es_global: esGlobal
+            fecha_vencimiento: fechaVencimientoConvertida
         });
-    } catch (error) { 
-        console.error("Error al crear aviso:", error);
-        res.status(500).json({ message: "Error al crear aviso" }); 
-    }
-});
-
-router.get('/eventos/globales', verificarToken, requireVerificado, async (req, res) => {
-    try {
-        const [eventos] = await db.query(`
-            SELECT e.*,
-                   c.nombre AS club_nombre,
-                   (SELECT COUNT(*) FROM asistencias_eventos WHERE evento_id = e.id AND asistira = 1) AS total_asistentes,
-                   (SELECT asistira FROM asistencias_eventos WHERE evento_id = e.id AND usuario_id = ?) AS mi_respuesta
-            FROM eventos_club e
-            JOIN clubes c ON e.club_id = c.id
-            WHERE e.es_global = 1 AND c.estatus = 'activo'
-            ORDER BY e.fecha_evento ASC
-        `, [req.user.id]);
-        res.status(200).json(eventos);
     } catch (error) {
-        console.error("Error al cargar eventos globales:", error);
-        res.status(500).json({ message: "Error al cargar eventos globales" });
+        console.error("Error al crear aviso:", error);
+        res.status(500).json({ message: "Error al crear aviso" });
     }
 });
 
@@ -203,8 +174,8 @@ router.post('/:id/eventos', verificarToken, requireVerificado, async (req, res) 
         return res.status(400).json({ message: "La fecha del evento no es válida. Usa un formato como 'YYYY-MM-DDTHH:mm:ss'." });
     }
 
-    const prioridadValida = ['alta', 'normal', 'baja'].includes(String(prioridad).toLowerCase()) 
-        ? String(prioridad).toLowerCase() 
+    const prioridadValida = ['alta', 'normal', 'baja'].includes(String(prioridad).toLowerCase())
+        ? String(prioridad).toLowerCase()
         : 'alta';
 
     const esGlobal = (
@@ -225,43 +196,40 @@ router.post('/:id/eventos', verificarToken, requireVerificado, async (req, res) 
             }
         }
 
-        // 1. Registrar el evento con su nivel de prioridad y alcance (es_global)
         await db.query(
-            `INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar, prioridad, es_global) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [req.params.id, req.user.id, titulo, descripcion, fechaConvertida, lugar, prioridadValida, esGlobal]
+            `INSERT INTO eventos_club (club_id, usuario_id, titulo, descripcion, fecha_evento, lugar, prioridad) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [req.params.id, req.user.id, titulo, descripcion, fechaConvertida, lugar, prioridadValida]
         );
 
-        // 2. Notificar creando un aviso oficial (del club o global según se haya elegido)
         if (notificarAviso !== false) {
             let fechaLegible = fechaConvertida;
             try {
                 const f = new Date(fechaConvertida);
                 fechaLegible = f.toLocaleString('es-MX', { dateStyle: 'full', timeStyle: 'short' });
-            } catch (e) {}
+            } catch (e) { }
 
-            const tituloAviso = esGlobal ? `🌍 Evento Global: ${titulo}` : `📅 Nuevo Evento: ${titulo}`;
-            const contenidoAviso = `Se ha programado una nueva actividad ${esGlobal ? 'abierta a toda la comunidad' : 'oficial del club'}: "${titulo}".\n📅 Fecha: ${fechaLegible}${lugar ? `\n📍 Lugar: ${lugar}` : ''}.\n${descripcion ? `📝 Detalles: ${descripcion}\n` : ''}¡Por favor confirma tu asistencia en el calendario o sección de Eventos!`;
+            const tituloAviso = `📅 Nuevo Evento: ${titulo}`;
+            const contenidoAviso = `Se ha programado una nueva actividad oficial del club: "${titulo}".\n📅 Fecha: ${fechaLegible}${lugar ? `\n📍 Lugar: ${lugar}` : ''}.\n${descripcion ? `📝 Detalles: ${descripcion}\n` : ''}¡Por favor confirma tu asistencia en el calendario o sección de Eventos!`;
 
             await db.query(
-                `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo, es_global) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1, ?)`,
-                [req.params.id, req.user.id, tituloAviso, contenidoAviso, prioridadValida, fechaConvertida, esGlobal]
+                `INSERT INTO avisos (club_id, usuario_id, titulo, contenido, prioridad, fecha_envio, fecha_vencimiento, activo) VALUES (?, ?, ?, ?, ?, NOW(), ?, 1)`,
+                [req.params.id, req.user.id, tituloAviso, contenidoAviso, prioridadValida, fechaConvertida]
             );
         }
 
         const io = req.app.get('socketio');
         if (io) {
-            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'evento', prioridad: prioridadValida, es_global: esGlobal });
-            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida, es_global: esGlobal });
+            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'evento', prioridad: prioridadValida });
+            io.to(`club_${req.params.id}`).emit('notificacion_interna', { tipo: 'aviso', prioridad: prioridadValida });
         }
 
         res.status(201).json({
-            message: esGlobal ? "Evento global creado y notificado a toda la comunidad" : "Evento creado y notificado a los miembros del club",
-            prioridad: prioridadValida,
-            es_global: esGlobal
+            message: "Evento creado y notificado a los miembros del club",
+            prioridad: prioridadValida
         });
-    } catch (error) { 
+    } catch (error) {
         console.error("Error al crear evento:", error);
-        res.status(500).json({ message: "Error al crear evento" }); 
+        res.status(500).json({ message: "Error al crear evento" });
     }
 });
 
@@ -362,9 +330,9 @@ router.get('/chat-directivos/historial', verificarToken, requireVerificado, asyn
             ORDER BY c.fecha_envio ASC
         `);
         res.status(200).json(mensajes);
-    } catch (error) { 
+    } catch (error) {
         console.error("Error al cargar chat directivos:", error);
-        res.status(500).json({ message: "Error interno al cargar el chat directivo" }); 
+        res.status(500).json({ message: "Error interno al cargar el chat directivo" });
     }
 });
 
@@ -399,8 +367,8 @@ router.get('/chat-encargados/historial', verificarToken, requireVerificado, asyn
             ORDER BY c.fecha_envio ASC
         `);
         res.status(200).json(mensajes);
-    } catch (error) { 
-        res.status(500).json({ message: "Error interno" }); 
+    } catch (error) {
+        res.status(500).json({ message: "Error interno" });
     }
 });
 
@@ -430,8 +398,8 @@ router.get('/', verificarToken, requireVerificado, async (req, res) => {
                 : null
         }));
         res.status(200).json(clubesTratados);
-    } catch (error) { 
-        res.status(500).json({ message: "Error interno" }); 
+    } catch (error) {
+        res.status(500).json({ message: "Error interno" });
     }
 });
 
@@ -471,7 +439,7 @@ router.get('/:id/historial-encargados', verificarToken, requireVerificado, async
     if (req.user.rol !== 1) {
         return res.status(403).json({ message: "Acceso exclusivo para administradores" });
     }
-    
+
     try {
         const [historial] = await db.query(`
             SELECT h.id, h.rol_desempenado AS rol_en_club, h.fecha_inicio, h.fecha_fin,
@@ -482,7 +450,7 @@ router.get('/:id/historial-encargados', verificarToken, requireVerificado, async
             WHERE h.club_id = ?
             ORDER BY h.fecha_fin DESC
         `, [req.params.id]);
-        
+
         res.status(200).json(historial);
     } catch (error) {
         console.error("Error historial:", error);
@@ -588,7 +556,7 @@ router.put('/:id', verificarToken, requireVerificado, async (req, res) => {
             await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_profesor', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_profesor', estatus = 'activo'`, [nuevo_profesor_id, id]);
             await db.query(`INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus) VALUES (?, ?, 'encargado_alumno', 'activo') ON DUPLICATE KEY UPDATE rol_en_club = 'encargado_alumno', estatus = 'activo'`, [nuevo_alumno_id, id]);
         }
-       
+
         res.status(200).json({ message: "Editado y actualizado correctamente" });
     } catch (error) {
         console.error("Error al editar club:", error);
