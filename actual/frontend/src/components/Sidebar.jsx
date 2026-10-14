@@ -91,13 +91,13 @@ const Sidebar = ({
                             <>
                                 <li 
                                     onClick={() => handleAction(() => navigate('/admin'))}
-                                    style={isPathActive('/admin') && !isPathActive('/admin/avisos') && !isPathActive('/admin/usuarios') && !isPathActive('/admin/calendario') ? activeItemStyle : undefined}
+                                    style={isPathActive('/admin') && !isPathActive('/admin/avisos') && !isPathActive('/admin/usuarios') && !isPathActive('/admin/calendario') && !isPathActive('/admin/politicas') && !isPathActive('/admin/auditoria') ? activeItemStyle : undefined}
                                 >
                                     🏠 Inicio
                                 </li>
                                 <li 
                                     onClick={() => handleAction(() => navigate('/admin'))}
-                                    style={isPathActive('/admin') && !isPathActive('/admin/avisos') && !isPathActive('/admin/usuarios') && !isPathActive('/admin/calendario') ? activeItemStyle : undefined}
+                                    style={isPathActive('/admin') && !isPathActive('/admin/avisos') && !isPathActive('/admin/usuarios') && !isPathActive('/admin/calendario') && !isPathActive('/admin/politicas') && !isPathActive('/admin/auditoria') ? activeItemStyle : undefined}
                                 >
                                     📋 Lista de Clubs
                                 </li>
@@ -124,6 +124,12 @@ const Sidebar = ({
                                     style={isPathActive('/admin/politicas') ? activeItemStyle : undefined}
                                 >
                                     ⚖️ Políticas y Privacidad
+                                </li>
+                                <li 
+                                    onClick={() => handleAction(() => navigate('/admin/auditoria'))}
+                                    style={isPathActive('/admin/auditoria') ? activeItemStyle : undefined}
+                                >
+                                    📜 Auditoría de Encargados
                                 </li>
                                 <li 
                                     onClick={() => {

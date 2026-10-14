@@ -1,0 +1,289 @@
+/* ==========================================================================
+   ESTILOS: AUDITORÍA DE ENCARGADOS DE CLUBS
+   ========================================================================== */
+
+.admin-auditoria-simple-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px 0 40px 0;
+    box-sizing: border-box;
+}
+
+/* Encabezado */
+.auditoria-simple-header {
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #dce4eb;
+}
+
+.auditoria-simple-title {
+    margin: 0 0 6px 0;
+    color: #003366;
+    font-size: 1.65rem;
+    font-weight: 700;
+}
+
+.auditoria-simple-subtitle {
+    margin: 0;
+    color: #5c6b78;
+    font-size: 0.95rem;
+}
+
+/* ==========================================================================
+   CUADRÍCULA DE TARJETAS CUADRADAS DE CLUBES
+   ========================================================================== */
+.auditoria-tarjetas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.auditoria-tarjeta-cuadrada {
+    background: #ffffff;
+    border: 1px solid #e4e6eb;
+    border-radius: 12px;
+    padding: 22px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 270px;
+    box-sizing: border-box;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.auditoria-tarjeta-cuadrada:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 51, 102, 0.12);
+    border-color: #003366;
+}
+
+.tarjeta-cuadrada-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.tarjeta-cuadrada-header h3 {
+    margin: 0;
+    color: #003366;
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.tarjeta-cuadrada-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.tarjeta-cuadrada-desc {
+    margin: 0;
+    color: #555;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+}
+
+.tarjeta-cuadrada-encargados {
+    font-size: 0.84rem;
+    color: #444;
+    background: #f8fafc;
+    border: 1px solid #eef2f6;
+    border-radius: 8px;
+    padding: 10px 12px;
+    line-height: 1.5;
+}
+
+.tarjeta-cuadrada-footer {
+    margin-top: auto;
+}
+
+.btn-tarjeta-auditoria {
+    width: 100%;
+    padding: 10px 14px;
+    background-color: #003366;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background-color 0.15s ease;
+}
+
+.auditoria-tarjeta-cuadrada:hover .btn-tarjeta-auditoria {
+    background-color: #002244;
+}
+
+/* ==========================================================================
+   VISTA DEL CLUB SELECCIONADO (DETALLES E HISTORIAL)
+   ========================================================================== */
+.auditoria-content-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Tarjeta Estándar */
+.auditoria-card {
+    background: #ffffff;
+    padding: 24px;
+    border-radius: 8px;
+    border: 1px solid #e4e6eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.auditoria-card-title {
+    margin: 0 0 16px 0;
+    font-size: 1.25rem;
+    color: #1c1e21;
+    font-weight: 700;
+    border-bottom: 1px solid #e4e6eb;
+    padding-bottom: 10px;
+}
+
+.auditoria-card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    border-bottom: 1px solid #e4e6eb;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+}
+
+/* Grid de Encargados Actuales */
+.auditoria-current-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.auditoria-current-item {
+    background: #fafafa;
+    border: 1px solid #e4e6eb;
+    border-radius: 8px;
+    padding: 18px;
+}
+
+.auditoria-current-role {
+    font-size: 0.88rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.auditoria-current-role.role-profesor {
+    color: #003366;
+}
+
+.auditoria-current-role.role-alumno {
+    color: #1e8449;
+}
+
+.auditoria-current-name {
+    margin: 0 0 6px 0;
+    color: #050505;
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.auditoria-current-meta {
+    font-size: 0.9rem;
+    color: #444;
+    margin-bottom: 3px;
+}
+
+/* Filtros por Rol */
+.auditoria-role-filters {
+    display: flex;
+    gap: 6px;
+}
+
+.auditoria-filter-btn {
+    padding: 5px 12px;
+    border-radius: 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.auditoria-filter-btn:hover {
+    background: #f8fafc;
+}
+
+.auditoria-filter-btn.active {
+    background: #003366;
+    color: #ffffff;
+    border-color: #003366;
+}
+
+/* Tabla de Historial */
+.auditoria-simple-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #e4e6eb;
+}
+
+.auditoria-simple-table thead tr {
+    background-color: #003366;
+    color: #ffffff;
+}
+
+.auditoria-simple-table th {
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.auditoria-simple-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.auditoria-simple-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.auditoria-simple-table tbody tr:nth-child(odd) {
+    background-color: #ffffff;
+}
+
+.auditoria-tag-cargo {
+    font-size: 0.82rem;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+    display: inline-block;
+}
+
+.auditoria-tag-cargo.tag-profesor {
+    background: #e7f3ff;
+    color: #003366;
+}
+
+.auditoria-tag-cargo.tag-alumno {
+    background: #e6f4ea;
+    color: #1e8449;
+}
