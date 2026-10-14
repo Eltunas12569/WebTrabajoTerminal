@@ -103,9 +103,13 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     const esEncargadoClub = Boolean(
         club && ['encargado_profesor', 'encargado_alumno'].includes(miRolInterno) && inscripcionEstatus === 'activo'
     );
+    const esProfesor = Number(user?.role_id) === 3 || Number(user?.rol) === 3;
     const canManage = esAdmin || esEncargadoClub || (
         club && (club.profesor_encargado_id === user?.id || club.alumno_encargado_id === user?.id)
     );
+    // Debido a que el backend restringe /clubes/:id/miembros a ADMINISTRADOR y PROFESOR,
+    // solo administradores y profesores pueden consultar el padrón de miembros.
+    const canViewMiembros = esAdmin || (esProfesor && isMember);
 
     // Cargar avisos descartados por el usuario
     useEffect(() => {
@@ -152,34 +156,68 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     // Sincronizar activeTab cuando cambia el query param en la URL
     useEffect(() => {
         const queryTab = searchParams.get('tab');
+        if (!loading) {
+            if (!isMember) {
+                if (activeTab !== 'detalles') {
+                    setActiveTab('detalles');
+                }
+                if (queryTab && queryTab !== 'detalles') {
+                    setSearchParams({ tab: 'detalles' }, { replace: true });
+                }
+                return;
+            }
+            if (queryTab === 'miembros' && !canViewMiembros) {
+                setActiveTab('detalles');
+                setSearchParams({ tab: 'detalles' }, { replace: true });
+                return;
+            }
+            if (queryTab === 'publicar' && !canManage) {
+                setActiveTab('detalles');
+                setSearchParams({ tab: 'detalles' }, { replace: true });
+                return;
+            }
+        }
         if (queryTab && queryTab !== activeTab) {
             setActiveTab(queryTab);
         }
-    }, [searchParams]);
+    }, [searchParams, isMember, canViewMiembros, canManage, loading]);
 
     // Cambiar de pestaña y actualizar la URL
     const handleTabChange = (tabId) => {
+        if (!isMember && tabId !== 'detalles') return;
+        if (tabId === 'miembros' && !canViewMiembros) return;
+        if (tabId === 'publicar' && !canManage) return;
         setActiveTab(tabId);
         setError('');
         setSuccess('');
         setSearchParams({ tab: tabId }, { replace: true });
     };
 
-    // Cargar datos según la pestaña activa
+    // Pre-cargar avisos y eventos para miembros (y miembros solo si tiene permiso)
     useEffect(() => {
-        if (!club || !id) return;
+        if (!club || !id || !isMember) return;
+        fetchAvisos();
+        fetchEventos();
+        if (canViewMiembros) {
+            fetchMiembros();
+        }
+    }, [club, id, isMember, canViewMiembros]);
 
-        if (activeTab === 'avisos' && isMember) {
+    // Recargar datos cuando se navega a pestañas específicas
+    useEffect(() => {
+        if (!club || !id || !isMember) return;
+
+        if (activeTab === 'avisos') {
             fetchAvisos();
-        } else if (activeTab === 'eventos' && isMember) {
+        } else if (activeTab === 'eventos') {
             fetchEventos();
-        } else if (activeTab === 'miembros' && isMember) {
+        } else if (activeTab === 'miembros' && canViewMiembros) {
             fetchMiembros();
         } else if (activeTab === 'publicar' && canManage) {
             fetchAvisos();
             fetchEventos();
         }
-    }, [activeTab, club, id, isMember, canManage]);
+    }, [activeTab]);
 
     const fetchAvisos = async () => {
         setLoadingAvisos(true);
@@ -496,9 +534,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             setInscripcionEstatus('activo');
             setShowModalUnirse(false);
             setCodigoInput('');
-            if (activeTab === 'avisos') fetchAvisos();
-            if (activeTab === 'eventos') fetchEventos();
-            if (activeTab === 'miembros') fetchMiembros();
+            fetchAvisos();
+            fetchEventos();
+            if (esAdmin || esProfesor) fetchMiembros();
         } catch (err) {
             setJoinMessage({
                 text: err.response?.data?.message || 'Código inválido o error al unirte al club con este código.',
@@ -524,6 +562,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             setMiRolInterno(null);
             setInscripcionEstatus(null);
             setActiveTab('detalles');
+            setSearchParams({ tab: 'detalles' }, { replace: true });
             setJoinMessage({
                 text: res.data?.message || 'Has salido del club exitosamente.',
                 type: 'success'
@@ -597,12 +636,19 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     });
 
     // Pestañas dinámicas: Si es encargado/admin se añade el apartado exclusivo 'publicar'
-    const tabs = [
+    // Pestañas dinámicas:
+    // - Para no miembros: solo Información General
+    // - Para miembros estudiantes: Información General, Avisos Internos, Eventos del Club
+    // - Para miembros profesores o administradores: se añade Padrón de Miembros
+    // - Para encargados/admin: se añade Crear Avisos y Eventos
+    const tabs = isMember ? [
         { id: 'detalles', label: 'Información General', icon: 'ℹ️' },
-        { id: 'avisos', label: 'Avisos Internos', icon: '📢', count: isMember ? avisosVisibles.length : undefined },
-        { id: 'eventos', label: 'Eventos del Club', icon: '📅', count: isMember ? eventos.length : undefined },
-        { id: 'miembros', label: 'Padrón de Miembros', icon: '👥', count: isMember ? miembros.length : undefined },
+        { id: 'avisos', label: 'Avisos Internos', icon: '📢', count: avisosVisibles.length },
+        { id: 'eventos', label: 'Eventos del Club', icon: '📅', count: eventos.length },
+        ...(canViewMiembros ? [{ id: 'miembros', label: 'Padrón de Miembros', icon: '👥', count: miembros.length }] : []),
         ...(canManage ? [{ id: 'publicar', label: 'Crear Avisos y Eventos', icon: '✍️' }] : [])
+    ] : [
+        { id: 'detalles', label: 'Información General', icon: 'ℹ️' }
     ];
 
     return (
@@ -852,6 +898,8 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                             ✍️ Crear Avisos / Eventos
                                         </button>
                                     )}
+
+                                    
 
                                     
 
@@ -1111,6 +1159,8 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
                                 
 
+                                
+
                                     {/* Tarjeta de Miembro Activo (No encargado) */}
                                     {isMember && !canManage && (
                                         <div style={{
@@ -1214,37 +1264,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                         {/* ========================================================= */}
                         {/* PESTAÑA 2: AVISOS INTERNOS (MURO DE LECTURA LIMPIO)       */}
                         {/* ========================================================= */}
-                        {activeTab === 'avisos' && (
+                        {activeTab === 'avisos' && isMember && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                {!isMember ? (
-                                    <div style={{ background: '#ffffff', padding: '40px 30px', borderRadius: '12px', textAlign: 'center', border: '1px solid #e1e5eb' }}>
-                                        <span style={{ fontSize: '3rem' }}>🔒</span>
-                                        <h3 style={{ color: '#003366', marginTop: '12px' }}>Avisos Internos Reservados para Miembros</h3>
-                                        <p style={{ color: '#666', maxWidth: '600px', margin: '10px auto 20px auto', lineHeight: '1.6' }}>
-                                            Los avisos y comunicados oficiales son exclusivos para los integrantes inscritos en este club. Únete con el código oficial para acceder a esta sección.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setJoinMessage({ text: '', type: '' });
-                                                setCodigoInput('');
-                                                setShowModalUnirse(true);
-                                            }}
-                                            style={{
-                                                padding: '10px 24px',
-                                                background: '#28a745',
-                                                color: '#fff',
-                                                border: 'none',
-                                                borderRadius: '8px',
-                                                fontWeight: 'bold',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            🔑 Ingresar Código de Acceso
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div style={{ background: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
+                                <div style={{ background: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #f0f2f5', paddingBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
                                             <div>
                                                 <h3 style={{ margin: 0, color: '#003366', fontSize: '1.25rem' }}>
@@ -1394,36 +1416,15 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                             </p>
                                         )}
                                     </div>
-                                )}
                             </div>
                         )}
 
                         {/* ========================================================= */}
                         {/* PESTAÑA 3: EVENTOS DEL CLUB (AGENDA / GRID LIMPIO)         */}
                         {/* ========================================================= */}
-                        {activeTab === 'eventos' && (
+                        {activeTab === 'eventos' && isMember && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                {!isMember ? (
-                                    <div style={{ background: '#ffffff', padding: '40px 30px', borderRadius: '12px', textAlign: 'center', border: '1px solid #e1e5eb' }}>
-                                        <span style={{ fontSize: '3rem' }}>🔒</span>
-                                        <h3 style={{ color: '#003366', marginTop: '12px' }}>Eventos Reservados para Miembros</h3>
-                                        <p style={{ color: '#666', maxWidth: '600px', margin: '10px auto 20px auto', lineHeight: '1.6' }}>
-                                            La agenda de entrenamientos, torneos y confirmaciones de asistencia son exclusivas para los miembros activos.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setJoinMessage({ text: '', type: '' });
-                                                setCodigoInput('');
-                                                setShowModalUnirse(true);
-                                            }}
-                                            style={{ padding: '10px 24px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
-                                        >
-                                            🔑 Ingresar Código de Acceso
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div style={{ background: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
+                                <div style={{ background: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #f0f2f5', paddingBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
                                             <div>
                                                 <h3 style={{ margin: 0, color: '#003366', fontSize: '1.25rem' }}>
@@ -1651,36 +1652,15 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                             </p>
                                         )}
                                     </div>
-                                )}
                             </div>
                         )}
 
                         {/* ========================================================= */}
                         {/* PESTAÑA 4: PADRÓN DE MIEMBROS (TABLA WEB CON FILTROS)     */}
                         {/* ========================================================= */}
-                        {activeTab === 'miembros' && (
+                        {activeTab === 'miembros' && canViewMiembros && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                {!isMember ? (
-                                    <div style={{ background: '#ffffff', padding: '40px 30px', borderRadius: '12px', textAlign: 'center', border: '1px solid #e1e5eb' }}>
-                                        <span style={{ fontSize: '3rem' }}>🔒</span>
-                                        <h3 style={{ color: '#003366', marginTop: '12px' }}>Padrón Reservado para Miembros</h3>
-                                        <p style={{ color: '#666', maxWidth: '600px', margin: '10px auto 20px auto', lineHeight: '1.6' }}>
-                                            La lista oficial de integrantes y sus roles institucionales es visible únicamente para miembros del club.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setJoinMessage({ text: '', type: '' });
-                                                setCodigoInput('');
-                                                setShowModalUnirse(true);
-                                            }}
-                                            style={{ padding: '10px 24px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
-                                        >
-                                            🔑 Ingresar Código de Acceso
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div style={{ background: '#ffffff', padding: '26px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
+                                <div style={{ background: '#ffffff', padding: '26px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
                                         
                                         {/* Barra Superior de Herramientas Web */}
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
@@ -1912,7 +1892,6 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                             </table>
                                         </div>
                                     </div>
-                                )}
                             </div>
                         )}
 
