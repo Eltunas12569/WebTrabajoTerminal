@@ -166,7 +166,7 @@ const Sidebar = ({
                                         if (onTabChange) {
                                             handleAction(() => onTabChange('clubs'));
                                         } else {
-                                            handleAction(() => navigate('/gestion'));
+                                            handleAction(() => navigate('/gestion', { state: { tab: 'clubs' } }));
                                         }
                                     }}
                                     style={onTabChange && activeTab === 'clubs' ? activeItemStyle : undefined}
@@ -174,14 +174,14 @@ const Sidebar = ({
                                     📅 Mis Clubs
                                 </li>
 
-                                {/* Opción de Unirse a un Club: solo para Alumnos (rol 2) */}
-                                {user?.role_id === 2 && (
+                                {/* Opción de Unirse a un Club: para Alumnos y Profesores */}
+                                {[2, 3, 4].includes(Number(user?.role_id)) && (
                                     <li 
                                         onClick={() => {
                                             if (onTabChange) {
                                                 handleAction(() => onTabChange('unirse'));
                                             } else {
-                                                handleAction(() => navigate('/gestion'));
+                                                handleAction(() => navigate('/gestion', { state: { tab: 'unirse' } }));
                                             }
                                         }}
                                         style={onTabChange && activeTab === 'unirse' ? activeItemStyle : undefined}

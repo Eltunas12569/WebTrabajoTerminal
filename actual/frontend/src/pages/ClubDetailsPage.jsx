@@ -577,7 +577,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
         if (filterRol === 'todos') return true;
         if (filterRol === 'encargados') return ['encargado_profesor', 'encargado_alumno'].includes(m.rol_en_club);
-        if (filterRol === 'alumnos') return m.rol_en_club === 'alumno' || !m.rol_en_club;
+        if (filterRol === 'alumnos' || filterRol === 'miembros') return !['encargado_profesor', 'encargado_alumno'].includes(m.rol_en_club);
         return true;
     });
 
@@ -1805,7 +1805,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => setFilterRol('alumnos')}
+                                                    onClick={() => setFilterRol('miembros')}
                                                     style={{
                                                         padding: '8px 14px',
                                                         borderRadius: '6px',
@@ -1813,11 +1813,11 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                         cursor: 'pointer',
                                                         fontWeight: 'bold',
                                                         fontSize: '0.85rem',
-                                                        background: filterRol === 'alumnos' ? '#003366' : '#f8f9fa',
-                                                        color: filterRol === 'alumnos' ? '#fff' : '#444'
+                                                        background: ['alumnos', 'miembros'].includes(filterRol) ? '#003366' : '#f8f9fa',
+                                                        color: ['alumnos', 'miembros'].includes(filterRol) ? '#fff' : '#444'
                                                     }}
                                                 >
-                                                    Alumnos
+                                                    Miembros
                                                 </button>
                                             </div>
                                         </div>
@@ -1859,6 +1859,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                             <div>{miembro.nombres} {miembro.apellidos}</div>
                                                                             {miembro.boleta && (
                                                                                 <small style={{ color: '#888', fontFamily: 'monospace' }}>Boleta: {miembro.boleta}</small>
+                                                                            )}
+                                                                            {miembro.num_empleado && (
+                                                                                <small style={{ color: '#888', fontFamily: 'monospace' }}>No. Emp: {miembro.num_empleado}</small>
                                                                             )}
                                                                         </div>
                                                                     </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import './css/Dashboards.css';
 import './css/GestionDashboard.css';
@@ -11,8 +11,15 @@ import Sidebar from '../components/Sidebar';
 const GestionDashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState('avisos');
+    const [activeTab, setActiveTab] = useState(location.state?.tab || 'avisos');
+
+    useEffect(() => {
+        if (location.state?.tab) {
+            setActiveTab(location.state.tab);
+        }
+    }, [location.state]);
     const [userClubs, setUserClubs] = useState([]);
     const [loadingClubs, setLoadingClubs] = useState(true);
     
@@ -382,7 +389,7 @@ const GestionDashboard = () => {
                                     <span className="gestion-tab-badge">{eventosCalendario.length}</span>
                                 </button>
 
-                                {esAlumno && (
+                                {(esAlumno || esProfesor) && (
                                     <button
                                         type="button"
                                         className={`gestion-tab-btn ${activeTab === 'unirse' ? 'active' : ''}`}
@@ -677,7 +684,7 @@ const GestionDashboard = () => {
                                             <p>
                                                 {esAlumno
                                                     ? 'Puedes unirte mediante un código de invitación o explorar los clubes activos en la pestaña "Explorar / Unirse a un Club".'
-                                                    : 'Puedes registrar un nuevo club desde el botón superior "Crear Nuevo Club".'}
+                                                    : 'Puedes unirte a un club activo desde la pestaña "Explorar / Unirse a un Club" o registrar un nuevo club desde el menú lateral.'}
                                             </p>
                                         </div>
                                     )}
@@ -730,8 +737,8 @@ const GestionDashboard = () => {
                                     <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
                                         <thead>
                                             <tr style={{ backgroundColor: '#003366', color: '#fff', textAlign: 'left' }}>
-                                                <th style={{ padding: '12px 16px', borderTopLeftRadius: '8px' }}>Alumno</th>
-                                                <th style={{ padding: '12px 16px' }}>Boleta</th>
+                                                <th style={{ padding: '12px 16px', borderTopLeftRadius: '8px' }}>Integrante</th>
+                                                <th style={{ padding: '12px 16px' }}>Identificador</th>
                                                 <th style={{ padding: '12px 16px' }}>Rol</th>
                                                 <th style={{ padding: '12px 16px', borderTopRightRadius: '8px' }}>Firma</th>
                                             </tr>
@@ -743,11 +750,11 @@ const GestionDashboard = () => {
                                                         {miembro.nombres} {miembro.apellidos}
                                                     </td>
                                                     <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
-                                                        {miembro.boleta || 'N/A'}
+                                                        {miembro.boleta || miembro.num_empleado || '—'}
                                                     </td>
                                                     <td style={{ padding: '12px 16px' }}>
-                                                        <span className={`role-badge-chip ${miembro.rol_en_club === 'encargado_alumno' ? 'lider' : 'miembro'}`}>
-                                                            {miembro.rol_en_club === 'encargado_alumno' ? '🎓 Líder' : 'Miembro'}
+                                                        <span className={`role-badge-chip ${miembro.rol_en_club === 'encargado_alumno' ? 'lider' : miembro.rol_en_club === 'encargado_profesor' ? 'profesor' : 'miembro'}`}>
+                                                            {miembro.rol_en_club === 'encargado_alumno' ? '🎓 Líder' : miembro.rol_en_club === 'encargado_profesor' ? '👨‍🏫 Profesor' : 'Miembro'}
                                                         </span>
                                                     </td>
                                                     <td style={{ padding: '12px 16px' }}>

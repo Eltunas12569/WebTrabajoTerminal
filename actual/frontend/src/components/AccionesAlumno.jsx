@@ -9,9 +9,9 @@ const AccionesAlumno = ({ onUpdate, mostrar = 'ambos' }) => {
     const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
     const [loading, setLoading] = useState(false);
     
-    // Cargar datos si el usuario autenticado es alumno (role_id 2 o 4)
+    // Cargar datos si el usuario autenticado es alumno o profesor (role_id 2, 3 o 4)
     useEffect(() => {
-        if ([2, 4].includes(Number(user?.role_id))) {
+        if ([2, 3, 4].includes(Number(user?.role_id))) {
             fetchInvitaciones();
         }
     }, [user]);
@@ -63,8 +63,8 @@ const AccionesAlumno = ({ onUpdate, mostrar = 'ambos' }) => {
         }
     };
 
-    // Si no es un alumno (2 o 4), este componente se oculta (no devuelve nada)
-    if (![2, 4].includes(Number(user?.role_id))) return null;
+    // Si no es un alumno o profesor (2, 3 o 4), este componente se oculta (no devuelve nada)
+    if (![2, 3, 4].includes(Number(user?.role_id))) return null;
 
     return (
         <>
@@ -81,7 +81,7 @@ const AccionesAlumno = ({ onUpdate, mostrar = 'ambos' }) => {
                                     Has sido seleccionado para formar parte de la plantilla de este club.
                                 </p>
                                 <span style={{ fontSize: '0.85rem', backgroundColor: '#dc3545', padding: '4px 8px', borderRadius: '12px', color: '#fff', fontWeight: 'bold' }}>
-                                    Rol Propuesto: {inv.rol_invitado === 'encargado_alumno' ? 'Alumno Encargado (Líder)' : 'Miembro Regular'}
+                                    Rol Propuesto: {inv.rol_invitado === 'encargado_profesor' ? 'Profesor Titular' : inv.rol_invitado === 'encargado_alumno' ? 'Alumno Encargado (Líder)' : 'Miembro Regular'}
                                 </span>
                             </div>
                             <div style={{ display: 'flex', gap: '10px' }}>
