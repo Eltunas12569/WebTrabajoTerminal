@@ -43,6 +43,8 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     const [joining, setJoining] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [joinMessage, setJoinMessage] = useState({ text: '', type: '' });
+    const [showModalUnirse, setShowModalUnirse] = useState(false);
+    const [codigoInput, setCodigoInput] = useState('');
 
     // Estados de Avisos
     const [avisos, setAvisos] = useState([]);
@@ -101,9 +103,13 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     const esEncargadoClub = Boolean(
         club && ['encargado_profesor', 'encargado_alumno'].includes(miRolInterno) && inscripcionEstatus === 'activo'
     );
+    const esProfesor = Number(user?.role_id) === 3 || Number(user?.rol) === 3;
     const canManage = esAdmin || esEncargadoClub || (
         club && (club.profesor_encargado_id === user?.id || club.alumno_encargado_id === user?.id)
     );
+    // Debido a que el backend restringe /clubes/:id/miembros a ADMINISTRADOR y PROFESOR,
+    // solo administradores y profesores pueden consultar el padrón de miembros.
+    const canViewMiembros = esAdmin || (esProfesor && isMember);
 
     // Cargar avisos descartados por el usuario
     useEffect(() => {
@@ -150,34 +156,68 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     // Sincronizar activeTab cuando cambia el query param en la URL
     useEffect(() => {
         const queryTab = searchParams.get('tab');
+        if (!loading) {
+            if (!isMember) {
+                if (activeTab !== 'detalles') {
+                    setActiveTab('detalles');
+                }
+                if (queryTab && queryTab !== 'detalles') {
+                    setSearchParams({ tab: 'detalles' }, { replace: true });
+                }
+                return;
+            }
+            if (queryTab === 'miembros' && !canViewMiembros) {
+                setActiveTab('detalles');
+                setSearchParams({ tab: 'detalles' }, { replace: true });
+                return;
+            }
+            if (queryTab === 'publicar' && !canManage) {
+                setActiveTab('detalles');
+                setSearchParams({ tab: 'detalles' }, { replace: true });
+                return;
+            }
+        }
         if (queryTab && queryTab !== activeTab) {
             setActiveTab(queryTab);
         }
-    }, [searchParams]);
+    }, [searchParams, isMember, canViewMiembros, canManage, loading]);
 
     // Cambiar de pestaña y actualizar la URL
     const handleTabChange = (tabId) => {
+        if (!isMember && tabId !== 'detalles') return;
+        if (tabId === 'miembros' && !canViewMiembros) return;
+        if (tabId === 'publicar' && !canManage) return;
         setActiveTab(tabId);
         setError('');
         setSuccess('');
         setSearchParams({ tab: tabId }, { replace: true });
     };
 
-    // Cargar datos según la pestaña activa
+    // Pre-cargar avisos y eventos para miembros (y miembros solo si tiene permiso)
     useEffect(() => {
-        if (!club || !id) return;
+        if (!club || !id || !isMember) return;
+        fetchAvisos();
+        fetchEventos();
+        if (canViewMiembros) {
+            fetchMiembros();
+        }
+    }, [club, id, isMember, canViewMiembros]);
 
-        if (activeTab === 'avisos' && isMember) {
+    // Recargar datos cuando se navega a pestañas específicas
+    useEffect(() => {
+        if (!club || !id || !isMember) return;
+
+        if (activeTab === 'avisos') {
             fetchAvisos();
-        } else if (activeTab === 'eventos' && isMember) {
+        } else if (activeTab === 'eventos') {
             fetchEventos();
-        } else if (activeTab === 'miembros' && isMember) {
+        } else if (activeTab === 'miembros' && canViewMiembros) {
             fetchMiembros();
         } else if (activeTab === 'publicar' && canManage) {
             fetchAvisos();
             fetchEventos();
         }
-    }, [activeTab, club, id, isMember, canManage]);
+    }, [activeTab]);
 
     const fetchAvisos = async () => {
         setLoadingAvisos(true);
@@ -474,19 +514,32 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         }
     };
 
-    const handleUnirseDirecto = async () => {
-        if (!club?.codigo_union) return;
+    const handleUnirseConCodigo = async (codigoParam) => {
+        const codigoFinal = (codigoParam !== undefined ? codigoParam : codigoInput).trim().toUpperCase();
+        if (!codigoFinal) {
+            setJoinMessage({
+                text: 'Por favor ingresa un código de acceso válido.',
+                type: 'error'
+            });
+            return;
+        }
+
         setJoining(true);
         setJoinMessage({ text: '', type: '' });
         try {
-            const res = await api.post('/clubes/unirse', { codigo: club.codigo_union });
-            setJoinMessage({ text: res.data.message || '¡Te has unido exitosamente al club!', type: 'success' });
+            const res = await api.post('/clubes/unirse', { codigo: codigoFinal });
+            setJoinMessage({ text: res.data?.message || '¡Te has unido exitosamente al club!', type: 'success' });
             setIsMember(true);
             setMiRolInterno('miembro');
             setInscripcionEstatus('activo');
+            setShowModalUnirse(false);
+            setCodigoInput('');
+            fetchAvisos();
+            fetchEventos();
+            if (esAdmin || esProfesor) fetchMiembros();
         } catch (err) {
             setJoinMessage({
-                text: err.response?.data?.message || 'Error al unirte al club con este código.',
+                text: err.response?.data?.message || 'Código inválido o error al unirte al club con este código.',
                 type: 'error'
             });
         } finally {
@@ -509,6 +562,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             setMiRolInterno(null);
             setInscripcionEstatus(null);
             setActiveTab('detalles');
+            setSearchParams({ tab: 'detalles' }, { replace: true });
             setJoinMessage({
                 text: res.data?.message || 'Has salido del club exitosamente.',
                 type: 'success'
@@ -582,12 +636,19 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     });
 
     // Pestañas dinámicas: Si es encargado/admin se añade el apartado exclusivo 'publicar'
-    const tabs = [
+    // Pestañas dinámicas:
+    // - Para no miembros: solo Información General
+    // - Para miembros estudiantes: Información General, Avisos Internos, Eventos del Club
+    // - Para miembros profesores o administradores: se añade Padrón de Miembros
+    // - Para encargados/admin: se añade Crear Avisos y Eventos
+    const tabs = isMember ? [
         { id: 'detalles', label: 'Información General', icon: 'ℹ️' },
-        { id: 'avisos', label: 'Avisos Internos', icon: '📢', count: isMember ? avisosVisibles.length : undefined },
-        { id: 'eventos', label: 'Eventos del Club', icon: '📅', count: isMember ? eventos.length : undefined },
-        { id: 'miembros', label: 'Padrón de Miembros', icon: '👥', count: isMember ? miembros.length : undefined },
+        { id: 'avisos', label: 'Avisos Internos', icon: '📢', count: avisosVisibles.length },
+        { id: 'eventos', label: 'Eventos del Club', icon: '📅', count: eventos.length },
+        ...(canViewMiembros ? [{ id: 'miembros', label: 'Padrón de Miembros', icon: '👥', count: miembros.length }] : []),
         ...(canManage ? [{ id: 'publicar', label: 'Crear Avisos y Eventos', icon: '✍️' }] : [])
+    ] : [
+        { id: 'detalles', label: 'Información General', icon: 'ℹ️' }
     ];
 
     return (
@@ -838,77 +899,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                         </button>
                                     )}
 
-                                    {isMember ? (
-                                        <>
-                                            <button
-                                                type="button"
-                                                onClick={() => navigate(`/chat/${id}`)}
-                                                style={{
-                                                    background: '#003366',
-                                                    border: 'none',
-                                                    color: '#fff',
-                                                    cursor: 'pointer',
-                                                    padding: '10px 18px',
-                                                    borderRadius: '8px',
-                                                    fontWeight: 'bold',
-                                                    fontSize: '0.9rem',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px',
-                                                    boxShadow: '0 2px 6px rgba(0, 51, 102, 0.25)',
-                                                    transition: 'all 0.2s'
-                                                }}
-                                            >
-                                                💬 Entrar al Chat
-                                            </button>
-                                            {!canManage && (
-                                                <button
-                                                    type="button"
-                                                    onClick={handleSalirDelClub}
-                                                    disabled={leaving}
-                                                    style={{
-                                                        background: '#fff5f5',
-                                                        border: '1px solid #feb2b2',
-                                                        color: '#c53030',
-                                                        cursor: leaving ? 'not-allowed' : 'pointer',
-                                                        padding: '10px 16px',
-                                                        borderRadius: '8px',
-                                                        fontWeight: 'bold',
-                                                        fontSize: '0.9rem',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '6px',
-                                                        transition: 'all 0.2s'
-                                                    }}
-                                                    title="Darse de baja de este club"
-                                                >
-                                                    {leaving ? '⏳ Saliendo...' : '🚪 Salir del Club'}
-                                                </button>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={handleUnirseDirecto}
-                                            disabled={joining}
-                                            style={{
-                                                background: '#28a745',
-                                                border: 'none',
-                                                color: '#fff',
-                                                cursor: 'pointer',
-                                                padding: '10px 18px',
-                                                borderRadius: '8px',
-                                                fontWeight: 'bold',
-                                                fontSize: '0.9rem',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px',
-                                                boxShadow: '0 2px 6px rgba(40, 167, 69, 0.25)'
-                                            }}
-                                        >
-                                            {joining ? '⏳ Uniendo...' : '🚀 Unirme a este Club'}
-                                        </button>
-                                    )}
+                                    
+
+                                    
 
                                     <button
                                         type="button"
@@ -1104,103 +1097,106 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                 {/* COLUMNA DERECHA (SIDEBAR WEB DE INFORMACIÓN) */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-                                    {/* Tarjeta de Código de Unión Oficial */}
-                                    <div style={{
-                                        background: '#ffffff',
-                                        padding: '24px',
-                                        borderRadius: '12px',
-                                        boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                                        border: '1px solid #e1e5eb',
-                                        textAlign: 'center'
-                                    }}>
-                                        <h4 style={{ margin: '0 0 8px 0', color: '#003366', fontSize: '1.1rem', fontWeight: '700' }}>
-                                            🔑 Código Oficial de Acceso
-                                        </h4>
-                                        <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: '#666' }}>
-                                            Comparte este código para permitir a otros alumnos integrarse a este club.
-                                        </p>
-
+                                    {/* Tarjeta de Código de Unión Oficial: Exclusiva para Encargados */}
+                                    {canManage && club?.codigo_union && (
                                         <div style={{
-                                            background: '#f8f9fa',
-                                            border: '2px dashed #003366',
-                                            borderRadius: '10px',
-                                            padding: '16px',
-                                            marginBottom: '14px'
+                                            background: '#ffffff',
+                                            padding: '24px',
+                                            borderRadius: '12px',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                                            border: '1px solid #e1e5eb',
+                                            textAlign: 'center'
                                         }}>
+                                            <h4 style={{ margin: '0 0 8px 0', color: '#003366', fontSize: '1.1rem', fontWeight: '700' }}>
+                                                🔑 Código Oficial de Acceso
+                                            </h4>
+                                            <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: '#666' }}>
+                                                Como encargado del club, comparte este código privado con los alumnos y profesores que desees integrar.
+                                            </p>
+
                                             <div style={{
-                                                fontSize: '1.8rem',
-                                                fontFamily: 'monospace',
-                                                fontWeight: 'bold',
-                                                color: '#003366',
-                                                letterSpacing: '2px'
+                                                background: '#f8f9fa',
+                                                border: '2px dashed #003366',
+                                                borderRadius: '10px',
+                                                padding: '16px',
+                                                marginBottom: '14px'
                                             }}>
-                                                {club.codigo_union || 'NO-ASIGNADO'}
+                                                <div style={{
+                                                    fontSize: '1.8rem',
+                                                    fontFamily: 'monospace',
+                                                    fontWeight: 'bold',
+                                                    color: '#003366',
+                                                    letterSpacing: '2px'
+                                                }}>
+                                                    {club.codigo_union || 'NO-ASIGNADO'}
+                                                </div>
                                             </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={handleCopyCode}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '11px',
+                                                    background: copied ? '#28a745' : '#003366',
+                                                    color: '#fff',
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    fontWeight: 'bold',
+                                                    fontSize: '0.92rem',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '8px',
+                                                    transition: 'background-color 0.2s ease'
+                                                }}
+                                            >
+                                                {copied ? '✓ ¡Código Copiado al Portapapeles!' : '📋 Copiar Código Oficial'}
+                                            </button>
                                         </div>
+                                    )}
 
-                                        <button
-                                            type="button"
-                                            onClick={handleCopyCode}
-                                            style={{
-                                                width: '100%',
-                                                padding: '11px',
-                                                background: copied ? '#28a745' : '#003366',
-                                                color: '#fff',
-                                                border: 'none',
-                                                borderRadius: '8px',
-                                                cursor: 'pointer',
-                                                fontWeight: 'bold',
-                                                fontSize: '0.92rem',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                gap: '8px',
-                                                transition: 'background-color 0.2s ease'
-                                            }}
-                                        >
-                                            {copied ? '✓ ¡Código Copiado al Portapapeles!' : '📋 Copiar Código Oficial'}
-                                        </button>
+                                
 
-                                        {!isMember && (
-                                            <div style={{ marginTop: '16px', borderTop: '1px solid #eee', paddingTop: '16px' }}>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleUnirseDirecto}
-                                                    disabled={joining}
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '11px',
-                                                        background: '#28a745',
-                                                        color: '#fff',
-                                                        border: 'none',
-                                                        borderRadius: '8px',
-                                                        cursor: 'pointer',
-                                                        fontWeight: 'bold',
-                                                        fontSize: '0.92rem',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        gap: '8px'
-                                                    }}
-                                                >
-                                                    {joining ? '⏳ Procesando unión...' : '🚀 Unirme a este Club Ahora'}
-                                                </button>
+                                
 
-                                                {joinMessage.text && (
-                                                    <div style={{
-                                                        marginTop: '10px',
-                                                        padding: '8px 12px',
-                                                        borderRadius: '6px',
-                                                        fontSize: '0.85rem',
-                                                        background: joinMessage.type === 'success' ? '#d4edda' : '#f8d7da',
-                                                        color: joinMessage.type === 'success' ? '#155724' : '#721c24'
-                                                    }}>
-                                                        {joinMessage.text}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
+                                    {/* Tarjeta de Miembro Activo (No encargado) */}
+                                    {isMember && !canManage && (
+                                        <div style={{
+                                            background: '#ffffff',
+                                            padding: '24px',
+                                            borderRadius: '12px',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                                            border: '1px solid #e1e5eb',
+                                            textAlign: 'center'
+                                        }}>
+                                            <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🎉</div>
+                                            <h4 style={{ margin: '0 0 6px 0', color: '#155724', fontSize: '1.1rem', fontWeight: '700' }}>
+                                                ¡Eres Miembro Activo!
+                                            </h4>
+                                            <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: '#666' }}>
+                                                Cuentas con acceso a avisos internos, eventos y chat en vivo de este club.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate(`/chat/${id}`)}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '11px',
+                                                    background: '#003366',
+                                                    color: '#fff',
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    fontWeight: 'bold',
+                                                    fontSize: '0.9rem'
+                                                }}
+                                            >
+                                                💬 Ir a la Sala de Chat
+                                            </button>
+                                        </div>
+                                    )}
 
                                     {/* Tarjeta de Horarios y Espacios */}
                                     <div style={{ background: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
@@ -1268,34 +1264,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                         {/* ========================================================= */}
                         {/* PESTAÑA 2: AVISOS INTERNOS (MURO DE LECTURA LIMPIO)       */}
                         {/* ========================================================= */}
-                        {activeTab === 'avisos' && (
+                        {activeTab === 'avisos' && isMember && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                {!isMember ? (
-                                    <div style={{ background: '#ffffff', padding: '40px 30px', borderRadius: '12px', textAlign: 'center', border: '1px solid #e1e5eb' }}>
-                                        <span style={{ fontSize: '3rem' }}>🔒</span>
-                                        <h3 style={{ color: '#003366', marginTop: '12px' }}>Avisos Internos Reservados para Miembros</h3>
-                                        <p style={{ color: '#666', maxWidth: '600px', margin: '10px auto 20px auto', lineHeight: '1.6' }}>
-                                            Los avisos y comunicados oficiales son exclusivos para los integrantes inscritos en este club. Únete con el código oficial para acceder a esta sección.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={handleUnirseDirecto}
-                                            disabled={joining}
-                                            style={{
-                                                padding: '10px 24px',
-                                                background: '#28a745',
-                                                color: '#fff',
-                                                border: 'none',
-                                                borderRadius: '8px',
-                                                fontWeight: 'bold',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            🚀 Unirme al Club
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div style={{ background: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
+                                <div style={{ background: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #f0f2f5', paddingBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
                                             <div>
                                                 <h3 style={{ margin: 0, color: '#003366', fontSize: '1.25rem' }}>
@@ -1445,33 +1416,15 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                             </p>
                                         )}
                                     </div>
-                                )}
                             </div>
                         )}
 
                         {/* ========================================================= */}
                         {/* PESTAÑA 3: EVENTOS DEL CLUB (AGENDA / GRID LIMPIO)         */}
                         {/* ========================================================= */}
-                        {activeTab === 'eventos' && (
+                        {activeTab === 'eventos' && isMember && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                {!isMember ? (
-                                    <div style={{ background: '#ffffff', padding: '40px 30px', borderRadius: '12px', textAlign: 'center', border: '1px solid #e1e5eb' }}>
-                                        <span style={{ fontSize: '3rem' }}>🔒</span>
-                                        <h3 style={{ color: '#003366', marginTop: '12px' }}>Eventos Reservados para Miembros</h3>
-                                        <p style={{ color: '#666', maxWidth: '600px', margin: '10px auto 20px auto', lineHeight: '1.6' }}>
-                                            La agenda de entrenamientos, torneos y confirmaciones de asistencia son exclusivas para los miembros activos.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={handleUnirseDirecto}
-                                            disabled={joining}
-                                            style={{ padding: '10px 24px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
-                                        >
-                                            🚀 Unirme al Club
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div style={{ background: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
+                                <div style={{ background: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #f0f2f5', paddingBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
                                             <div>
                                                 <h3 style={{ margin: 0, color: '#003366', fontSize: '1.25rem' }}>
@@ -1699,33 +1652,15 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                             </p>
                                         )}
                                     </div>
-                                )}
                             </div>
                         )}
 
                         {/* ========================================================= */}
                         {/* PESTAÑA 4: PADRÓN DE MIEMBROS (TABLA WEB CON FILTROS)     */}
                         {/* ========================================================= */}
-                        {activeTab === 'miembros' && (
+                        {activeTab === 'miembros' && canViewMiembros && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                {!isMember ? (
-                                    <div style={{ background: '#ffffff', padding: '40px 30px', borderRadius: '12px', textAlign: 'center', border: '1px solid #e1e5eb' }}>
-                                        <span style={{ fontSize: '3rem' }}>🔒</span>
-                                        <h3 style={{ color: '#003366', marginTop: '12px' }}>Padrón Reservado para Miembros</h3>
-                                        <p style={{ color: '#666', maxWidth: '600px', margin: '10px auto 20px auto', lineHeight: '1.6' }}>
-                                            La lista oficial de integrantes y sus roles institucionales es visible únicamente para miembros del club.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={handleUnirseDirecto}
-                                            disabled={joining}
-                                            style={{ padding: '10px 24px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
-                                        >
-                                            🚀 Unirme al Club
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div style={{ background: '#ffffff', padding: '26px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
+                                <div style={{ background: '#ffffff', padding: '26px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #e1e5eb' }}>
                                         
                                         {/* Barra Superior de Herramientas Web */}
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
@@ -1957,7 +1892,6 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                             </table>
                                         </div>
                                     </div>
-                                )}
                             </div>
                         )}
 
@@ -3216,6 +3150,152 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                 Cerrar
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Unión con Código de Acceso */}
+            {showModalUnirse && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0, 0, 0, 0.55)',
+                        backdropFilter: 'blur(3px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 9999,
+                        padding: '20px'
+                    }}
+                    onClick={() => {
+                        if (!joining) {
+                            setShowModalUnirse(false);
+                            setJoinMessage({ text: '', type: '' });
+                        }
+                    }}
+                >
+                    <div
+                        style={{
+                            background: '#ffffff',
+                            borderRadius: '14px',
+                            padding: '28px',
+                            maxWidth: '440px',
+                            width: '100%',
+                            boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
+                            position: 'relative'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h3 style={{ margin: 0, color: '#003366', fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>🔑</span> Unirse a {club?.nombre}
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowModalUnirse(false);
+                                    setJoinMessage({ text: '', type: '' });
+                                }}
+                                disabled={joining}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    fontSize: '1.3rem',
+                                    cursor: 'pointer',
+                                    color: '#666',
+                                    padding: '4px 8px'
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '20px', lineHeight: '1.5' }}>
+                            Ingresa el <strong>código de acceso de 6 dígitos</strong> proporcionado por el profesor titular o los encargados del club para validar tu incorporación.
+                        </p>
+
+                        <form onSubmit={(e) => { e.preventDefault(); handleUnirseConCodigo(); }}>
+                            <div style={{ marginBottom: '18px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: '#333', marginBottom: '8px' }}>
+                                    Código de Invitación:
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej. J5SEXI"
+                                    value={codigoInput}
+                                    onChange={(e) => setCodigoInput(e.target.value.toUpperCase())}
+                                    maxLength={6}
+                                    autoFocus
+                                    style={{
+                                        width: '100%',
+                                        boxSizing: 'border-box',
+                                        padding: '12px 16px',
+                                        borderRadius: '8px',
+                                        border: '2px solid #003366',
+                                        fontFamily: 'monospace',
+                                        fontSize: '1.25rem',
+                                        fontWeight: 'bold',
+                                        textAlign: 'center',
+                                        letterSpacing: '4px',
+                                        textTransform: 'uppercase',
+                                        outline: 'none'
+                                    }}
+                                />
+                            </div>
+
+                            {joinMessage.text && (
+                                <div style={{
+                                    marginBottom: '16px',
+                                    padding: '10px 14px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.88rem',
+                                    background: joinMessage.type === 'success' ? '#d4edda' : '#f8d7da',
+                                    color: joinMessage.type === 'success' ? '#155724' : '#721c24',
+                                    fontWeight: '600'
+                                }}>
+                                    {joinMessage.text}
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowModalUnirse(false);
+                                        setJoinMessage({ text: '', type: '' });
+                                    }}
+                                    disabled={joining}
+                                    style={{
+                                        padding: '10px 18px',
+                                        background: '#f1f5f9',
+                                        color: '#475569',
+                                        border: '1px solid #cbd5e1',
+                                        borderRadius: '8px',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={joining || !codigoInput.trim()}
+                                    style={{
+                                        padding: '10px 22px',
+                                        background: '#28a745',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontWeight: 'bold',
+                                        cursor: joining || !codigoInput.trim() ? 'not-allowed' : 'pointer',
+                                        opacity: joining || !codigoInput.trim() ? 0.7 : 1
+                                    }}
+                                >
+                                    {joining ? '⏳ Validando...' : '✓ Unirme al Club'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
