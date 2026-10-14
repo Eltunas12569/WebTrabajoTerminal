@@ -24,6 +24,7 @@ import AdminUsersPage from './pages/AdminUsersPage';
 import AdminEditUserPage from './pages/AdminEditUserPage';
 import AdminCalendarioPage from './pages/AdminCalendarioPage';
 import AdminPoliticasPage from './pages/AdminPoliticasPage';
+import AdminAuditoriaPage from './pages/AdminAuditoriaPage';
 import CanalesChatPage from './pages/CanalesChatPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import ModalAceptacionPoliticas from './components/ModalAceptacionPoliticas';
@@ -151,6 +152,13 @@ function App() {
           <Route path="/admin/politicas" element={
             <ProtectedRoute rolesPermitidos={[1]}>
               <AdminPoliticasPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Auditoría de Encargados de Clubs (Administrador) */}
+          <Route path="/admin/auditoria" element={
+            <ProtectedRoute rolesPermitidos={[1]}>
+              <AdminAuditoriaPage />
             </ProtectedRoute>
           } />
 

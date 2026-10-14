@@ -91,13 +91,13 @@ const Sidebar = ({
                             <>
                                 <li 
                                     onClick={() => handleAction(() => navigate('/admin'))}
-                                    style={isPathActive('/admin') && !isPathActive('/admin/avisos') && !isPathActive('/admin/usuarios') && !isPathActive('/admin/calendario') ? activeItemStyle : undefined}
+                                    style={isPathActive('/admin') && !isPathActive('/admin/avisos') && !isPathActive('/admin/usuarios') && !isPathActive('/admin/calendario') && !isPathActive('/admin/politicas') && !isPathActive('/admin/auditoria') ? activeItemStyle : undefined}
                                 >
                                     🏠 Inicio
                                 </li>
                                 <li 
                                     onClick={() => handleAction(() => navigate('/admin'))}
-                                    style={isPathActive('/admin') && !isPathActive('/admin/avisos') && !isPathActive('/admin/usuarios') && !isPathActive('/admin/calendario') ? activeItemStyle : undefined}
+                                    style={isPathActive('/admin') && !isPathActive('/admin/avisos') && !isPathActive('/admin/usuarios') && !isPathActive('/admin/calendario') && !isPathActive('/admin/politicas') && !isPathActive('/admin/auditoria') ? activeItemStyle : undefined}
                                 >
                                     📋 Lista de Clubs
                                 </li>
@@ -124,6 +124,12 @@ const Sidebar = ({
                                     style={isPathActive('/admin/politicas') ? activeItemStyle : undefined}
                                 >
                                     ⚖️ Políticas y Privacidad
+                                </li>
+                                <li 
+                                    onClick={() => handleAction(() => navigate('/admin/auditoria'))}
+                                    style={isPathActive('/admin/auditoria') ? activeItemStyle : undefined}
+                                >
+                                    📜 Auditoría de Encargados
                                 </li>
                                 <li 
                                     onClick={() => {
@@ -160,7 +166,7 @@ const Sidebar = ({
                                         if (onTabChange) {
                                             handleAction(() => onTabChange('clubs'));
                                         } else {
-                                            handleAction(() => navigate('/gestion'));
+                                            handleAction(() => navigate('/gestion', { state: { tab: 'clubs' } }));
                                         }
                                     }}
                                     style={onTabChange && activeTab === 'clubs' ? activeItemStyle : undefined}
@@ -168,14 +174,14 @@ const Sidebar = ({
                                     📅 Mis Clubs
                                 </li>
 
-                                {/* Opción de Unirse a un Club: solo para Alumnos (rol 2) */}
-                                {user?.role_id === 2 && (
+                                {/* Opción de Unirse a un Club: para Alumnos y Profesores */}
+                                {[2, 3, 4].includes(Number(user?.role_id)) && (
                                     <li 
                                         onClick={() => {
                                             if (onTabChange) {
                                                 handleAction(() => onTabChange('unirse'));
                                             } else {
-                                                handleAction(() => navigate('/gestion'));
+                                                handleAction(() => navigate('/gestion', { state: { tab: 'unirse' } }));
                                             }
                                         }}
                                         style={onTabChange && activeTab === 'unirse' ? activeItemStyle : undefined}

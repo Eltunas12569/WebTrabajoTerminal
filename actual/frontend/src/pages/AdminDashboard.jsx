@@ -255,6 +255,7 @@ const AdminDashboard = () => {
                                         ) : (
                                             <button className="btn-view-club" onClick={() => goToClubDetails(club.id)}>Ver Detalles</button>
                                         )}
+                                        
                                     </div>
                                 </div>
                             ))
