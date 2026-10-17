@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { solicitarRecuperacion, restablecerPassword } from '../services/authService';
+import PasswordRulesChecklist, { checkPasswordRules } from '../components/PasswordRulesChecklist';
 import './css/RecuperarPassword.css';
 
 // Componentes de Iconos SVG
@@ -89,8 +90,9 @@ const RecuperarPasswordPage = () => {
             setMensaje('');
             return;
         }
-        if (nuevaPassword.length < 8) {
-            setError('La nueva contraseña debe tener al menos 8 caracteres.');
+        const { allBaseMet } = checkPasswordRules(nuevaPassword);
+        if (!allBaseMet) {
+            setError('La nueva contraseña debe cumplir con todos los requisitos de seguridad (mínimo 8 caracteres, mayúscula, minúscula, número y símbolo).');
             setMensaje('');
             return;
         }
@@ -285,6 +287,12 @@ const RecuperarPasswordPage = () => {
                                 )}
                             </div>
                         </div>
+
+                        {/* Cumplimiento de reglas de contraseña en tiempo real */}
+                        <PasswordRulesChecklist
+                            password={nuevaPassword}
+                            confirmPassword={confirmarPassword}
+                        />
 
                         <button className="btn-submit-recovery" type="submit" disabled={loading}>
                             {loading ? (

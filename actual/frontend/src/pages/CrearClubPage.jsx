@@ -79,7 +79,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder }) => {
     );
 };
 
-const MIN_ESTUDIANTES = 19;
+const MIN_ESTUDIANTES = 20;
 
 // Componente interno para selector múltiple (Autocomplete para plantilla de miembros)
 const MultiSearchableSelect = ({ options, selectedIds, leaderId, onChange, placeholder, onRemoteSearch }) => {

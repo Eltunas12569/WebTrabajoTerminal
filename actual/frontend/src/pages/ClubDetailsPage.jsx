@@ -2550,16 +2550,37 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
                                     {/* Columna Derecha: Contactos de Emergencia */}
                                     <div style={{ background: '#fff', border: '1px solid #e1e5eb', borderRadius: '8px', padding: '18px' }}>
-                                        <h4 style={{ margin: '0 0 14px 0', color: '#003366', fontSize: '1rem', borderBottom: '1px solid #eee', paddingBottom: '8px' }}>
-                                            📞 Contactos de Emergencia
-                                        </h4>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '8px', marginBottom: '14px' }}>
+                                            <h4 style={{ margin: 0, color: '#003366', fontSize: '1rem' }}>
+                                                📞 Contactos de Emergencia
+                                            </h4>
+                                            {selectedEmergencia.contactos?.length > 2 && (
+                                                <span style={{ fontSize: '0.74rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
+                                                    ↕ {selectedEmergencia.contactos.length} contactos (desplaza)
+                                                </span>
+                                            )}
+                                        </div>
 
                                         {selectedEmergencia.contactos && selectedEmergencia.contactos.length > 0 ? (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <div style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '10px',
+                                                maxHeight: '235px',
+                                                overflowY: 'auto',
+                                                paddingRight: '6px'
+                                            }}>
                                                 {selectedEmergencia.contactos.map((c, idx) => (
                                                     <div key={idx} style={{ background: '#f8f9fa', padding: '12px', borderRadius: '8px', border: '1px solid #e9ecef' }}>
-                                                        <div style={{ fontWeight: 'bold', color: '#003366', fontSize: '0.95rem' }}>
-                                                            {c.nombre}
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <div style={{ fontWeight: 'bold', color: '#003366', fontSize: '0.95rem' }}>
+                                                                {c.nombre}
+                                                            </div>
+                                                            {idx >= 2 && (
+                                                                <span style={{ fontSize: '0.7rem', color: '#0369a1', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                                                    #{idx + 1}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <div style={{ fontSize: '0.82rem', color: '#666', marginBottom: '8px' }}>
                                                             Parentesco: {c.parentesco || 'Familiar'}

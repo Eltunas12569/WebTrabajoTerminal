@@ -5,6 +5,7 @@ import api from '../services/api';
 import './css/Dashboards.css';
 import './css/CrearClubPage.css';
 import Sidebar from '../components/Sidebar';
+import PasswordRulesChecklist, { checkPasswordRules } from '../components/PasswordRulesChecklist';
 
 const CambiarPasswordPage = () => {
     const { user, logout } = useAuth();
@@ -54,18 +55,19 @@ const CambiarPasswordPage = () => {
             return;
         }
 
-        if (newPassword.length < 8) {
-            setError('La nueva contraseña debe tener al menos 8 caracteres.');
-            return;
-        }
-
-        if (newPassword !== confirmNewPassword) {
-            setError('Las contraseñas nuevas no coinciden.');
+        const { allBaseMet } = checkPasswordRules(newPassword);
+        if (!allBaseMet) {
+            setError('La nueva contraseña debe cumplir con todos los requisitos de seguridad (mínimo 8 caracteres, mayúscula, minúscula, número y símbolo).');
             return;
         }
 
         if (currentPassword === newPassword) {
             setError('La nueva contraseña no puede ser igual a la contraseña actual.');
+            return;
+        }
+
+        if (newPassword !== confirmNewPassword) {
+            setError('Las contraseñas nuevas no coinciden.');
             return;
         }
 
@@ -301,6 +303,13 @@ const CambiarPasswordPage = () => {
                                             </button>
                                         </div>
                                     </div>
+
+                                    {/* Cumplimiento de reglas de contraseña en tiempo real */}
+                                    <PasswordRulesChecklist
+                                        password={newPassword}
+                                        confirmPassword={confirmNewPassword}
+                                        currentPassword={currentPassword}
+                                    />
 
                                     {/* Mensajes de error / éxito */}
                                     {error && (

@@ -5,6 +5,54 @@ import api from '../services/api';
 import './css/Dashboards.css';
 import './css/ClubEmergencias.css';
 
+const ContactosMiembroList = ({ contactos, handleCopiar, telefonoCopiado }) => {
+    if (!contactos || contactos.length === 0) {
+        return (
+            <div className="sin-contactos-alerta">
+                <span style={{ fontSize: '1.2rem' }}>🚨</span>
+                <div>
+                    <strong>Sin contactos registrados</strong>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem' }}>
+                        No cuenta con teléfonos de emergencia en su perfil.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className={`contactos-lista ${contactos.length > 2 ? 'con-scroll' : ''}`}>
+            {contactos.map((contacto, idx) => (
+                <div key={contacto.id || idx} className="contacto-mini-card">
+                    <div className="contacto-info">
+                        <span className="contacto-parentesco">
+                            {contacto.parentesco || 'Familiar'} {idx >= 2 ? `(#${idx + 1})` : ''}
+                        </span>
+                        <div className="contacto-nombre">
+                            {contacto.nombre}
+                        </div>
+                        <div className="contacto-telefono">
+                            <a href={`tel:${contacto.telefono}`} style={{ color: '#003366', textDecoration: 'none' }}>
+                                📞 {contacto.telefono}
+                            </a>
+                        </div>
+                    </div>
+                    <div className="no-print" style={{ display: 'flex', alignItems: 'center' }}>
+                        <button
+                            type="button"
+                            onClick={() => handleCopiar(contacto.telefono)}
+                            className={`btn-copiar ${telefonoCopiado === contacto.telefono ? 'copiado' : ''}`}
+                            title="Copiar número de emergencia"
+                        >
+                            {telefonoCopiado === contacto.telefono ? '✓ Copiado' : '📋 Copiar'}
+                        </button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
 const ClubEmergenciasPage = () => {
     const { id: clubId } = useParams();
     const { user } = useAuth();
@@ -20,9 +68,8 @@ const ClubEmergenciasPage = () => {
     const [busqueda, setBusqueda] = useState('');
     const [filtroSangre, setFiltroSangre] = useState('todos');
     const [filtroAlergias, setFiltroAlergias] = useState('todos');
-    const [filtroContactos, setFiltroContactos] = useState('todos');
     const [filtroRol, setFiltroRol] = useState('todos');
-    const [modalKpiTipo, setModalKpiTipo] = useState(null); // 'alergias' | 'sin_contactos' | null
+    const [modalKpiTipo, setModalKpiTipo] = useState(null); // 'alergias' | null
 
     const esAdmin = Number(user?.role_id) === 1 || Number(user?.rol) === 1;
 
@@ -64,7 +111,6 @@ const ClubEmergenciasPage = () => {
         setBusqueda('');
         setFiltroSangre('todos');
         setFiltroAlergias('todos');
-        setFiltroContactos('todos');
         setFiltroRol('todos');
     };
 
@@ -73,17 +119,12 @@ const ClubEmergenciasPage = () => {
         return miembros.filter(m => m.alergias && m.alergias.trim() && m.alergias.trim().toLowerCase() !== 'ninguna');
     }, [miembros]);
 
-    const miembrosSinContactos = useMemo(() => {
-        return miembros.filter(m => !m.contactos || m.contactos.length === 0);
-    }, [miembros]);
-
     // Métricas para los KPIs
     const kpiData = useMemo(() => {
         const total = miembros.length;
         const conAlergias = miembrosConAlergias.length;
-        const sinContactos = miembrosSinContactos.length;
-        return { total, conAlergias, sinContactos };
-    }, [miembros.length, miembrosConAlergias.length, miembrosSinContactos.length]);
+        return { total, conAlergias };
+    }, [miembros.length, miembrosConAlergias.length]);
 
     // Filtrado interactivo
     const miembrosFiltrados = useMemo(() => {
@@ -109,11 +150,7 @@ const ClubEmergenciasPage = () => {
 
             // Filtro por tipo de sangre
             if (filtroSangre !== 'todos') {
-                if (filtroSangre === 'sin_especificar') {
-                    if (m.tipo_sangre && m.tipo_sangre.trim()) return false;
-                } else {
-                    if ((m.tipo_sangre || '').trim().toUpperCase() !== filtroSangre.toUpperCase()) return false;
-                }
+                if ((m.tipo_sangre || '').trim().toUpperCase() !== filtroSangre.toUpperCase()) return false;
             }
 
             // Filtro por alergias / condiciones
@@ -123,13 +160,6 @@ const ClubEmergenciasPage = () => {
                 if (m.alergias && m.alergias.trim() && m.alergias.trim().toLowerCase() !== 'ninguna') return false;
             }
 
-            // Filtro por contactos de emergencia
-            if (filtroContactos === 'con_contactos') {
-                if (!m.contactos || m.contactos.length === 0) return false;
-            } else if (filtroContactos === 'sin_contactos') {
-                if (m.contactos && m.contactos.length > 0) return false;
-            }
-
             // Filtro por rol en club
             if (filtroRol !== 'todos') {
                 if (m.rol_en_club !== filtroRol) return false;
@@ -137,7 +167,7 @@ const ClubEmergenciasPage = () => {
 
             return true;
         });
-    }, [miembros, busqueda, filtroSangre, filtroAlergias, filtroContactos, filtroRol]);
+    }, [miembros, busqueda, filtroSangre, filtroAlergias, filtroRol]);
 
     const getRolBadge = (rol) => {
         switch (rol) {
@@ -304,33 +334,6 @@ const ClubEmergenciasPage = () => {
                             </div>
                         </div>
                     </div>
-
-                    <div
-                        className={`kpi-card ${kpiData.sinContactos > 0 ? 'kpi-danger' : 'kpi-success'}`}
-                        onClick={() => {
-                            if (kpiData.sinContactos > 0) setModalKpiTipo('sin_contactos');
-                        }}
-                        style={{
-                            cursor: kpiData.sinContactos > 0 ? 'pointer' : 'default',
-                            position: 'relative'
-                        }}
-                        title={kpiData.sinContactos > 0 ? 'Haz clic para ver integrantes sin contacto de emergencia' : 'Todos los integrantes cuentan con contacto de emergencia'}
-                    >
-                        <div className="kpi-icon">{kpiData.sinContactos > 0 ? '🚨' : '✅'}</div>
-                        <div className="kpi-info" style={{ flex: 1 }}>
-                            <h4>Sin Contacto de Emergencia</h4>
-                            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
-                                <div className="kpi-number" style={{ color: kpiData.sinContactos > 0 ? '#dc3545' : '#10b981' }}>
-                                    {kpiData.sinContactos}
-                                </div>
-                                {kpiData.sinContactos > 0 && (
-                                    <span style={{ fontSize: '0.76rem', fontWeight: '700', color: '#dc3545' }}>
-                                        Ver faltantes →
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 {/* Panel de Control y Filtros de Accesibilidad Rápida (Sticky) */}
@@ -364,7 +367,7 @@ const ClubEmergenciasPage = () => {
                             <button
                                 type="button"
                                 onClick={limpiarFiltros}
-                                className={`quick-pill ${filtroAlergias === 'todos' && filtroContactos === 'todos' && filtroSangre === 'todos' && filtroRol === 'todos' && !busqueda ? 'active-default' : ''}`}
+                                className={`quick-pill ${filtroAlergias === 'todos' && filtroSangre === 'todos' && filtroRol === 'todos' && !busqueda ? 'active-default' : ''}`}
                             >
                                 👥 Todos ({miembros.length})
                             </button>
@@ -376,14 +379,6 @@ const ClubEmergenciasPage = () => {
                             >
                                 ⚠️ Con Alergias ({kpiData.conAlergias})
                             </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setFiltroContactos(filtroContactos === 'sin_contactos' ? 'todos' : 'sin_contactos')}
-                                className={`quick-pill ${filtroContactos === 'sin_contactos' ? 'active-danger' : ''}`}
-                            >
-                                🚨 Sin Contacto ({kpiData.sinContactos})
-                            </button>
                         </div>
                     </div>
 
@@ -391,8 +386,8 @@ const ClubEmergenciasPage = () => {
                         {/* Chips de acceso rápido por Tipo de Sangre */}
                         <div className="sangre-chips-bar">
                             <span className="sangre-chips-label">🩸 Sangre:</span>
-                            {['todos', 'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'sin_especificar'].map((grupo) => {
-                                const etiqueta = grupo === 'todos' ? 'Todos' : (grupo === 'sin_especificar' ? 'Sin reg.' : grupo);
+                            {['todos', 'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((grupo) => {
+                                const etiqueta = grupo === 'todos' ? 'Todos' : grupo;
                                 return (
                                     <button
                                         key={grupo}
@@ -425,7 +420,7 @@ const ClubEmergenciasPage = () => {
                                 Mostrando {miembrosFiltrados.length} de {miembros.length}
                             </span>
 
-                            {(busqueda || filtroSangre !== 'todos' || filtroAlergias !== 'todos' || filtroContactos !== 'todos' || filtroRol !== 'todos') && (
+                            {(busqueda || filtroSangre !== 'todos' || filtroAlergias !== 'todos' || filtroRol !== 'todos') && (
                                 <button type="button" onClick={limpiarFiltros} className="btn-reset-filtros">
                                     🔄 Limpiar
                                 </button>
@@ -541,49 +536,19 @@ const ClubEmergenciasPage = () => {
 
                                         {/* Columna Derecha: Contactos de Emergencia */}
                                         <div className="ficha-seccion">
-                                            <h4>📞 Contactos de Emergencia</h4>
-                                            
-                                            {(!m.contactos || m.contactos.length === 0) ? (
-                                                <div className="sin-contactos-alerta">
-                                                    <span style={{ fontSize: '1.2rem' }}>🚨</span>
-                                                    <div>
-                                                        <strong>Sin contactos registrados</strong>
-                                                        <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem' }}>
-                                                            No cuenta con teléfonos de emergencia en su perfil.
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="contactos-lista">
-                                                    {m.contactos.map((contacto) => (
-                                                        <div key={contacto.id} className="contacto-mini-card">
-                                                            <div className="contacto-info">
-                                                                <span className="contacto-parentesco">
-                                                                    {contacto.parentesco || 'Familiar'}
-                                                                </span>
-                                                                <div className="contacto-nombre">
-                                                                    {contacto.nombre}
-                                                                </div>
-                                                                <div className="contacto-telefono">
-                                                                    <a href={`tel:${contacto.telefono}`} style={{ color: '#003366', textDecoration: 'none' }}>
-                                                                        📞 {contacto.telefono}
-                                                                    </a>
-                                                                </div>
-                                                            </div>
-                                                            <div className="no-print" style={{ display: 'flex', alignItems: 'center' }}>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleCopiar(contacto.telefono)}
-                                                                    className={`btn-copiar ${telefonoCopiado === contacto.telefono ? 'copiado' : ''}`}
-                                                                    title="Copiar número de emergencia"
-                                                                >
-                                                                    {telefonoCopiado === contacto.telefono ? '✓ Copiado' : '📋 Copiar'}
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
+                                            <div className="ficha-seccion-header-row">
+                                                <h4>📞 Contactos de Emergencia</h4>
+                                                {m.contactos?.length > 2 && (
+                                                    <span className="badge-scroll-indicador" title={`${m.contactos.length} contactos registrados. Desplaza para ver todos.`}>
+                                                        ↕ {m.contactos.length} contactos (desplaza)
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <ContactosMiembroList
+                                                contactos={m.contactos}
+                                                handleCopiar={handleCopiar}
+                                                telefonoCopiado={telefonoCopiado}
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -633,28 +598,22 @@ const ClubEmergenciasPage = () => {
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
                                     gap: '12px',
-                                    background: modalKpiTipo === 'alergias' ? '#fffbeb' : '#fef2f2'
+                                    background: '#fffbeb'
                                 }}
                             >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <span style={{ fontSize: '1.6rem' }}>
-                                        {modalKpiTipo === 'alergias' ? '⚠️' : '🚨'}
-                                    </span>
+                                    <span style={{ fontSize: '1.6rem' }}>⚠️</span>
                                     <div>
                                         <h3 style={{
                                             margin: 0,
                                             fontSize: '1.1rem',
                                             fontWeight: '700',
-                                            color: modalKpiTipo === 'alergias' ? '#92400e' : '#991b1b'
+                                            color: '#92400e'
                                         }}>
-                                            {modalKpiTipo === 'alergias'
-                                                ? 'Integrantes con Alergias o Condiciones Médicas'
-                                                : 'Integrantes sin Contacto de Emergencia'}
+                                            Integrantes con Alergias o Condiciones Médicas
                                         </h3>
                                         <p style={{ margin: '2px 0 0 0', fontSize: '0.84rem', color: '#64748b' }}>
-                                            {modalKpiTipo === 'alergias'
-                                                ? `${miembrosConAlergias.length} persona(s) con datos médicos reportados`
-                                                : `${miembrosSinContactos.length} persona(s) pendientes de registrar contacto de emergencia`}
+                                            {miembrosConAlergias.length} persona(s) con datos médicos reportados
                                         </p>
                                     </div>
                                 </div>
@@ -682,70 +641,23 @@ const ClubEmergenciasPage = () => {
 
                             {/* Cuerpo del Modal */}
                             <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {modalKpiTipo === 'alergias' ? (
-                                    miembrosConAlergias.map((m) => {
-                                        const inicial = (m.nombre_completo || 'U').charAt(0).toUpperCase();
-                                        const identificador = m.boleta ? `Boleta: ${m.boleta}` : (m.num_empleado ? `No. Emp: ${m.num_empleado}` : 'Sin identificador');
-                                        return (
-                                            <div
-                                                key={m.usuario_id}
-                                                style={{
-                                                    border: '1px solid #fde68a',
-                                                    borderRadius: '10px',
-                                                    padding: '14px 16px',
-                                                    background: '#ffffff',
-                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-                                                }}
-                                            >
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                        <div className="integrante-avatar" style={{ width: '36px', height: '36px', fontSize: '0.95rem' }}>
-                                                            {inicial}
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.96rem' }}>
-                                                                {m.nombre_completo}
-                                                            </div>
-                                                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                                                {identificador}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        {getRolBadge(m.rol_en_club)}
-                                                        {m.tipo_sangre && (
-                                                            <span className="badge-sangre">🩸 {m.tipo_sangre}</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <div className="alergias-box" style={{ marginTop: '10px' }}>
-                                                    <strong>⚠️ Condición / Alergia:</strong> {m.alergias}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                ) : (
-                                    miembrosSinContactos.map((m) => {
-                                        const inicial = (m.nombre_completo || 'U').charAt(0).toUpperCase();
-                                        const identificador = m.boleta ? `Boleta: ${m.boleta}` : (m.num_empleado ? `No. Emp: ${m.num_empleado}` : 'Sin identificador');
-                                        return (
-                                            <div
-                                                key={m.usuario_id}
-                                                style={{
-                                                    border: '1px solid #fecaca',
-                                                    borderRadius: '10px',
-                                                    padding: '14px 16px',
-                                                    background: '#ffffff',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center',
-                                                    flexWrap: 'wrap',
-                                                    gap: '10px'
-                                                }}
-                                            >
+                                {miembrosConAlergias.map((m) => {
+                                    const inicial = (m.nombre_completo || 'U').charAt(0).toUpperCase();
+                                    const identificador = m.boleta ? `Boleta: ${m.boleta}` : (m.num_empleado ? `No. Emp: ${m.num_empleado}` : 'Sin identificador');
+                                    return (
+                                        <div
+                                            key={m.usuario_id}
+                                            style={{
+                                                border: '1px solid #fde68a',
+                                                borderRadius: '10px',
+                                                padding: '14px 16px',
+                                                background: '#ffffff',
+                                                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <div className="integrante-avatar" style={{ width: '36px', height: '36px', fontSize: '0.95rem', background: '#dc2626' }}>
+                                                    <div className="integrante-avatar" style={{ width: '36px', height: '36px', fontSize: '0.95rem' }}>
                                                         {inicial}
                                                     </div>
                                                     <div>
@@ -753,28 +665,24 @@ const ClubEmergenciasPage = () => {
                                                             {m.nombre_completo}
                                                         </div>
                                                         <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                                            {identificador} {m.telefono ? `• 📞 ${m.telefono}` : ''} {m.correo ? `• ✉️ ${m.correo}` : ''}
+                                                            {identificador}
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     {getRolBadge(m.rol_en_club)}
-                                                    <span style={{
-                                                        backgroundColor: '#fef2f2',
-                                                        color: '#b91c1c',
-                                                        border: '1px solid #fecaca',
-                                                        padding: '4px 10px',
-                                                        borderRadius: '20px',
-                                                        fontSize: '0.75rem',
-                                                        fontWeight: '700'
-                                                    }}>
-                                                        Sin contactos
-                                                    </span>
+                                                    {m.tipo_sangre && (
+                                                        <span className="badge-sangre">🩸 {m.tipo_sangre}</span>
+                                                    )}
                                                 </div>
                                             </div>
-                                        );
-                                    })
-                                )}
+
+                                            <div className="alergias-box" style={{ marginTop: '10px' }}>
+                                                <strong>⚠️ Condición / Alergia:</strong> {m.alergias}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             {/* Pie del Modal */}

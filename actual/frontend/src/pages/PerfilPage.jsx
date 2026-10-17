@@ -100,11 +100,30 @@ const PerfilPage = () => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        if (['nombres', 'apellido_paterno', 'apellido_materno'].includes(name)) {
+            const sanitized = value
+                .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '')
+                .replace(/^\s+/, '')
+                .replace(/\s{2,}/g, ' ');
+            const maxLen = name === 'nombres' ? 50 : 30;
+            if (sanitized.length > maxLen) return;
+            setFormData(prev => ({ ...prev, [name]: sanitized }));
+            return;
+        }
         setFormData({ ...formData, [name]: value });
     };
 
     const handleContactChange = (index, field, value) => {
-        const val = field === 'telefono' ? value.replace(/\D/g, '').slice(0, 15) : value;
+        let val = value;
+        if (field === 'nombre') {
+            val = value
+                .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '')
+                .replace(/^\s+/, '')
+                .replace(/\s{2,}/g, ' ')
+                .slice(0, 70);
+        } else if (field === 'telefono') {
+            val = value.replace(/\D/g, '').slice(0, 10);
+        }
         setFormData(prev => ({
             ...prev,
             contactos: prev.contactos.map((contacto, i) => {
@@ -173,11 +192,36 @@ const PerfilPage = () => {
             setMedicalSuccess('');
         }
 
+        const nombreRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+(?:\s[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+)*$/;
+
         if (type === 'personal') {
-            if (!formData.nombres || !formData.apellido_paterno) {
-                setPersonalError('Los nombres y el apellido paterno son obligatorios.');
+            if (!formData.nombres || formData.nombres.trim().length < 2) {
+                setPersonalError('El campo de nombres debe tener al menos 2 caracteres.');
                 return;
             }
+            if (!nombreRegex.test(formData.nombres.trim())) {
+                setPersonalError('Los nombres solo pueden contener letras y espacios válidos (sin números ni caracteres especiales).');
+                return;
+            }
+            if (!formData.apellido_paterno || formData.apellido_paterno.trim().length < 2) {
+                setPersonalError('El apellido paterno debe tener al menos 2 caracteres.');
+                return;
+            }
+            if (!nombreRegex.test(formData.apellido_paterno.trim())) {
+                setPersonalError('El apellido paterno solo puede contener letras y espacios válidos.');
+                return;
+            }
+            if (formData.apellido_materno && formData.apellido_materno.trim().length > 0) {
+                if (formData.apellido_materno.trim().length < 2) {
+                    setPersonalError('El apellido materno debe tener al menos 2 caracteres si se especifica.');
+                    return;
+                }
+                if (!nombreRegex.test(formData.apellido_materno.trim())) {
+                    setPersonalError('El apellido materno solo puede contener letras y espacios válidos.');
+                    return;
+                }
+            }
+
             const contactosBase = (originalData || formData).contactos || [];
             const contactosValidos = contactosBase.filter(c => c.nombre?.trim() && c.telefono?.trim());
             if (contactosValidos.length < 2) {
@@ -189,9 +233,33 @@ const PerfilPage = () => {
                 setMedicalError('Debes registrar al menos 2 contactos de emergencia.');
                 return;
             }
-            for (const contacto of formData.contactos) {
-                if (!contacto.nombre.trim() || !contacto.telefono.trim()) {
-                    setMedicalError('Todos los contactos de emergencia deben tener nombre y teléfono.');
+            for (let i = 0; i < formData.contactos.length; i++) {
+                const contacto = formData.contactos[i];
+                const nom = contacto.nombre ? contacto.nombre.trim() : '';
+                const tel = contacto.telefono ? contacto.telefono.trim() : '';
+
+                if (!nom) {
+                    setMedicalError(`El contacto #${i + 1} necesita un nombre.`);
+                    return;
+                }
+                if (nom.length < 3) {
+                    setMedicalError(`El nombre del contacto #${i + 1} debe tener al menos 3 caracteres.`);
+                    return;
+                }
+                if (!nombreRegex.test(nom)) {
+                    setMedicalError(`El nombre del contacto #${i + 1} solo puede contener letras y espacios válidos (sin números ni caracteres especiales).`);
+                    return;
+                }
+                if (!tel) {
+                    setMedicalError(`El contacto #${i + 1} necesita un teléfono.`);
+                    return;
+                }
+                if (tel.length !== 10) {
+                    setMedicalError(`El teléfono del contacto #${i + 1} debe tener exactamente 10 dígitos.`);
+                    return;
+                }
+                if (!contacto.parentesco || !contacto.parentesco.trim()) {
+                    setMedicalError(`Selecciona el parentesco o relación para el contacto #${i + 1}.`);
                     return;
                 }
             }
@@ -307,10 +375,10 @@ const PerfilPage = () => {
                                                     🔒 Tus datos de nombre e identidad están verificados institucionalmente.
                                                 </div>
                                             )}
-                                            <div className="form-group"><label>Nombres</label><input type="text" name="nombres" value={formData.nombres || ''} onChange={handleChange} required disabled={institutionalInfo.verificado} /></div>
+                                            <div className="form-group"><label>Nombres</label><input type="text" name="nombres" value={formData.nombres || ''} onChange={handleChange} required minLength={2} maxLength={50} pattern="^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+(?:\s[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+)*$" title="Solo letras y espacios (mínimo 2 caracteres, sin números ni símbolos)" disabled={institutionalInfo.verificado} /></div>
                                             <div style={{ display: 'flex', gap: '10px' }}>
-                                                <div className="form-group" style={{ flex: 1 }}><label>Apellido Paterno</label><input type="text" name="apellido_paterno" value={formData.apellido_paterno || ''} onChange={handleChange} required disabled={institutionalInfo.verificado} /></div>
-                                                <div className="form-group" style={{ flex: 1 }}><label>Apellido Materno</label><input type="text" name="apellido_materno" value={formData.apellido_materno || ''} onChange={handleChange} disabled={institutionalInfo.verificado} /></div>
+                                                <div className="form-group" style={{ flex: 1 }}><label>Apellido Paterno</label><input type="text" name="apellido_paterno" value={formData.apellido_paterno || ''} onChange={handleChange} required minLength={2} maxLength={30} pattern="^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+(?:\s[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+)*$" title="Solo letras y espacios (mínimo 2 caracteres, sin números ni símbolos)" disabled={institutionalInfo.verificado} /></div>
+                                                <div className="form-group" style={{ flex: 1 }}><label>Apellido Materno</label><input type="text" name="apellido_materno" value={formData.apellido_materno || ''} onChange={handleChange} minLength={2} maxLength={30} pattern="^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+(?:\s[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+)*$" title="Solo letras y espacios (mínimo 2 caracteres si se especifica)" disabled={institutionalInfo.verificado} /></div>
                                             </div>
                                             <div className="form-group"><label>Correo Electrónico</label><input type="email" name="correo" value={formData.correo || ''} disabled title="El correo institucional no puede modificarse" /></div>
                                             
@@ -419,11 +487,32 @@ const PerfilPage = () => {
                                         <div key={index} style={{ display: 'flex', gap: '15px', alignItems: 'center', marginTop: '15px', padding: '15px', border: '1px solid #e1e5eb', borderRadius: '8px', flexWrap: 'wrap' }}>
                                             <div className="form-group" style={{ flex: '1 1 200px', margin: 0 }}>
                                                 <label>Contacto de Emergencia #{index + 1} (Nombre)</label>
-                                                <input type="text" value={contacto.nombre} onChange={(e) => handleContactChange(index, 'nombre', e.target.value)} required placeholder="Nombre completo" />
+                                                <input
+                                                    type="text"
+                                                    value={contacto.nombre}
+                                                    onChange={(e) => handleContactChange(index, 'nombre', e.target.value)}
+                                                    required
+                                                    minLength={3}
+                                                    maxLength={70}
+                                                    pattern="^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+(?:\s[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+)*$"
+                                                    title="Solo letras y espacios (mínimo 3 caracteres, sin números ni símbolos)"
+                                                    placeholder="Nombre completo"
+                                                />
                                             </div>
                                             <div className="form-group" style={{ flex: '1 1 180px', margin: 0 }}>
                                                 <label>Contacto de Emergencia #{index + 1} (Teléfono)</label>
-                                                <input type="text" value={contacto.telefono} onChange={(e) => handleContactChange(index, 'telefono', e.target.value)} required placeholder="10 dígitos" />
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={contacto.telefono}
+                                                    onChange={(e) => handleContactChange(index, 'telefono', e.target.value)}
+                                                    required
+                                                    minLength={10}
+                                                    maxLength={10}
+                                                    pattern="[0-9]{10}"
+                                                    title="Número de teléfono a 10 dígitos"
+                                                    placeholder="10 dígitos"
+                                                />
                                             </div>
                                             <div className="form-group" style={{ flex: '1 1 160px', margin: 0 }}>
                                                 <label>Parentesco / Relación</label>

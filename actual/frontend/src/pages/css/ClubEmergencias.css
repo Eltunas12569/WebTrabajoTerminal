@@ -31,7 +31,7 @@
 /* KPIs de Resumen */
 .emergencias-kpis {
     display: grid;
-    grid-template-columns: repeat(3, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 16px;
 }
 
@@ -592,10 +592,60 @@
 }
 
 /* Contactos de Emergencia */
+.ficha-seccion-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 6px;
+    margin-bottom: 4px;
+}
+
+.ficha-seccion-header-row h4 {
+    margin: 0 !important;
+    border-bottom: none !important;
+    padding-bottom: 0 !important;
+}
+
+.badge-scroll-indicador {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #0369a1;
+    background-color: #e0f2fe;
+    padding: 2px 8px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .contactos-lista {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    max-height: 162px;
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+.contactos-lista::-webkit-scrollbar {
+    width: 6px;
+}
+
+.contactos-lista::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.contactos-lista::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 4px;
+}
+
+.contactos-lista::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
 }
 
 .contacto-mini-card {
@@ -695,6 +745,11 @@
 
 /* Modo Impresión */
 @media print {
+    .contactos-lista {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
     body {
         background: #fff !important;
         color: #000 !important;
