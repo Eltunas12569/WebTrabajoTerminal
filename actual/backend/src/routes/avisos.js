@@ -177,6 +177,35 @@ router.post('/', verifyToken, requireVerificado, async (req, res) => {
     }
 });
 
+
+router.delete('/gestion-admin/eventos/:id', verifyToken, requireVerificado, async (req, res) => {
+    const eventoId = req.params.id;
+
+    if (!/^\d+$/.test(eventoId)) {
+        return res.status(400).json({ message: 'Identificador de evento inválido.' });
+    }
+
+    try {
+        // Validar que sea Administrador (rol 1)
+        const [usuarios] = await db.query('SELECT role_id FROM usuarios WHERE id = ?', [req.user.id]);
+        if (!usuarios.length || Number(usuarios[0].role_id) !== 1) {
+            return res.status(403).json({ message: 'Acceso denegado. Solo para administradores.' });
+        }
+
+        // Eliminar el evento (Por CASCADE en la BD, las asistencias se borran solas)
+        const [resultado] = await db.query('DELETE FROM eventos_club WHERE id = ?', [Number(eventoId)]);
+
+        if (resultado.affectedRows === 0) {
+            return res.status(404).json({ message: 'El evento no existe o ya fue eliminado.' });
+        }
+
+        res.status(200).json({ message: 'Evento eliminado correctamente.' });
+    } catch (error) {
+        console.error('Error al eliminar evento:', error.message);
+        res.status(500).json({ message: 'No se pudo eliminar el evento.' });
+    }
+});
+
 router.delete('/:tipo/:id', verifyToken, requireVerificado, async (req, res) => {
     const { tipo, id } = req.params;
 
