@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { register } from '../services/authService';
 import { useNavigate, Link } from 'react-router-dom';
+import PasswordRulesChecklist, { checkPasswordRules } from '../components/PasswordRulesChecklist';
 import './css/Register.css';
 
 // Iconos SVG limpios y estándar
@@ -80,6 +81,18 @@ const Register = () => {
     const handleChange = (e) => {
         const { name, value } = e.target;
 
+        // Restricción para nombres y apellidos: solo letras, acentos, ñ, ü y espacios simples
+        if (['nombres', 'apellido_paterno', 'apellido_materno'].includes(name)) {
+            const sanitized = value
+                .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '')
+                .replace(/^\s+/, '')
+                .replace(/\s{2,}/g, ' ');
+            const maxLen = name === 'nombres' ? 50 : 30;
+            if (sanitized.length > maxLen) return;
+            setFormData(prev => ({ ...prev, [name]: sanitized }));
+            return;
+        }
+
         // Restricciones numéricas institucionales
         if (name === 'nss') {
             const onlyNums = value.replace(/\D/g, '');
@@ -106,13 +119,45 @@ const Register = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (formData.password !== confirmPassword) {
-            setError('Las contraseñas no coinciden.');
+        const nombreRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+(?:\s[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+)*$/;
+
+        if (!formData.nombres || formData.nombres.trim().length < 2) {
+            setError('El campo de nombres debe tener al menos 2 caracteres.');
+            return;
+        }
+        if (!nombreRegex.test(formData.nombres.trim())) {
+            setError('Los nombres solo pueden contener letras y espacios válidos (sin números ni caracteres especiales).');
             return;
         }
 
-        if (formData.password.length < 8) {
-            setError('La contraseña debe tener al menos 8 caracteres.');
+        if (!formData.apellido_paterno || formData.apellido_paterno.trim().length < 2) {
+            setError('El apellido paterno debe tener al menos 2 caracteres.');
+            return;
+        }
+        if (!nombreRegex.test(formData.apellido_paterno.trim())) {
+            setError('El apellido paterno solo puede contener letras y espacios válidos.');
+            return;
+        }
+
+        if (formData.apellido_materno && formData.apellido_materno.trim().length > 0) {
+            if (formData.apellido_materno.trim().length < 2) {
+                setError('El apellido materno debe tener al menos 2 caracteres si se especifica.');
+                return;
+            }
+            if (!nombreRegex.test(formData.apellido_materno.trim())) {
+                setError('El apellido materno solo puede contener letras y espacios válidos.');
+                return;
+            }
+        }
+
+        const { allBaseMet } = checkPasswordRules(formData.password);
+        if (!allBaseMet) {
+            setError('La contraseña debe cumplir con todos los requisitos de seguridad (mínimo 8 caracteres, mayúscula, minúscula, número y símbolo).');
+            return;
+        }
+
+        if (formData.password !== confirmPassword) {
+            setError('Las contraseñas no coinciden.');
             return;
         }
 
@@ -208,6 +253,10 @@ const Register = () => {
                                     value={formData.nombres}
                                     onChange={handleChange}
                                     required
+                                    minLength={2}
+                                    maxLength={50}
+                                    pattern="^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+(?:\s[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+)*$"
+                                    title="Solo letras y espacios (mínimo 2 caracteres, sin números ni símbolos)"
                                     className="form-input"
                                     autoComplete="given-name"
                                 />
@@ -226,6 +275,10 @@ const Register = () => {
                                         value={formData.apellido_paterno}
                                         onChange={handleChange}
                                         required
+                                        minLength={2}
+                                        maxLength={30}
+                                        pattern="^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+(?:\s[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+)*$"
+                                        title="Solo letras y espacios (mínimo 2 caracteres, sin números ni símbolos)"
                                         className="form-input"
                                         autoComplete="family-name"
                                     />
@@ -243,6 +296,10 @@ const Register = () => {
                                         placeholder="Segundo apellido"
                                         value={formData.apellido_materno}
                                         onChange={handleChange}
+                                        minLength={2}
+                                        maxLength={30}
+                                        pattern="^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+(?:\s[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+)*$"
+                                        title="Solo letras y espacios (mínimo 2 caracteres si se especifica)"
                                         className="form-input"
                                         autoComplete="additional-name"
                                     />
@@ -437,6 +494,15 @@ const Register = () => {
                                 </div>
                             </div>
                         </section>
+                    </div>
+
+                    {/* Checklist en tiempo real de reglas de contraseña a todo el ancho */}
+                    <div className="register-fullwidth-rules">
+                        <PasswordRulesChecklist
+                            password={formData.password}
+                            confirmPassword={confirmPassword}
+                            title="Requisitos de la contraseña"
+                        />
                     </div>
 
                     {/* Fila Inferior: Términos, Botón de Acción y Enlace */}

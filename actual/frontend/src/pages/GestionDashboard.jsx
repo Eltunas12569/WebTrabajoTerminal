@@ -330,7 +330,7 @@ const GestionDashboard = () => {
             <header className="admin-navbar-fixed">
                 <div className="nav-left">
                     <button className="menu-toggle" onClick={toggleSidebar}>☰</button>
-                    <span className="nav-title">Sistema de Clubs</span>
+                    <span className="nav-title">    Sistema de Clubs</span>
                 </div>
                 <div className="nav-right">
                     <div className="profile-container">
