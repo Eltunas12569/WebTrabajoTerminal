@@ -6,15 +6,13 @@ const limitadorPeticiones = require('express-rate-limit');
 const { Server } = require('socket.io');
 const db = require('./src/config/db');
 require('dotenv').config();
+const AES_KEY = process.env.AES_KEY;
 
 const app = express();
 
-// ==========================================
-// --- CORS: lista blanca de orígenes permitidos ---
-// ==========================================
 const origenesPermitidos = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(origen => origen.trim())
-    : ['http://localhost:5173']; 
+    : ['http://localhost:5173'];
 
 const opcionesCors = {
     origin: (origenSolicitante, callback) => {
@@ -32,11 +30,6 @@ app.use(cors(opcionesCors));
 app.use(express.json({ limit: '1mb' }));
 
 
-
-
-// ==========================================
-// --- RATE LIMITING GLOBAL ---
-// ==========================================
 const limitadorGeneral = limitadorPeticiones({
     windowMs: 15 * 60 * 1000,
     max: 300,
@@ -55,9 +48,6 @@ const limitadorLogin = limitadorPeticiones({
 });
 app.use('/api/auth/login', limitadorLogin);
 
-// ==========================================
-// --- CONFIGURACIÓN DE SOCKET.IO (CHAT Y NOTIFICACIONES) ---
-// ==========================================
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: opcionesCors
@@ -65,7 +55,6 @@ const io = new Server(server, {
 
 app.set('socketio', io);
 
-// Rechaza cualquier conexión de socket que no traiga un JWT válido.
 io.use(async (socket, siguiente) => {
     const token = socket.handshake.auth?.token;
     if (!token) {
@@ -75,8 +64,10 @@ io.use(async (socket, siguiente) => {
         const datosDecodificados = jwt.verify(token, process.env.JWT_SECRET);
 
         const [filasUsuario] = await db.query(
-            `SELECT nombres, apellido_paterno FROM usuarios WHERE id = ?`,
-            [datosDecodificados.id]
+            `SELECT CAST(AES_DECRYPT(nombres, ?) AS CHAR) AS nombres, 
+                    CAST(AES_DECRYPT(apellido_paterno, ?) AS CHAR) AS apellido_paterno 
+             FROM usuarios WHERE id = ?`,
+            [AES_KEY, AES_KEY, datosDecodificados.id]
         );
         if (filasUsuario.length === 0) {
             return siguiente(new Error('Usuario no encontrado'));
@@ -161,13 +152,11 @@ io.on('connection', (socket) => {
     socket.on('enviar_mensaje_directivos', async (data) => {
         const { mensaje } = data;
         try {
-            // Guardar en la nueva tabla
             const [resultado] = await db.query(
                 `INSERT INTO chat_mensajes (usuario_id, tipo_sala, mensaje) VALUES (?, 'directivos', ?)`,
                 [socket.datosUsuario.id, mensaje]
             );
 
-            // Obtener a qué clubes representa para la etiqueta en vivo
             const [etiquetas] = await db.query(`
                 SELECT GROUP_CONCAT(DISTINCT CONCAT(
                     IF(i.rol_en_club = 'encargado_profesor', 'Profe Titular', 'Alumno Rep.'), 
@@ -180,18 +169,16 @@ io.on('connection', (socket) => {
 
             const etiqueta = etiquetas[0]?.etiqueta_encargado || null;
 
-            // Armar el payload para los clientes
             const nuevoMensaje = {
                 id: resultado.insertId,
                 usuario_id: socket.datosUsuario.id,
                 autor_nombre: socket.datosUsuario.nombreCompleto,
-                rol_usuario: socket.datosUsuario.rol, 
+                rol_usuario: socket.datosUsuario.rol,
                 etiqueta_encargado: etiqueta, // NUEVO
                 mensaje,
                 fecha_envio: new Date().toISOString()
             };
 
-            // Emitir solo a los que están en la sala
             io.to('sala_directivos').emit('nuevo_mensaje_directivos', nuevoMensaje);
         } catch (error) {
             console.error('Error guardando mensaje de directivos:', error);
@@ -199,9 +186,6 @@ io.on('connection', (socket) => {
     });
 
 
-    // ==========================================
-    // --- NUEVO: CHAT EXCLUSIVO DE ENCARGADOS ---
-    // ==========================================
     socket.on('unirse_chat_encargados', async () => {
         try {
             const [esEncargado] = await db.query(
@@ -227,7 +211,6 @@ io.on('connection', (socket) => {
                 [socket.datosUsuario.id, mensaje]
             );
 
-            // Extraer a qué club(es) representa
             const [etiquetas] = await db.query(`
                 SELECT GROUP_CONCAT(DISTINCT CONCAT(
                     IF(i.rol_en_club = 'encargado_profesor', 'Profe Titular', 'Alumno Rep.'), 
@@ -259,9 +242,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// ==========================================
-// --- REGISTRO DE RUTAS API REST ---
-// ==========================================
 app.use('/api/auth', require('./src/routes/authRoutes'));
 app.use('/api/politicas', require('./src/routes/politicasRoutes'));
 app.use('/api/users', require('./src/routes/userRoutes'));

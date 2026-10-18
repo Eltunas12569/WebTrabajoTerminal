@@ -1,12 +1,8 @@
 const db = require('../config/db');
 const { invalidarCachePoliticas } = require('../middlewares/verificarPoliticas');
+const AES_KEY = process.env.AES_KEY;
 
-/**
- * Controlador de Políticas Legales (Aviso de Privacidad y Términos y Condiciones)
- * Garantiza cumplimiento estricto con los Artículos 28, 31, 43, 63 y 250 de la LGPDPPSO.
- */
 
-// 1. Obtener la versión activa del Aviso de Privacidad y Términos con métricas de aceptación
 const obtenerPoliticaActiva = async (req, res) => {
     try {
         const [filas] = await db.query(`
@@ -73,9 +69,9 @@ const obtenerEstadoUsuario = async (req, res) => {
         const usuario = usuarios[0];
 
         const alDia = usuario.version_aviso_privacidad === versionVigente &&
-                      usuario.version_terminos === versionVigente &&
-                      Boolean(usuario.acepta_privacidad) &&
-                      Boolean(usuario.acepta_terminos);
+            usuario.version_terminos === versionVigente &&
+            Boolean(usuario.acepta_privacidad) &&
+            Boolean(usuario.acepta_terminos);
 
         res.status(200).json({
             al_dia: alDia,
@@ -242,7 +238,6 @@ const actualizarVersionPolitica = async (req, res) => {
     }
 };
 
-// 5. Estadísticas de cumplimiento y auditoría de políticas (Solo Administrador)
 const obtenerHistorialYEstadisticas = async (req, res) => {
     try {
         const [versiones] = await db.query(`
@@ -275,12 +270,12 @@ const obtenerHistorialYEstadisticas = async (req, res) => {
 
         const [ultimasAceptaciones] = await db.query(`
             SELECT hap.id, hap.version_aceptada, hap.fecha_aceptacion, hap.ip_origen,
-                   CONCAT(u.nombres, ' ', u.apellido_paterno) AS nombre_usuario,
+                   CONCAT(CAST(AES_DECRYPT(u.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR)) AS nombre_usuario,
                    u.correo, u.role_id
             FROM historial_aceptacion_politicas hap
             JOIN usuarios u ON hap.usuario_id = u.id
             ORDER BY hap.id DESC LIMIT 15
-        `);
+        `, [AES_KEY, AES_KEY]);
 
         res.status(200).json({
             version_vigente: versionVigente,

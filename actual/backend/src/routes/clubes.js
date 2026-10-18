@@ -5,6 +5,7 @@ const verificarToken = require('../middlewares/authMiddleware');
 const requireVerificado = require('../middlewares/verificarCuentaMiddleware');
 const checkRole = require('../middlewares/roleAuth');
 const ROLES = require('../config/roles');
+const AES_KEY = process.env.AES_KEY;
 
 
 function convertirAFechaMySQL(valor) {
@@ -13,9 +14,6 @@ function convertirAFechaMySQL(valor) {
     return fecha.toISOString().slice(0, 19).replace('T', ' ');
 }
 
-// ==========================================
-// --- SISTEMA DE INVITACIONES Y NOTIFICACIONES ---
-// ==========================================
 router.get('/invitaciones/pendientes', verificarToken, requireVerificado, async (req, res) => {
     const idUsuario = req.user.id;
     try {
@@ -54,16 +52,14 @@ router.put('/:id/enviar-revision', verificarToken, requireVerificado, async (req
     } catch (error) { res.status(500).json({ message: "Error interno" }); }
 });
 
-// ==========================================
-// --- DASHBOARD DEL CLUB (CHAT, AVISOS, EVENTOS, RECURSOS) ---
-// ==========================================
 router.get('/:id/chat', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [mensajes] = await db.query(`
-            SELECT c.id, c.club_id, c.usuario_id, c.mensaje, c.fecha_envio, CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre
+            SELECT c.id, c.club_id, c.usuario_id, c.mensaje, c.fecha_envio, 
+                   CONCAT(CAST(AES_DECRYPT(u.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR)) AS autor_nombre
             FROM chat_mensajes c JOIN usuarios u ON c.usuario_id = u.id
             WHERE c.club_id = ? AND c.tipo_sala = 'club' ORDER BY c.fecha_envio ASC
-        `, [req.params.id]);
+        `, [AES_KEY, AES_KEY, req.params.id]);
         res.status(200).json(mensajes);
     } catch (error) { res.status(500).json({ message: "Error al cargar chat" }); }
 });
@@ -78,9 +74,9 @@ router.get('/:id/avisos', verificarToken, requireVerificado, async (req, res) =>
 
         const [avisos] = await db.query(`
             SELECT a.*,
-                   u.nombres,
-                   CONCAT(u.apellido_paterno, ' ', IFNULL(u.apellido_materno, '')) AS apellidos,
-                   CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre,
+                   CAST(AES_DECRYPT(u.nombres, ?) AS CHAR) AS nombres,
+                   CONCAT(CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR), ' ', IFNULL(CAST(AES_DECRYPT(u.apellido_materno, ?) AS CHAR), '')) AS apellidos,
+                   CONCAT(CAST(AES_DECRYPT(u.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR)) AS autor_nombre,
                    u.role_id,
                    i.rol_en_club
             FROM avisos a
@@ -88,7 +84,7 @@ router.get('/:id/avisos', verificarToken, requireVerificado, async (req, res) =>
             LEFT JOIN inscripciones i ON i.club_id = a.club_id AND i.usuario_id = u.id
             WHERE a.club_id = ? AND a.activo = 1
             ORDER BY a.fecha_envio DESC
-        `, [req.params.id]);
+        `, [AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, req.params.id]);
         res.status(200).json(avisos);
     } catch (error) { res.status(500).json({ message: "Error al cargar avisos" }); }
 });
@@ -168,7 +164,6 @@ router.get('/:id/eventos', verificarToken, requireVerificado, async (req, res) =
 router.post('/:id/eventos', verificarToken, requireVerificado, async (req, res) => {
     const { titulo, descripcion, fecha_evento, lugar, prioridad = 'alta', notificarAviso = true, alcance, es_global } = req.body;
 
-    // Validamos y convertimos la fecha ANTES de tocar la base de datos
     const fechaConvertida = convertirAFechaMySQL(fecha_evento);
     if (!fechaConvertida) {
         return res.status(400).json({ message: "La fecha del evento no es válida. Usa un formato como 'YYYY-MM-DDTHH:mm:ss'." });
@@ -251,7 +246,6 @@ router.get('/:id/eventos/:idEvento/asistentes', verificarToken, requireVerificad
     const rolUsuario = Number(req.user.rol || req.user.role_id);
 
     try {
-        // Verificar que el usuario sea administrador o encargado activo de este club
         if (rolUsuario !== 1) {
             const [permiso] = await db.query(
                 `SELECT id FROM inscripciones
@@ -268,13 +262,13 @@ router.get('/:id/eventos/:idEvento/asistentes', verificarToken, requireVerificad
 
         const [asistentes] = await db.query(
             `SELECT u.id AS usuario_id,
-                    u.nombres,
-                    u.apellido_paterno,
-                    u.apellido_materno,
-                    CONCAT(u.nombres, ' ', u.apellido_paterno, IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != '', CONCAT(' ', u.apellido_materno), '')) AS nombre_completo,
-                    u.correo,
-                    u.boleta,
-                    u.num_empleado,
+                   CAST(AES_DECRYPT(u.nombres, ?) AS CHAR) AS nombres,
+                   CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR) AS apellido_paterno,
+                   CAST(AES_DECRYPT(u.apellido_materno, ?) AS CHAR) AS apellido_materno,
+                   CONCAT(CAST(AES_DECRYPT(u.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR), IF(CAST(AES_DECRYPT(u.apellido_materno, ?) AS CHAR) IS NOT NULL AND CAST(AES_DECRYPT(u.apellido_materno, ?) AS CHAR) != '', CONCAT(' ', CAST(AES_DECRYPT(u.apellido_materno, ?) AS CHAR)), '')) AS nombre_completo,
+                   u.correo,
+                   CAST(AES_DECRYPT(u.boleta, ?) AS CHAR) AS boleta,
+                   CAST(AES_DECRYPT(u.num_empleado, ?) AS CHAR) AS num_empleado,
                     IFNULL(i.rol_en_club, 'miembro') AS rol_en_club
              FROM asistencias_eventos ae
              JOIN eventos_club e ON ae.evento_id = e.id AND e.club_id = ?
@@ -282,7 +276,7 @@ router.get('/:id/eventos/:idEvento/asistentes', verificarToken, requireVerificad
              LEFT JOIN inscripciones i ON i.usuario_id = u.id AND i.club_id = ?
              WHERE ae.evento_id = ? AND ae.asistira = 1
              ORDER BY u.apellido_paterno ASC, u.nombres ASC`,
-            [clubId, clubId, idEvento]
+            [AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, clubId, clubId, idEvento]
         );
 
         res.status(200).json({ asistentes });
@@ -292,17 +286,11 @@ router.get('/:id/eventos/:idEvento/asistentes', verificarToken, requireVerificad
     }
 });
 
-
-
-// ==========================================
-// --- CHAT GLOBAL DE DIRECTIVOS (ADMIN Y ENCARGADOS) ---
-// ==========================================
 router.get('/chat-directivos/historial', verificarToken, requireVerificado, async (req, res) => {
     const idUsuario = req.user.id;
-    const rolUsuario = req.user.rol; // Asumiendo que tu token inyecta el rol en req.user
+    const rolUsuario = req.user.rol;
 
     try {
-        // Barrera de seguridad: Verificar si tiene privilegios para ver esto
         if (rolUsuario !== 1) {
             const [esEncargado] = await db.query(
                 `SELECT id FROM inscripciones WHERE usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno') AND estatus = 'activo' LIMIT 1`,
@@ -315,7 +303,7 @@ router.get('/chat-directivos/historial', verificarToken, requireVerificado, asyn
 
         const [mensajes] = await db.query(`
             SELECT c.id, c.usuario_id, c.mensaje, c.fecha_envio, 
-                   CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre,
+                   CONCAT(CAST(AES_DECRYPT(u.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR)) AS autor_nombre,
                    u.role_id AS autor_rol,
                    (
                        SELECT GROUP_CONCAT(DISTINCT CONCAT(
@@ -328,7 +316,7 @@ router.get('/chat-directivos/historial', verificarToken, requireVerificado, asyn
             JOIN usuarios u ON c.usuario_id = u.id 
             WHERE c.tipo_sala = 'directivos'
             ORDER BY c.fecha_envio ASC
-        `);
+        `, [AES_KEY, AES_KEY]);
         res.status(200).json(mensajes);
     } catch (error) {
         console.error("Error al cargar chat directivos:", error);
@@ -336,9 +324,6 @@ router.get('/chat-directivos/historial', verificarToken, requireVerificado, asyn
     }
 });
 
-// ==========================================
-// --- CHAT EXCLUSIVO ENTRE ENCARGADOS ---
-// ==========================================
 router.get('/chat-encargados/historial', verificarToken, requireVerificado, async (req, res) => {
     const idUsuario = req.user.id;
     try {
@@ -352,7 +337,7 @@ router.get('/chat-encargados/historial', verificarToken, requireVerificado, asyn
 
         const [mensajes] = await db.query(`
             SELECT c.id, c.usuario_id, c.mensaje, c.fecha_envio, 
-                   CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor_nombre,
+                   CONCAT(CAST(AES_DECRYPT(u.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR)) AS autor_nombre,
                    u.role_id AS autor_rol,
                    (
                        SELECT GROUP_CONCAT(DISTINCT CONCAT(
@@ -365,32 +350,33 @@ router.get('/chat-encargados/historial', verificarToken, requireVerificado, asyn
             JOIN usuarios u ON c.usuario_id = u.id 
             WHERE c.tipo_sala = 'encargados'
             ORDER BY c.fecha_envio ASC
-        `);
+        `, [AES_KEY, AES_KEY]);
         res.status(200).json(mensajes);
     } catch (error) {
         res.status(500).json({ message: "Error interno" });
     }
 });
 
-
-// ==========================================
-// --- OBTENER CLUBES GLOBALES ---
-// ==========================================
-
 router.get('/', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [filas] = await db.query(`
             SELECT c.*,
-                p.id AS profesor_encargado_id, p.nombres AS profesor_nombres, CONCAT(p.apellido_paterno, ' ', IFNULL(p.apellido_materno, '')) AS profesor_apellidos,
-                p.correo AS profesor_correo, p.num_empleado AS profesor_num_empleado,
-                a.id AS alumno_encargado_id, a.nombres AS alumno_nombres, CONCAT(a.apellido_paterno, ' ', IFNULL(a.apellido_materno, '')) AS alumno_apellidos,
-                a.correo AS alumno_correo, a.boleta AS alumno_boleta
+                p.id AS profesor_encargado_id, 
+                CAST(AES_DECRYPT(p.nombres, ?) AS CHAR) AS profesor_nombres, 
+                CONCAT(CAST(AES_DECRYPT(p.apellido_paterno, ?) AS CHAR), ' ', IFNULL(CAST(AES_DECRYPT(p.apellido_materno, ?) AS CHAR), '')) AS profesor_apellidos,
+                p.correo AS profesor_correo, 
+                CAST(AES_DECRYPT(p.num_empleado, ?) AS CHAR) AS profesor_num_empleado,
+                a.id AS alumno_encargado_id, 
+                CAST(AES_DECRYPT(a.nombres, ?) AS CHAR) AS alumno_nombres, 
+                CONCAT(CAST(AES_DECRYPT(a.apellido_paterno, ?) AS CHAR), ' ', IFNULL(CAST(AES_DECRYPT(a.apellido_materno, ?) AS CHAR), '')) AS alumno_apellidos,
+                a.correo AS alumno_correo, 
+                CAST(AES_DECRYPT(a.boleta, ?) AS CHAR) AS alumno_boleta
             FROM clubes c
             LEFT JOIN inscripciones ip ON c.id = ip.club_id AND ip.rol_en_club = 'encargado_profesor' AND ip.estatus = 'activo'
             LEFT JOIN usuarios p ON ip.usuario_id = p.id
             LEFT JOIN inscripciones ia ON c.id = ia.club_id AND ia.rol_en_club = 'encargado_alumno' AND ia.estatus = 'activo'
             LEFT JOIN usuarios a ON ia.usuario_id = a.id
-        `);
+        `, [AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY]);
         const clubesTratados = filas.map(club => ({
             ...club,
             cronograma: club.cronograma
@@ -408,10 +394,16 @@ router.get('/user/:idUsuario', verificarToken, requireVerificado, async (req, re
     try {
         const [filas] = await db.query(`
             SELECT c.*,
-                p.id AS profesor_encargado_id, p.nombres AS profesor_nombres, CONCAT(p.apellido_paterno, ' ', IFNULL(p.apellido_materno, '')) AS profesor_apellidos,
-                p.correo AS profesor_correo, p.num_empleado AS profesor_num_empleado,
-                a.id AS alumno_encargado_id, a.nombres AS alumno_nombres, CONCAT(a.apellido_paterno, ' ', IFNULL(a.apellido_materno, '')) AS alumno_apellidos,
-                a.correo AS alumno_correo, a.boleta AS alumno_boleta,
+                p.id AS profesor_encargado_id, 
+                CAST(AES_DECRYPT(p.nombres, ?) AS CHAR) AS profesor_nombres, 
+                CONCAT(CAST(AES_DECRYPT(p.apellido_paterno, ?) AS CHAR), ' ', IFNULL(CAST(AES_DECRYPT(p.apellido_materno, ?) AS CHAR), '')) AS profesor_apellidos,
+                p.correo AS profesor_correo, 
+                CAST(AES_DECRYPT(p.num_empleado, ?) AS CHAR) AS profesor_num_empleado,
+                a.id AS alumno_encargado_id, 
+                CAST(AES_DECRYPT(a.nombres, ?) AS CHAR) AS alumno_nombres, 
+                CONCAT(CAST(AES_DECRYPT(a.apellido_paterno, ?) AS CHAR), ' ', IFNULL(CAST(AES_DECRYPT(a.apellido_materno, ?) AS CHAR), '')) AS alumno_apellidos,
+                a.correo AS alumno_correo, 
+                CAST(AES_DECRYPT(a.boleta, ?) AS CHAR) AS alumno_boleta
                 i.estatus AS inscripcion_estatus, i.fecha_inscripcion, i.rol_en_club AS mi_rol_interno,
                 (SELECT COUNT(*) FROM inscripciones WHERE club_id = c.id AND estatus = 'activo' AND rol_en_club != 'encargado_profesor') AS aceptados_count
             FROM clubes c
@@ -420,7 +412,7 @@ router.get('/user/:idUsuario', verificarToken, requireVerificado, async (req, re
             LEFT JOIN usuarios p ON ip.usuario_id = p.id
             LEFT JOIN inscripciones ia ON c.id = ia.club_id AND ia.rol_en_club = 'encargado_alumno' AND ia.estatus = 'activo'
             LEFT JOIN usuarios a ON ia.usuario_id = a.id
-        `, [idUsuario]);
+        `, [AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, idUsuario]);
 
         const clubesTratados = filas.map(club => ({
             ...club,
@@ -432,9 +424,6 @@ router.get('/user/:idUsuario', verificarToken, requireVerificado, async (req, re
     } catch (error) { res.status(500).json({ message: "Error" }); }
 });
 
-// ==========================================
-// --- AUDITORÍA DE HISTORIAL DE ENCARGADOS ---
-// ==========================================
 router.get('/:id/historial-encargados', verificarToken, requireVerificado, async (req, res) => {
     if (req.user.rol !== 1) {
         return res.status(403).json({ message: "Acceso exclusivo para administradores" });
@@ -443,13 +432,13 @@ router.get('/:id/historial-encargados', verificarToken, requireVerificado, async
     try {
         const [historial] = await db.query(`
             SELECT h.id, h.rol_desempenado AS rol_en_club, h.fecha_inicio, h.fecha_fin,
-                   CONCAT(u.nombres, ' ', u.apellido_paterno) AS nombre_completo,
-                   u.correo, u.num_empleado, u.boleta
+                   CONCAT(CAST(AES_DECRYPT(u.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR)) AS nombre_completo,
+                   u.correo, CAST(AES_DECRYPT(u.num_empleado, ?) AS CHAR) AS num_empleado, CAST(AES_DECRYPT(u.boleta, ?) AS CHAR) AS boleta
             FROM historial_encargados h
             JOIN usuarios u ON h.usuario_id = u.id
             WHERE h.club_id = ?
             ORDER BY h.fecha_fin DESC
-        `, [req.params.id]);
+        `, [AES_KEY, AES_KEY, AES_KEY, req.params.id]);
 
         res.status(200).json(historial);
     } catch (error) {
@@ -458,10 +447,6 @@ router.get('/:id/historial-encargados', verificarToken, requireVerificado, async
     }
 });
 
-
-// ==========================================
-// --- CREACIÓN, EDICIÓN Y ACCIONES DE ADMIN ---
-// ==========================================
 router.post('/', verificarToken, requireVerificado, async (req, res) => {
     const { nombre, descripcion, objetivo, cronograma, detalle_actividades, espacios_tiempos, impacto, profesor_encargado_id, alumno_encargado_id, lista_estudiantes } = req.body;
     const estatus = 'esperando_firmas';
@@ -621,13 +606,14 @@ router.post('/unirse', verificarToken, requireVerificado, async (req, res) => {
 router.get('/:id/miembros', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR]), async (req, res) => {
     try {
         const [miembros] = await db.query(`
-            SELECT u.id, u.nombres, CONCAT(u.apellido_paterno, ' ', IFNULL(u.apellido_materno, '')) AS apellidos,
-                   u.boleta, i.rol_en_club, i.estatus
+            SELECT u.id, CAST(AES_DECRYPT(u.nombres, ?) AS CHAR) AS nombres, 
+                   CONCAT(CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR), ' ', IFNULL(CAST(AES_DECRYPT(u.apellido_materno, ?) AS CHAR), '')) AS apellidos,
+                   CAST(AES_DECRYPT(u.boleta, ?) AS CHAR) AS boleta, i.rol_en_club, i.estatus
             FROM inscripciones i
             JOIN usuarios u ON i.usuario_id = u.id
             WHERE i.club_id = ? AND i.rol_en_club != 'encargado_profesor'
-            ORDER BY i.estatus DESC, u.nombres ASC
-        `, [req.params.id]);
+            ORDER BY i.estatus DESC, CAST(AES_DECRYPT(u.nombres, ?) AS CHAR) ASC
+        `, [AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, req.params.id]);
 
         res.status(200).json(miembros);
     } catch (error) {
@@ -666,11 +652,18 @@ router.get('/:idClub/miembros/:idUsuario/emergencia', verificarToken, requireVer
         }
 
         const [filasUsuario] = await db.query(`
-            SELECT id, nombres, CONCAT(apellido_paterno, ' ', IFNULL(apellido_materno, '')) AS apellidos,
-                   boleta, num_empleado, correo, nss, tipo_sangre, condiciones_preexistentes
+            SELECT id, 
+                   CAST(AES_DECRYPT(nombres, ?) AS CHAR) AS nombres, 
+                   CONCAT(CAST(AES_DECRYPT(apellido_paterno, ?) AS CHAR), ' ', IFNULL(CAST(AES_DECRYPT(apellido_materno, ?) AS CHAR), '')) AS apellidos,
+                   CAST(AES_DECRYPT(boleta, ?) AS CHAR) AS boleta, 
+                   CAST(AES_DECRYPT(num_empleado, ?) AS CHAR) AS num_empleado, 
+                   correo, 
+                   CAST(AES_DECRYPT(nss, ?) AS CHAR) AS nss, 
+                   tipo_sangre, 
+                   CAST(AES_DECRYPT(condiciones_preexistentes, ?) AS CHAR) AS condiciones_preexistentes
             FROM usuarios
             WHERE id = ?
-        `, [idUsuario]);
+        `, [AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, idUsuario]);
 
         if (filasUsuario.length === 0) {
             return res.status(404).json({ message: "Usuario no encontrado." });
@@ -679,11 +672,14 @@ router.get('/:idClub/miembros/:idUsuario/emergencia', verificarToken, requireVer
         const usuario = filasUsuario[0];
 
         const [contactos] = await db.query(`
-            SELECT id, nombre, telefono, parentesco
+            SELECT id, 
+                   CAST(AES_DECRYPT(nombre, ?) AS CHAR) AS nombre, 
+                   CAST(AES_DECRYPT(telefono, ?) AS CHAR) AS telefono, 
+                   CAST(AES_DECRYPT(parentesco, ?) AS CHAR) AS parentesco
             FROM contactos_emergencia
             WHERE usuario_id = ?
             ORDER BY id ASC
-        `, [idUsuario]);
+        `, [AES_KEY, AES_KEY, AES_KEY, idUsuario]);
 
         res.status(200).json({
             usuario_id: usuario.id,
@@ -769,11 +765,14 @@ router.get('/:idClub/emergencias', verificarToken, requireVerificado, checkRole(
 
         const memberIds = miembros.map(m => m.usuario_id);
         const [contactos] = await db.query(`
-            SELECT id, usuario_id, nombre, telefono, parentesco
+            SELECT id, usuario_id, 
+                   CAST(AES_DECRYPT(nombre, ?) AS CHAR) AS nombre, 
+                   CAST(AES_DECRYPT(telefono, ?) AS CHAR) AS telefono, 
+                   CAST(AES_DECRYPT(parentesco, ?) AS CHAR) AS parentesco
             FROM contactos_emergencia
             WHERE usuario_id IN (?)
             ORDER BY id ASC
-        `, [memberIds]);
+        `, [AES_KEY, AES_KEY, AES_KEY, memberIds]);
 
 
         const contactosMap = {};
