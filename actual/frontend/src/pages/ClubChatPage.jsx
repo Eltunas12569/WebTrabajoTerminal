@@ -55,8 +55,16 @@ const ClubChatPage = () => {
                     const response = await api.get('/clubes');
                     foundClub = response.data.find(c => String(c.id) === String(clubId));
                 } else {
-                    const response = await api.get(`/clubes/user/${user.id}`);
-                    foundClub = response.data.find(c => String(c.id) === String(clubId));
+                    try {
+                        const response = await api.get(`/clubes/user/${user.id}`);
+                        foundClub = (response.data || []).find(c => String(c.id) === String(clubId));
+                    } catch (err) {
+                        const response = await api.get('/clubes');
+                        const c = (response.data || []).find(c => String(c.id) === String(clubId));
+                        if (c && (Number(c.profesor_encargado_id) === Number(user.id) || Number(c.alumno_encargado_id) === Number(user.id))) {
+                            foundClub = { ...c, inscripcion_estatus: 'activo' };
+                        }
+                    }
                 }
                 
                 if (!foundClub) {

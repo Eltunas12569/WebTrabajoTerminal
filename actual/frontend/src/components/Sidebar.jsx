@@ -50,8 +50,19 @@ const Sidebar = ({
                     );
                     setEsEncargado(tieneCargo);
                 })
-                .catch(err => {
-                    console.warn("Sidebar: No se pudo verificar rol de encargado:", err);
+                .catch(async (err) => {
+                    console.warn("Sidebar: No se pudo verificar rol de encargado directamente:", err);
+                    try {
+                        const fallbackRes = await api.get('/clubes');
+                        const clubs = fallbackRes.data || [];
+                        const tieneCargo = clubs.some(c =>
+                            Number(c.profesor_encargado_id) === Number(user.id) ||
+                            Number(c.alumno_encargado_id) === Number(user.id)
+                        );
+                        setEsEncargado(tieneCargo);
+                    } catch (e) {
+                        // Silencioso
+                    }
                 });
         }
     }, [user, propEsEncargado]);
