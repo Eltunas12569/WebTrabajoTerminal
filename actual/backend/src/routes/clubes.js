@@ -643,19 +643,49 @@ router.post('/unirse', verificarToken, requireVerificado, async (req, res) => {
 });
 
 
-router.get('/:id/miembros', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR]), async (req, res) => {
+router.get('/:id/miembros', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR, ROLES.ALUMNO_REPRESENTANTE, ROLES.ALUMNO]), async (req, res) => {
     try {
+        const clubId = req.params.id;
         const [miembros] = await db.query(`
-            SELECT u.id, CAST(AES_DECRYPT(u.nombres, ?) AS CHAR) AS nombres, 
-                   CONCAT(CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR), ' ', IFNULL(CAST(AES_DECRYPT(u.apellido_materno, ?) AS CHAR), '')) AS apellidos,
-                   CAST(AES_DECRYPT(u.boleta, ?) AS CHAR) AS boleta, i.rol_en_club, i.estatus
+            SELECT 
+                u.id, 
+                CAST(AES_DECRYPT(u.nombres, ?) AS CHAR CHARACTER SET utf8mb4) AS nombres, 
+                CONCAT(
+                    IFNULL(CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR CHARACTER SET utf8mb4), ''), 
+                    ' ', 
+                    IFNULL(CAST(AES_DECRYPT(u.apellido_materno, ?) AS CHAR CHARACTER SET utf8mb4), '')
+                ) AS apellidos,
+                CAST(AES_DECRYPT(u.boleta, ?) AS CHAR CHARACTER SET utf8mb4) AS boleta, 
+                u.correo,
+                i.rol_en_club, 
+                i.estatus
             FROM inscripciones i
             JOIN usuarios u ON i.usuario_id = u.id
             WHERE i.club_id = ? AND i.rol_en_club != 'encargado_profesor'
-            ORDER BY i.estatus DESC, CAST(AES_DECRYPT(u.nombres, ?) AS CHAR) ASC
-        `, [AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, req.params.id]);
+            ORDER BY 
+                CASE WHEN i.rol_en_club = 'encargado_alumno' THEN 0 ELSE 1 END,
+                i.estatus DESC, 
+                CAST(AES_DECRYPT(u.nombres, ?) AS CHAR CHARACTER SET utf8mb4) ASC
+        `, [AES_KEY, AES_KEY, AES_KEY, AES_KEY, clubId, AES_KEY]);
 
-        res.status(200).json(miembros);
+        const convertir = (val) => {
+            if (!val) return '';
+            if (typeof val === 'string') return val;
+            if (Buffer.isBuffer(val)) return val.toString('utf8');
+            return String(val);
+        };
+
+        const miembrosFormateados = miembros.map(m => ({
+            id: m.id,
+            nombres: convertir(m.nombres),
+            apellidos: convertir(m.apellidos).trim(),
+            boleta: convertir(m.boleta),
+            correo: m.correo ? String(m.correo) : '',
+            rol_en_club: m.rol_en_club || 'miembro',
+            estatus: String(m.estatus || 'pendiente').toLowerCase()
+        }));
+
+        res.status(200).json(miembrosFormateados);
     } catch (error) {
         console.error("Error al obtener firmas:", error);
         res.status(500).json({ message: "Error al cargar la lista de firmas" });

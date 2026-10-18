@@ -8,6 +8,16 @@ import AccionesAlumno from '../components/AccionesAlumno';
 import CalendarioEventos from '../components/CalendarioEventos';
 import Sidebar from '../components/Sidebar';
 
+const getAvatarColor = (name) => {
+    const colors = [
+        '#800020', '#003366', '#1E8449', '#D4AC0D',
+        '#7D3C98', '#A04000', '#2E4053', '#117864'
+    ];
+    const text = name || "U";
+    const index = text.charCodeAt(0) % colors.length;
+    return colors[index];
+};
+
 const GestionDashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -32,6 +42,8 @@ const GestionDashboard = () => {
     const [selectedClubName, setSelectedClubName] = useState('');
     const [selectedClub, setSelectedClub] = useState(null);
     const [sendingReview, setSendingReview] = useState(false);
+    const [memberSearchTerm, setMemberSearchTerm] = useState('');
+    const [memberFilterStatus, setMemberFilterStatus] = useState('todos');
     
     const [allActiveClubs, setAllActiveClubs] = useState([]);
     const [loadingAllClubs, setLoadingAllClubs] = useState(false);
@@ -321,45 +333,107 @@ const GestionDashboard = () => {
         setLoadingMembers(true);
         setSelectedClubName(club.nombre);
         setSelectedClub(club);
+        setMemberSearchTerm('');
+        setMemberFilterStatus('todos');
         try {
-            let members = [];
-            try {
-                const resEmergencias = await api.get(`/clubes/${club.id}/emergencias`);
-                const lista = resEmergencias.data?.miembros;
-                if (Array.isArray(lista) && lista.length > 0) {
-                    members = lista.map(m => ({
-                        id: m.usuario_id || m.id,
-                        nombres: m.nombre_completo || m.nombres || '',
-                        apellidos: m.apellidos || '',
-                        nombre_completo: m.nombre_completo || `${m.nombres || ''} ${m.apellidos || ''}`.trim(),
-                        boleta: m.boleta || m.num_empleado || '—',
-                        num_empleado: m.num_empleado || '',
-                        rol_en_club: m.rol_en_club || 'miembro',
-                        estatus: m.estatus_inscripcion || m.estatus || 'activo'
-                    }));
-                }
-            } catch (e) {
-                // Continuar al endpoint regular si no tiene acceso
-            }
-
-            if (members.length === 0) {
-                const response = await api.get(`/clubes/${club.id}/miembros`);
-                members = response.data || [];
-            }
+            const response = await api.get(`/clubes/${club.id}/miembros`);
+            const rawList = Array.isArray(response.data) ? response.data : [];
+            const members = rawList.map(m => {
+                const parseVal = (v) => {
+                    if (!v) return '';
+                    if (typeof v === 'string') return v;
+                    if (v.type === 'Buffer' && Array.isArray(v.data)) {
+                        return String.fromCharCode.apply(null, v.data);
+                    }
+                    return String(v);
+                };
+                const nombres = parseVal(m.nombres);
+                const apellidos = parseVal(m.apellidos).trim();
+                const nombreCompleto = `${nombres} ${apellidos}`.trim() || 'Sin nombre registrado';
+                const boleta = parseVal(m.boleta) || '—';
+                const estatusNormalizado = String(m.estatus || '').trim().toLowerCase();
+                return {
+                    id: m.id,
+                    nombres,
+                    apellidos,
+                    nombre_completo: nombreCompleto,
+                    boleta,
+                    correo: m.correo ? String(m.correo) : '',
+                    rol_en_club: m.rol_en_club || 'miembro',
+                    estatus: estatusNormalizado === 'activo' ? 'activo' : 'pendiente'
+                };
+            });
             setClubMembers(members);
         } catch (error) {
             console.error("Error al cargar firmas:", error);
+            alert("No se pudo cargar la lista de firmas de este club.");
         } finally {
             setLoadingMembers(false);
         }
     };
 
+    const handleCloseMembersModal = () => {
+        setShowMembersModal(false);
+        setSelectedClub(null);
+        setClubMembers([]);
+        setMemberSearchTerm('');
+        setMemberFilterStatus('todos');
+        if (location.state?.openSignaturesClubId) {
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    };
+
+    // Efecto para abrir automáticamente el modal de firmas si se redirige desde la creación de un club
+    useEffect(() => {
+        if (location.state?.openSignaturesClubId) {
+            const targetClubId = location.state.openSignaturesClubId;
+            const clubFound = userClubs.find(c => Number(c.id) === Number(targetClubId));
+            if (clubFound) {
+                openMembersModal(clubFound);
+                navigate(location.pathname, { replace: true, state: {} });
+            } else if (!loadingClubs) {
+                api.get('/clubes').then(res => {
+                    const found = (res.data || []).find(c => Number(c.id) === Number(targetClubId));
+                    if (found) {
+                        openMembersModal(found);
+                    }
+                }).catch(err => console.error("Error al buscar club recién creado:", err))
+                  .finally(() => {
+                    navigate(location.pathname, { replace: true, state: {} });
+                  });
+            }
+        }
+    }, [location.state?.openSignaturesClubId, userClubs, loadingClubs]);
+
+    const MIN_FIRMAS = 20;
+    const firmadosCount = clubMembers.filter(m => m.estatus === 'activo').length;
+    const pendientesCount = clubMembers.filter(m => m.estatus === 'pendiente').length;
+    const porcentajeProgreso = Math.min(100, Math.round((firmadosCount / MIN_FIRMAS) * 100));
+    const metaCumplida = firmadosCount >= MIN_FIRMAS;
+
+    const filteredClubMembers = clubMembers.filter(m => {
+        if (memberFilterStatus === 'firmados' && m.estatus !== 'activo') return false;
+        if (memberFilterStatus === 'pendientes' && m.estatus !== 'pendiente') return false;
+        if (memberSearchTerm.trim()) {
+            const term = memberSearchTerm.toLowerCase();
+            const fullName = (m.nombre_completo || '').toLowerCase();
+            const boleta = String(m.boleta || '').toLowerCase();
+            const email = (m.correo || '').toLowerCase();
+            return fullName.includes(term) || boleta.includes(term) || email.includes(term);
+        }
+        return true;
+    });
+
     const handleEnviarRevision = async () => {
         if (!selectedClub) return;
+        if (firmadosCount < MIN_FIRMAS) {
+            alert(`Aún faltan confirmaciones. Se requieren al menos ${MIN_FIRMAS} firmas de estudiantes y actualmente hay ${firmadosCount}.`);
+            return;
+        }
         setSendingReview(true);
         try {
             const response = await api.put(`/clubes/${selectedClub.id}/enviar-revision`, {});
-            alert(response.data.message);
+            alert(response.data.message || "¡Club enviado a revisión institucional exitosamente!");
             setShowMembersModal(false);
             fetchUserClubs();
         } catch (error) {
@@ -713,9 +787,9 @@ const GestionDashboard = () => {
                                                                 📋 Panel y Detalles
                                                             </button>
 
-                                                            {club.mi_rol_interno === 'encargado_profesor' && club.estatus === 'esperando_firmas' && (
+                                                            {club.estatus === 'esperando_firmas' && (club.mi_rol_interno === 'encargado_profesor' || club.mi_rol_interno === 'encargado_alumno' || user?.role_id === 1) && (
                                                                 <button 
-                                                                    type="button"
+                                                                    type="button" 
                                                                     className="btn-club-action signatures"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
@@ -750,110 +824,238 @@ const GestionDashboard = () => {
 
             {/* Modal de Detalles y Firmas del Club */}
             {showMembersModal && (
-                <div className="club-details-overlay" onClick={() => setShowMembersModal(false)}>
+                <div 
+                    className="club-details-overlay" 
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            handleCloseMembersModal();
+                        }
+                    }}
+                >
                     <div
-                        className="club-details-modal"
+                        className="club-details-modal signatures-modal-dialog"
                         onClick={e => e.stopPropagation()}
-                        style={{ maxWidth: '820px', width: '92%', maxHeight: '90vh', overflowY: 'auto', borderRadius: '16px' }}
                     >
-                        <button className="close-modal-btn" onClick={() => setShowMembersModal(false)}>✖</button>
-                        <h2 className="modal-title" style={{ marginBottom: '4px' }}>{selectedClubName}</h2>
-                        <p style={{ textAlign: 'center', color: '#64748b', marginTop: 0, marginBottom: '22px', fontSize: '0.92rem' }}>
-                            Control de Firmas de Conformidad e Integrantes Registrados
-                        </p>
+                        <button 
+                            type="button" 
+                            className="sig-modal-close-btn" 
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleCloseMembersModal();
+                            }}
+                            title="Cerrar ventana"
+                            aria-label="Cerrar ventana"
+                        >
+                            ✕
+                        </button>
+                        
+                        <div className="sig-modal-header">
+                            <div className="sig-modal-header-top">
+                                <span className="sig-modal-badge">
+                                    {selectedClub?.estatus === 'esperando_firmas' ? '⏳ Esperando Firmas' : (selectedClub?.estatus || 'Expediente')}
+                                </span>
+                                {selectedClub?.codigo_union && (
+                                    <span className="sig-modal-code">Código: {selectedClub.codigo_union}</span>
+                                )}
+                            </div>
+                            <h2 className="sig-modal-title">{selectedClubName}</h2>
+                            <p className="sig-modal-subtitle">
+                                Control de Firmas de Conformidad e Integrantes Registrados
+                            </p>
+                        </div>
                         
                         {loadingMembers ? (
-                            <p style={{ textAlign: 'center', padding: '30px' }}>Cargando lista de alumnos...</p>
+                            <div className="sig-loading-state">
+                                <div className="sig-spinner"></div>
+                                <p>Cargando lista de firmas de los alumnos...</p>
+                            </div>
                         ) : (
-                            <div>
-                                {/* Resumen en 3 tarjetas */}
+                            <div className="sig-modal-body">
+                                {/* Banner explicativo de estado */}
+                                {selectedClub?.estatus === 'esperando_firmas' && (
+                                    <div className={`sig-status-notice ${metaCumplida ? 'ready' : 'waiting'}`}>
+                                        <div className="sig-notice-icon">{metaCumplida ? '🎉' : 'ℹ️'}</div>
+                                        <div className="sig-notice-content">
+                                            <strong>{metaCumplida ? '¡Requisito de firmas alcanzado!' : 'Expediente en recopilación de firmas'}</strong>
+                                            <p>
+                                                {metaCumplida
+                                                    ? `Se han recolectado ${firmadosCount} firmas de alumnos (mínimo requerido: ${MIN_FIRMAS}). Ya puedes enviar el club a revisión del comité institucional.`
+                                                    : `Se requiere que al menos ${MIN_FIRMAS} estudiantes confirmen y firmen su participación para validar el club. Faltan ${MIN_FIRMAS - firmadosCount} firmas para habilitar el envío.`}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Resumen en 3 tarjetas métricas */}
                                 <div className="signatures-summary-grid">
                                     <div className="sig-metric-box">
                                         <span className="sig-metric-val">{clubMembers.length}</span>
                                         <span className="sig-metric-label">Total en Lista</span>
                                     </div>
-                                    <div className="sig-metric-box">
+                                    <div className="sig-metric-box success">
                                         <span className="sig-metric-val" style={{ color: '#16a34a' }}>
-                                            {clubMembers.filter(m => m.estatus === 'activo').length}
+                                            {firmadosCount} / {MIN_FIRMAS}
                                         </span>
                                         <span className="sig-metric-label">Firmados ✓</span>
                                     </div>
-                                    <div className="sig-metric-box">
+                                    <div className="sig-metric-box warning">
                                         <span className="sig-metric-val" style={{ color: '#d97706' }}>
-                                            {clubMembers.filter(m => m.estatus === 'pendiente').length}
+                                            {pendientesCount}
                                         </span>
                                         <span className="sig-metric-label">Pendientes ⏳</span>
                                     </div>
                                 </div>
 
-                                <div style={{ overflowX: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
+                                {/* Barra de progreso de firmas */}
+                                <div className="sig-progress-container">
+                                    <div className="sig-progress-header">
+                                        <span className="sig-progress-title">Avance hacia la meta de firmas requeridas</span>
+                                        <span className={`sig-progress-percent ${metaCumplida ? 'complete' : ''}`}>
+                                            {porcentajeProgreso}% ({firmadosCount} de {MIN_FIRMAS})
+                                        </span>
+                                    </div>
+                                    <div className="sig-progress-track">
+                                        <div 
+                                            className={`sig-progress-fill ${metaCumplida ? 'complete' : ''}`}
+                                            style={{ width: `${porcentajeProgreso}%` }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Barra de búsqueda y filtros rápidos */}
+                                <div className="sig-toolbar">
+                                    <div className="sig-search-box">
+                                        <span className="sig-search-icon">🔍</span>
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar alumno por nombre o boleta..."
+                                            value={memberSearchTerm}
+                                            onChange={(e) => setMemberSearchTerm(e.target.value)}
+                                        />
+                                        {memberSearchTerm && (
+                                            <button 
+                                                type="button" 
+                                                className="sig-search-clear" 
+                                                onClick={() => setMemberSearchTerm('')}
+                                            >
+                                                ×
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="sig-filters">
+                                        <button
+                                            type="button"
+                                            className={`sig-filter-btn ${memberFilterStatus === 'todos' ? 'active' : ''}`}
+                                            onClick={() => setMemberFilterStatus('todos')}
+                                        >
+                                            Todos ({clubMembers.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`sig-filter-btn ${memberFilterStatus === 'firmados' ? 'active' : ''}`}
+                                            onClick={() => setMemberFilterStatus('firmados')}
+                                        >
+                                            Firmados ({firmadosCount})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`sig-filter-btn ${memberFilterStatus === 'pendientes' ? 'active' : ''}`}
+                                            onClick={() => setMemberFilterStatus('pendientes')}
+                                        >
+                                            Pendientes ({pendientesCount})
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Tabla de Miembros y Firmas */}
+                                <div className="sig-table-wrapper">
+                                    <table className="sig-table">
                                         <thead>
-                                            <tr style={{ backgroundColor: '#003366', color: '#fff', textAlign: 'left' }}>
-                                                <th style={{ padding: '12px 16px', borderTopLeftRadius: '8px' }}>Integrante</th>
-                                                <th style={{ padding: '12px 16px' }}>Identificador</th>
-                                                <th style={{ padding: '12px 16px' }}>Rol</th>
-                                                <th style={{ padding: '12px 16px', borderTopRightRadius: '8px' }}>Firma</th>
+                                            <tr>
+                                                <th style={{ width: '40px' }}>#</th>
+                                                <th>Estudiante</th>
+                                                <th>Boleta</th>
+                                                <th>Rol en Club</th>
+                                                <th style={{ textAlign: 'center' }}>Firma</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {clubMembers.map((miembro, idx) => (
-                                                <tr key={miembro.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
-                                                    <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1e293b' }}>
-                                                        {miembro.nombre_completo || `${miembro.nombres || ''} ${miembro.apellidos || ''}`.trim() || 'Sin nombre'}
+                                            {filteredClubMembers.map((miembro, idx) => (
+                                                <tr key={miembro.id}>
+                                                    <td className="sig-td-idx">{idx + 1}</td>
+                                                    <td className="sig-td-student">
+                                                        <div className="sig-student-cell">
+                                                            <div 
+                                                                className="sig-avatar"
+                                                                style={{ backgroundColor: getAvatarColor(miembro.nombres) }}
+                                                            >
+                                                                {(miembro.nombres || 'A').charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div className="sig-student-names">
+                                                                <span className="sig-name">{miembro.nombre_completo}</span>
+                                                                {miembro.correo && (
+                                                                    <span className="sig-email">{miembro.correo}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </td>
-                                                    <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
-                                                        {miembro.boleta || miembro.num_empleado || '—'}
+                                                    <td className="sig-td-boleta">
+                                                        <span className="sig-boleta-chip">{miembro.boleta}</span>
                                                     </td>
-                                                    <td style={{ padding: '12px 16px' }}>
-                                                        <span className={`role-badge-chip ${miembro.rol_en_club === 'encargado_alumno' ? 'lider' : miembro.rol_en_club === 'encargado_profesor' ? 'profesor' : 'miembro'}`}>
-                                                            {miembro.rol_en_club === 'encargado_alumno' ? '🎓 Líder' : miembro.rol_en_club === 'encargado_profesor' ? '👨‍🏫 Profesor' : 'Miembro'}
+                                                    <td className="sig-td-rol">
+                                                        <span className={`role-badge-chip ${miembro.rol_en_club === 'encargado_alumno' ? 'lider' : 'miembro'}`}>
+                                                            {miembro.rol_en_club === 'encargado_alumno' ? '⭐ Alumno Representante' : '👤 Integrante'}
                                                         </span>
                                                     </td>
-                                                    <td style={{ padding: '12px 16px' }}>
+                                                    <td className="sig-td-status" style={{ textAlign: 'center' }}>
                                                         {miembro.estatus === 'activo' ? (
-                                                            <span style={{ color: '#15803d', backgroundColor: '#dcfce7', padding: '4px 10px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: '700' }}>
+                                                            <span className="sig-status-badge signed">
                                                                 ✓ Firmado
                                                             </span>
                                                         ) : (
-                                                            <span style={{ color: '#b45309', backgroundColor: '#fef3c7', padding: '4px 10px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: '700' }}>
-                                                                ⏳ Pendiente
+                                                            <span className="sig-status-badge pending">
+                                                                ⏳ Pendiente de firma
                                                             </span>
                                                         )}
                                                     </td>
                                                 </tr>
                                             ))}
-                                            {clubMembers.length === 0 && (
+                                            {filteredClubMembers.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="4" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
-                                                        No hay miembros inscritos.
+                                                    <td colSpan="5" className="sig-empty-row">
+                                                        No se encontraron integrantes con el criterio seleccionado.
                                                     </td>
                                                 </tr>
                                             )}
                                         </tbody>
                                     </table>
+                                </div>
+
+                                {/* Pie del Modal con Acciones */}
+                                <div className="sig-modal-footer">
+                                    <button
+                                        type="button"
+                                        className="btn-cancelar-club"
+                                        onClick={handleCloseMembersModal}
+                                    >
+                                        Cerrar
+                                    </button>
 
                                     {selectedClub?.estatus === 'esperando_firmas' && (
-                                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
-                                            <button 
-                                                onClick={handleEnviarRevision}
-                                                disabled={sendingReview}
-                                                style={{ 
-                                                    padding: '12px 28px',
-                                                    backgroundColor: '#16a34a',
-                                                    color: 'white', 
-                                                    border: 'none',
-                                                    borderRadius: '10px',
-                                                    fontWeight: '700', 
-                                                    cursor: sendingReview ? 'not-allowed' : 'pointer',
-                                                    fontSize: '0.96rem',
-                                                    boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
-                                                    transition: 'all 0.2s ease'
-                                                }}
-                                            >
-                                                {sendingReview ? 'Enviando...' : '🚀 Enviar Club a Revisión Institucional'}
-                                            </button>
-                                        </div>
+                                        <button 
+                                            type="button"
+                                            onClick={handleEnviarRevision}
+                                            disabled={sendingReview || !metaCumplida}
+                                            className={`btn-enviar-revision ${metaCumplida ? 'ready' : 'locked'}`}
+                                            title={metaCumplida ? 'Enviar club para validación de la administración' : `Faltan ${MIN_FIRMAS - firmadosCount} firmas para habilitar el envío`}
+                                        >
+                                            {sendingReview 
+                                                ? 'Enviando...' 
+                                                : metaCumplida
+                                                    ? '🚀 Enviar Club a Revisión Institucional' 
+                                                    : `🔒 Enviar a Revisión (Faltan ${MIN_FIRMAS - firmadosCount} firmas)`}
+                                        </button>
                                     )}
                                 </div>
                             </div>

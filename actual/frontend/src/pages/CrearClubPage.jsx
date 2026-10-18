@@ -255,6 +255,7 @@ const CrearClubPage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [createdClubSuccess, setCreatedClubSuccess] = useState(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const navigate = useNavigate();
@@ -418,6 +419,12 @@ const CrearClubPage = () => {
                 estatus: 'esperando_firmas',
                 archivo_lista_estudiantes: 'pendiente.pdf'
             });
+            const newClubId = response.data?.clubId;
+            setCreatedClubSuccess({
+                id: newClubId,
+                nombre: nombre,
+                totalMiembros: alumnosArray.length
+            });
             setSuccess('Club creado exitosamente: ' + response.data.message);
             setNombre('');
             setDescripcion('');
@@ -500,9 +507,29 @@ const CrearClubPage = () => {
                             </div>
                         )}
                         {success && (
-                            <div className="message-banner success">
-                                <span>✅</span>
-                                <span>{success}</span>
+                            <div className="message-banner success" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>✅</span>
+                                    <span>{success}</span>
+                                </div>
+                                {createdClubSuccess && (
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate('/gestion', { state: { openSignaturesClubId: createdClubSuccess.id } })}
+                                        style={{
+                                            padding: '6px 14px',
+                                            backgroundColor: '#15803d',
+                                            color: '#fff',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            fontWeight: '700',
+                                            cursor: 'pointer',
+                                            fontSize: '0.85rem'
+                                        }}
+                                    >
+                                        ✍️ Ver Firmas del Club
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -796,6 +823,84 @@ const CrearClubPage = () => {
                     </div>
                 </main>
             </div>
+
+            {/* Modal de Confirmación y Acceso a Firmas tras Registro */}
+            {createdClubSuccess && (
+                <div className="club-details-overlay" onClick={() => setCreatedClubSuccess(null)}>
+                    <div 
+                        className="club-details-modal" 
+                        onClick={e => e.stopPropagation()} 
+                        style={{ maxWidth: '560px', width: '92%', textAlign: 'center', padding: '36px 28px', borderRadius: '18px' }}
+                    >
+                        <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🎉</div>
+                        <h2 style={{ color: '#003366', fontSize: '1.5rem', fontWeight: '800', marginBottom: '8px' }}>
+                            ¡Club Registrado Exitosamente!
+                        </h2>
+                        <p style={{ color: '#475569', fontSize: '0.98rem', lineHeight: '1.5', marginBottom: '20px' }}>
+                            El club <strong>"{createdClubSuccess.nombre}"</strong> ha sido creado y su estado actual es <strong>Esperando Firmas</strong> con <strong>{createdClubSuccess.totalMiembros}</strong> estudiantes integrantes registrados.
+                        </p>
+                        
+                        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px', marginBottom: '24px', textAlign: 'left', fontSize: '0.9rem', color: '#166534', lineHeight: '1.45' }}>
+                            <div style={{ fontWeight: '700', marginBottom: '4px' }}>📋 Próximo paso:</div>
+                            Los {createdClubSuccess.totalMiembros} estudiantes deben ingresar al sistema con su cuenta para firmar su conformidad. En cuanto se cuente con al menos <strong>20 firmas</strong>, el expediente se podrá enviar a revisión institucional.
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/gestion', { state: { openSignaturesClubId: createdClubSuccess.id } })}
+                                style={{
+                                    padding: '12px 20px',
+                                    backgroundColor: '#800020',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '10px',
+                                    fontWeight: '700',
+                                    fontSize: '0.98rem',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(128, 0, 32, 0.25)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px'
+                                }}
+                            >
+                                ✍️ Ver Control de Firmas de Este Club
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/gestion')}
+                                style={{
+                                    padding: '10px 20px',
+                                    backgroundColor: '#f1f5f9',
+                                    color: '#334155',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '10px',
+                                    fontWeight: '600',
+                                    fontSize: '0.92rem',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                📋 Ir a Mi Panel de Gestión
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setCreatedClubSuccess(null)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#64748b',
+                                    fontSize: '0.88rem',
+                                    cursor: 'pointer',
+                                    padding: '6px'
+                                }}
+                            >
+                                ➕ Registrar otro club
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
