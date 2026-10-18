@@ -65,10 +65,11 @@ const seedMasivo = async () => {
         let alumnoIds = [];
         let resumenClubes = [];
 
-        // ADMIN (Sin encriptar porque no tiene datos sensibles reales)
+        // ADMIN (Ahora sí encriptado para que las consultas genéricas funcionen)
         await db.query(
             `INSERT INTO usuarios (id, nombres, apellido_paterno, apellido_materno, correo, password, role_id, verificado, acepta_privacidad, version_aviso_privacidad, fecha_aceptacion_privacidad) 
-               VALUES (1, 'Administración', 'ESCOM', 'IPN', 'admin@ipn.mx', ?, 1, 1, 1, '1.0', NOW())`, [hash]
+               VALUES (1, AES_ENCRYPT('Administración', ?), AES_ENCRYPT('ESCOM', ?), AES_ENCRYPT('IPN', ?), 'admin@ipn.mx', ?, 1, 1, 1, '1.0', NOW())`,
+            [AES_KEY, AES_KEY, AES_KEY, hash]
         );
 
         // 30 PROFESORES ENCRIPTADOS
