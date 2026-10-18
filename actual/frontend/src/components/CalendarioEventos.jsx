@@ -15,7 +15,8 @@ const CalendarioEventos = ({
     onAsistencia = null,
     clubes = [],
     cargando = false,
-    onRefresh = null
+    onRefresh = null,
+    onEliminarEvento = null
 }) => {
     const { user } = useAuth();
     // Roles permitidos para confirmar asistencia: Alumnos (2, 4) y Profesores (3)
@@ -27,11 +28,39 @@ const CalendarioEventos = ({
     const [diaSeleccionado, setDiaSeleccionado] = useState(null);
     const [filtroClub, setFiltroClub] = useState('todos');
     const [guardandoAsistencia, setGuardandoAsistencia] = useState(false);
+    const [eliminandoEvento, setEliminandoEvento] = useState(false);
 
     // Estados para ver lista de asistentes cuando el usuario es encargado
     const [mostrarAsistentes, setMostrarAsistentes] = useState(false);
     const [listaAsistentes, setListaAsistentes] = useState([]);
     const [cargandoAsistentes, setCargandoAsistentes] = useState(false);
+
+    const handleEliminarEventoSeleccionado = async () => {
+        if (!eventoSeleccionado) return;
+        if (onEliminarEvento) {
+            await onEliminarEvento(eventoSeleccionado);
+            setEventoSeleccionado(null);
+            return;
+        }
+        const confirmacion = window.confirm(
+            `¿Estás seguro de que deseas eliminar el evento "${eventoSeleccionado.titulo}"? Esta acción cancelará el evento y eliminará las asistencias registradas permanentemente.`
+        );
+        if (!confirmacion) return;
+
+        setEliminandoEvento(true);
+        try {
+            await api.delete(`/avisos/gestion-admin/eventos/${eventoSeleccionado.id}`);
+            setEventoSeleccionado(null);
+            if (typeof onRefresh === 'function') {
+                onRefresh();
+            }
+        } catch (err) {
+            console.error("Error al eliminar evento:", err);
+            alert(err.response?.data?.message || err.response?.data?.mensaje || err.message || 'No se pudo eliminar el evento.');
+        } finally {
+            setEliminandoEvento(false);
+        }
+    };
 
     const meses = [
         'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -952,8 +981,40 @@ const CalendarioEventos = ({
                             </div>
                         )}
 
-                        {/* Botón Cerrar Inferior */}
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                        {/* Botón Cerrar Inferior y Acciones de Administrador */}
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: (modo === 'admin' || Number(user?.role_id) === 1) ? 'space-between' : 'flex-end',
+                            alignItems: 'center',
+                            marginTop: '12px',
+                            borderTop: '1px solid #e2e8f0',
+                            paddingTop: '12px',
+                            flexWrap: 'wrap',
+                            gap: '8px'
+                        }}>
+                            {(modo === 'admin' || Number(user?.role_id) === 1) && (
+                                <button
+                                    type="button"
+                                    onClick={handleEliminarEventoSeleccionado}
+                                    disabled={eliminandoEvento}
+                                    style={{
+                                        background: '#fce8e6',
+                                        color: '#b42318',
+                                        border: '1px solid #fecaca',
+                                        borderRadius: '8px',
+                                        padding: '8px 16px',
+                                        fontWeight: 'bold',
+                                        cursor: eliminandoEvento ? 'wait' : 'pointer',
+                                        fontSize: '0.88rem',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    {eliminandoEvento ? '⏳ Eliminando...' : '🗑️ Eliminar Evento'}
+                                </button>
+                            )}
                             <button
                                 onClick={() => setEventoSeleccionado(null)}
                                 style={{

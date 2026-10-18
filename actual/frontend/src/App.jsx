@@ -28,6 +28,7 @@ import AdminAuditoriaPage from './pages/AdminAuditoriaPage';
 import CanalesChatPage from './pages/CanalesChatPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import ModalAceptacionPoliticas from './components/ModalAceptacionPoliticas';
+import ErrorBoundary from './components/ErrorBoundary';
 
 /**
  * Componente modal global para bloquear la interfaz si las políticas legales están desactualizadas.
@@ -56,8 +57,9 @@ function App() {
     <AuthProvider>
       <GlobalPoliticasModal />
       <Router>
-        <Routes>
-          {/* --- RUTAS PÚBLICAS --- */}
+        <ErrorBoundary>
+          <Routes>
+            {/* --- RUTAS PÚBLICAS --- */}
           <Route path="/" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/recuperar-password" element={<RecuperarPasswordPage />} />
@@ -220,6 +222,7 @@ function App() {
           {/* Manejo de errores 404 */}
           <Route path="*" element={<div style={{ padding: '20px' }}><h1>404 - Página no encontrada</h1></div>} />
         </Routes>
+        </ErrorBoundary>
       </Router>
     </AuthProvider>
   );

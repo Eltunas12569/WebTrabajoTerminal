@@ -20,6 +20,8 @@ const AdminCalendarioPage = () => {
     const [eventos, setEventos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [eliminandoId, setEliminandoId] = useState(null);
 
     // Estado de la vista activa: 'calendario' o 'todos'
     const [vistaActiva, setVistaActiva] = useState('calendario');
@@ -30,6 +32,33 @@ const AdminCalendarioPage = () => {
     const [filtroTiempo, setFiltroTiempo] = useState('todos'); // 'todos', 'proximos', 'pasados', 'este_mes'
     const [orden, setOrden] = useState('proximos_primero'); // 'proximos_primero', 'recientes', 'antiguos', 'asistentes'
     const [eventoDetalle, setEventoDetalle] = useState(null);
+
+    const handleEliminarEvento = async (evento) => {
+        if (!evento || !evento.id) return;
+        const confirmacion = window.confirm(
+            `¿Estás seguro de que deseas eliminar el evento "${evento.titulo}"? Esta acción cancelará el evento y eliminará las asistencias registradas permanentemente.`
+        );
+        if (!confirmacion) return;
+
+        setEliminandoId(evento.id);
+        setError('');
+        setSuccess('');
+        try {
+            await api.delete(`/avisos/gestion-admin/eventos/${evento.id}`);
+            setEventos(prev => prev.filter(ev => ev.id !== evento.id));
+            if (eventoDetalle && eventoDetalle.id === evento.id) {
+                setEventoDetalle(null);
+            }
+            setSuccess(`El evento "${evento.titulo}" fue eliminado correctamente.`);
+            setTimeout(() => setSuccess(''), 4500);
+        } catch (err) {
+            console.error("Error al eliminar evento:", err);
+            const msg = err.response?.data?.message || err.response?.data?.mensaje || err.message || 'No se pudo eliminar el evento.';
+            setError(msg);
+        } finally {
+            setEliminandoId(null);
+        }
+    };
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -281,6 +310,20 @@ const AdminCalendarioPage = () => {
                             </div>
                         )}
 
+                        {success && (
+                            <div className="message-banner success" style={{
+                                marginBottom: '16px',
+                                backgroundColor: '#e6f4ea',
+                                color: '#1b7a43',
+                                padding: '12px 16px',
+                                borderRadius: '8px',
+                                border: '1px solid #a8dab5',
+                                fontWeight: '600'
+                            }}>
+                                ✓ {success}
+                            </div>
+                        )}
+
                         {/* VISTA 1: CALENDARIO INTERACTIVO */}
                         {vistaActiva === 'calendario' && (
                             <CalendarioEventos
@@ -289,6 +332,7 @@ const AdminCalendarioPage = () => {
                                 clubes={clubes}
                                 cargando={loading}
                                 onRefresh={fetchAllData}
+                                onEliminarEvento={handleEliminarEvento}
                             />
                         )}
 
@@ -560,13 +604,40 @@ const AdminCalendarioPage = () => {
                                                     </div>
 
                                                     {/* Pie de la tarjeta: Asistentes y botón */}
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '8px', flexWrap: 'wrap', gap: '8px' }}>
                                                         <span style={{ fontSize: '0.84rem', color: '#334155', fontWeight: '600' }}>
                                                             👥 {ev.total_asistentes || 0} confirmados
                                                         </span>
-                                                        <span style={{ fontSize: '0.84rem', color: '#1877f2', fontWeight: 'bold' }}>
-                                                            Ver detalle →
-                                                        </span>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleEliminarEvento(ev);
+                                                                }}
+                                                                disabled={eliminandoId === ev.id}
+                                                                title="Eliminar evento institucional"
+                                                                style={{
+                                                                    padding: '5px 10px',
+                                                                    border: 'none',
+                                                                    borderRadius: '6px',
+                                                                    background: '#fce8e6',
+                                                                    color: '#b42318',
+                                                                    cursor: eliminandoId === ev.id ? 'wait' : 'pointer',
+                                                                    fontWeight: '700',
+                                                                    fontSize: '0.82rem',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px',
+                                                                    transition: 'all 0.15s ease'
+                                                                }}
+                                                            >
+                                                                {eliminandoId === ev.id ? '⏳ Eliminando...' : '🗑️ Eliminar'}
+                                                            </button>
+                                                            <span style={{ fontSize: '0.84rem', color: '#1877f2', fontWeight: 'bold' }}>
+                                                                Ver detalle →
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );
@@ -694,7 +765,28 @@ const AdminCalendarioPage = () => {
                             </div>
                         )}
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px', borderTop: '1px solid #e2e8f0', paddingTop: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                            <button
+                                type="button"
+                                onClick={() => handleEliminarEvento(eventoDetalle)}
+                                disabled={eliminandoId === eventoDetalle.id}
+                                style={{
+                                    background: '#fce8e6',
+                                    color: '#b42318',
+                                    border: '1px solid #fecaca',
+                                    borderRadius: '8px',
+                                    padding: '8px 16px',
+                                    fontWeight: 'bold',
+                                    cursor: eliminandoId === eventoDetalle.id ? 'wait' : 'pointer',
+                                    fontSize: '0.9rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.15s ease'
+                                }}
+                            >
+                                {eliminandoId === eventoDetalle.id ? '⏳ Eliminando...' : '🗑️ Eliminar Evento'}
+                            </button>
                             <button
                                 onClick={() => setEventoDetalle(null)}
                                 style={{

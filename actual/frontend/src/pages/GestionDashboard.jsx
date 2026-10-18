@@ -322,8 +322,31 @@ const GestionDashboard = () => {
         setSelectedClubName(club.nombre);
         setSelectedClub(club);
         try {
-            const response = await api.get(`/clubes/${club.id}/miembros`);
-            setClubMembers(response.data);
+            let members = [];
+            try {
+                const resEmergencias = await api.get(`/clubes/${club.id}/emergencias`);
+                const lista = resEmergencias.data?.miembros;
+                if (Array.isArray(lista) && lista.length > 0) {
+                    members = lista.map(m => ({
+                        id: m.usuario_id || m.id,
+                        nombres: m.nombre_completo || m.nombres || '',
+                        apellidos: m.apellidos || '',
+                        nombre_completo: m.nombre_completo || `${m.nombres || ''} ${m.apellidos || ''}`.trim(),
+                        boleta: m.boleta || m.num_empleado || '—',
+                        num_empleado: m.num_empleado || '',
+                        rol_en_club: m.rol_en_club || 'miembro',
+                        estatus: m.estatus_inscripcion || m.estatus || 'activo'
+                    }));
+                }
+            } catch (e) {
+                // Continuar al endpoint regular si no tiene acceso
+            }
+
+            if (members.length === 0) {
+                const response = await api.get(`/clubes/${club.id}/miembros`);
+                members = response.data || [];
+            }
+            setClubMembers(members);
         } catch (error) {
             console.error("Error al cargar firmas:", error);
         } finally {
@@ -777,7 +800,7 @@ const GestionDashboard = () => {
                                             {clubMembers.map((miembro, idx) => (
                                                 <tr key={miembro.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
                                                     <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1e293b' }}>
-                                                        {miembro.nombres} {miembro.apellidos}
+                                                        {miembro.nombre_completo || `${miembro.nombres || ''} ${miembro.apellidos || ''}`.trim() || 'Sin nombre'}
                                                     </td>
                                                     <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
                                                         {miembro.boleta || miembro.num_empleado || '—'}

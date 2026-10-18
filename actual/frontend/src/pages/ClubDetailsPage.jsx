@@ -97,6 +97,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     const [loadingAsistentes, setLoadingAsistentes] = useState(false);
     const [errorAsistentes, setErrorAsistentes] = useState('');
     const [busquedaAsistente, setBusquedaAsistente] = useState('');
+    const [eliminandoEventoId, setEliminandoEventoId] = useState(null);
 
     // Roles y permisos
     const esAdmin = Number(user?.role_id) === 1 || Number(user?.rol) === 1;
@@ -129,7 +130,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             setLoading(true);
             try {
                 let miRegistro = null;
-                if (user?.id) {
+                if (user?.id && !esAdmin) {
                     try {
                         const userClubsRes = await api.get(`/clubes/user/${user.id}`);
                         miRegistro = (userClubsRes.data || []).find(uc => String(uc.id) === String(id));
@@ -211,17 +212,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         setSearchParams({ tab: tabId }, { replace: true });
     };
 
-    // Pre-cargar avisos y eventos para miembros (y miembros solo si tiene permiso)
-    useEffect(() => {
-        if (!club || !id || !isMember) return;
-        fetchAvisos();
-        fetchEventos();
-        if (canViewMiembros) {
-            fetchMiembros();
-        }
-    }, [club, id, isMember, canViewMiembros]);
-
-    // Recargar datos cuando se navega a pestañas específicas
+    // Carga de datos bajo demanda según la pestaña activa (evita peticiones innecesarias en 'detalles')
     useEffect(() => {
         if (!club || !id || !isMember) return;
 
@@ -235,7 +226,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             fetchAvisos();
             fetchEventos();
         }
-    }, [activeTab]);
+    }, [activeTab, club, id, isMember, canViewMiembros, canManage]);
 
     const fetchAvisos = async () => {
         setLoadingAvisos(true);
@@ -264,8 +255,33 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     const fetchMiembros = async () => {
         setLoadingMiembros(true);
         try {
-            const res = await api.get(`/clubes/${id}/miembros`);
-            setMiembros(res.data || []);
+            let listaMiembros = [];
+            // Intentar a través de /emergencias que provee el padrón completo sin el bug de SQL del backend
+            try {
+                const resEmergencias = await api.get(`/clubes/${id}/emergencias`);
+                const lista = resEmergencias.data?.miembros;
+                if (Array.isArray(lista) && lista.length > 0) {
+                    listaMiembros = lista.map(m => ({
+                        id: m.usuario_id || m.id,
+                        nombres: typeof m.nombre_completo === 'string' ? m.nombre_completo : (typeof m.nombres === 'string' ? m.nombres : 'Usuario'),
+                        apellidos: typeof m.apellidos === 'string' ? m.apellidos : '',
+                        nombre_completo: typeof m.nombre_completo === 'string' ? m.nombre_completo : 'Usuario',
+                        boleta: typeof m.boleta === 'string' ? m.boleta : (typeof m.num_empleado === 'string' ? m.num_empleado : ''),
+                        num_empleado: typeof m.num_empleado === 'string' ? m.num_empleado : '',
+                        correo: typeof m.correo === 'string' ? m.correo : '',
+                        rol_en_club: typeof m.rol_en_club === 'string' ? m.rol_en_club : 'miembro',
+                        estatus: typeof (m.estatus_inscripcion || m.estatus) === 'string' ? (m.estatus_inscripcion || m.estatus) : 'activo'
+                    }));
+                }
+            } catch (e) {
+                // Fallback si no tiene acceso a emergencias
+            }
+
+            if (listaMiembros.length === 0) {
+                const res = await api.get(`/clubes/${id}/miembros`);
+                listaMiembros = res.data || [];
+            }
+            setMiembros(listaMiembros);
         } catch (err) {
             console.error(err);
         } finally {
@@ -475,6 +491,33 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         }
     };
 
+    const handleEliminarEventoAdmin = async (evento) => {
+        if (!evento || !evento.id) return;
+        const confirmacion = window.confirm(
+            `¿Estás seguro de que deseas eliminar el evento "${evento.titulo}"? Esta acción cancelará el evento y eliminará los registros de asistencia asociados permanentemente.`
+        );
+        if (!confirmacion) return;
+
+        setEliminandoEventoId(evento.id);
+        setError('');
+        setSuccess('');
+        try {
+            await api.delete(`/avisos/gestion-admin/eventos/${evento.id}`);
+            setEventos(prev => prev.filter(e => e.id !== evento.id));
+            if (eventoAsistentesModal && eventoAsistentesModal.id === evento.id) {
+                setEventoAsistentesModal(null);
+            }
+            setSuccess(`El evento "${evento.titulo}" fue eliminado correctamente.`);
+            setTimeout(() => setSuccess(''), 4500);
+        } catch (err) {
+            console.error("Error al eliminar evento:", err);
+            const msg = err.response?.data?.message || err.response?.data?.mensaje || err.message || 'No se pudo eliminar el evento.';
+            setError(msg);
+        } finally {
+            setEliminandoEventoId(null);
+        }
+    };
+
     // Ficha Médica de Emergencia (Encargados)
     const handleVerEmergencia = async (miembro) => {
         if (!canManage) return;
@@ -639,9 +682,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
     // Filtrado de miembros en vivo
     const filteredMiembros = miembros.filter(m => {
-        const nombreCompleto = `${m.nombres || ''} ${m.apellidos || ''}`.toLowerCase();
+        const nombreCompleto = (m.nombre_completo || `${m.nombres || ''} ${m.apellidos || ''}`).toLowerCase();
         const correo = (m.correo || '').toLowerCase();
-        const boleta = (m.boleta || '').toLowerCase();
+        const boleta = (m.boleta || m.num_empleado || '').toLowerCase();
         const term = searchMember.toLowerCase().trim();
 
         const matchBusqueda = !term || nombreCompleto.includes(term) || correo.includes(term) || boleta.includes(term);
@@ -1590,27 +1633,53 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                             👥 <strong>Confirmados:</strong> {evento.total_asistentes || 0} integrantes
                                                                         </div>
 
-                                                                        {canManage && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => handleVerAsistentesEvento(evento)}
-                                                                                style={{
-                                                                                    backgroundColor: '#eff6ff',
-                                                                                    color: '#003366',
-                                                                                    border: '1px solid #bfdbfe',
-                                                                                    borderRadius: '7px',
-                                                                                    padding: '5px 11px',
-                                                                                    fontSize: '0.8rem',
-                                                                                    fontWeight: '700',
-                                                                                    cursor: 'pointer',
-                                                                                    display: 'inline-flex',
-                                                                                    alignItems: 'center',
-                                                                                    gap: '5px'
-                                                                                }}
-                                                                            >
-                                                                                📋 Ver lista de asistentes
-                                                                            </button>
-                                                                        )}
+                                                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                                            {canManage && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleVerAsistentesEvento(evento)}
+                                                                                    style={{
+                                                                                        backgroundColor: '#eff6ff',
+                                                                                        color: '#003366',
+                                                                                        border: '1px solid #bfdbfe',
+                                                                                        borderRadius: '7px',
+                                                                                        padding: '5px 11px',
+                                                                                        fontSize: '0.8rem',
+                                                                                        fontWeight: '700',
+                                                                                        cursor: 'pointer',
+                                                                                        display: 'inline-flex',
+                                                                                        alignItems: 'center',
+                                                                                        gap: '5px'
+                                                                                    }}
+                                                                                >
+                                                                                    📋 Ver lista de asistentes
+                                                                                </button>
+                                                                            )}
+                                                                            {esAdmin && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleEliminarEventoAdmin(evento)}
+                                                                                    disabled={eliminandoEventoId === evento.id}
+                                                                                    title="Eliminar evento institucional (Administrador)"
+                                                                                    style={{
+                                                                                        backgroundColor: '#fce8e6',
+                                                                                        color: '#b42318',
+                                                                                        border: '1px solid #fecaca',
+                                                                                        borderRadius: '7px',
+                                                                                        padding: '5px 11px',
+                                                                                        fontSize: '0.8rem',
+                                                                                        fontWeight: '700',
+                                                                                        cursor: eliminandoEventoId === evento.id ? 'wait' : 'pointer',
+                                                                                        display: 'inline-flex',
+                                                                                        alignItems: 'center',
+                                                                                        gap: '4px',
+                                                                                        transition: 'all 0.15s ease'
+                                                                                    }}
+                                                                                >
+                                                                                    {eliminandoEventoId === evento.id ? '⏳ Eliminando...' : '🗑️ Eliminar'}
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
 
                                                                     {esAlumnoOProfesor && (
@@ -3170,8 +3239,36 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                             borderTop: '1px solid #e2e8f0',
                             backgroundColor: '#f8fafc',
                             display: 'flex',
-                            justifyContent: 'flex-end'
+                            justifyContent: esAdmin ? 'space-between' : 'flex-end',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '8px'
                         }}>
+                            {esAdmin && (
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        await handleEliminarEventoAdmin(eventoAsistentesModal);
+                                    }}
+                                    disabled={eliminandoEventoId === eventoAsistentesModal.id}
+                                    style={{
+                                        padding: '8px 16px',
+                                        backgroundColor: '#fce8e6',
+                                        color: '#b42318',
+                                        border: '1px solid #fecaca',
+                                        borderRadius: '8px',
+                                        fontWeight: '700',
+                                        fontSize: '0.88rem',
+                                        cursor: eliminandoEventoId === eventoAsistentesModal.id ? 'wait' : 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    {eliminandoEventoId === eventoAsistentesModal.id ? '⏳ Eliminando...' : '🗑️ Eliminar Evento'}
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={() => setEventoAsistentesModal(null)}

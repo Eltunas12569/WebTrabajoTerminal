@@ -117,7 +117,7 @@ const ClubEmergenciasPage = () => {
     // Listas específicas para modales de KPIs
     const miembrosConAlergias = useMemo(() => {
         return miembros.filter(m => {
-            const al = typeof m.alergias === 'string' ? m.alergias.trim() : (m.alergias ? String(m.alergias).trim() : '');
+            const al = typeof m.alergias === 'string' ? m.alergias.trim() : '';
             return al.length > 0 && al.toLowerCase() !== 'ninguna';
         });
     }, [miembros]);
@@ -132,14 +132,15 @@ const ClubEmergenciasPage = () => {
     // Filtrado interactivo
     const miembrosFiltrados = useMemo(() => {
         return miembros.filter(m => {
+            const alStr = typeof m.alergias === 'string' ? m.alergias.trim() : '';
+
             // Filtro por texto de búsqueda
             if (busqueda.trim()) {
                 const query = busqueda.toLowerCase().trim();
-                const alStr = typeof m.alergias === 'string' ? m.alergias : (m.alergias ? String(m.alergias) : '');
-                const coincideNombre = (m.nombre_completo || '').toLowerCase().includes(query);
-                const coincideBoleta = (m.boleta || '').toLowerCase().includes(query);
-                const coincideEmpleado = (m.num_empleado || '').toLowerCase().includes(query);
-                const coincideTelefono = (m.telefono || '').toLowerCase().includes(query);
+                const coincideNombre = (typeof m.nombre_completo === 'string' ? m.nombre_completo : '').toLowerCase().includes(query);
+                const coincideBoleta = (typeof m.boleta === 'string' ? m.boleta : '').toLowerCase().includes(query);
+                const coincideEmpleado = (typeof m.num_empleado === 'string' ? m.num_empleado : '').toLowerCase().includes(query);
+                const coincideTelefono = (typeof m.telefono === 'string' ? m.telefono : '').toLowerCase().includes(query);
                 const coincideAlergias = alStr.toLowerCase().includes(query);
                 const coincideContacto = m.contactos?.some(c => 
                     (c.nombre || '').toLowerCase().includes(query) || 
@@ -154,14 +155,14 @@ const ClubEmergenciasPage = () => {
 
             // Filtro por tipo de sangre
             if (filtroSangre !== 'todos') {
-                if ((m.tipo_sangre || '').trim().toUpperCase() !== filtroSangre.toUpperCase()) return false;
+                if ((typeof m.tipo_sangre === 'string' ? m.tipo_sangre : '').trim().toUpperCase() !== filtroSangre.toUpperCase()) return false;
             }
 
             // Filtro por alergias / condiciones
             if (filtroAlergias === 'con_alergias') {
-                if (!m.alergias || !m.alergias.trim() || m.alergias.trim().toLowerCase() === 'ninguna') return false;
+                if (!alStr || alStr.toLowerCase() === 'ninguna') return false;
             } else if (filtroAlergias === 'sin_alergias') {
-                if (m.alergias && m.alergias.trim() && m.alergias.trim().toLowerCase() !== 'ninguna') return false;
+                if (alStr && alStr.toLowerCase() !== 'ninguna') return false;
             }
 
             // Filtro por rol en club

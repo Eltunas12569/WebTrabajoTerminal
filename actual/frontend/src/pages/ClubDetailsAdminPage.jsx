@@ -3,6 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import './css/Dashboards.css';
 
+// Función para sanitizar cualquier valor antes de renderizarlo en React
+// Previene que objetos Buffer de MySQL u objetos no válidos rompan el renderizado
+const toSafeString = (val, defaultVal = '') => {
+    if (val === null || val === undefined) return defaultVal;
+    if (typeof val === 'string') return val;
+    if (typeof val === 'number') return String(val);
+    if (typeof val === 'object') {
+        // En caso de recibir objetos Buffer { type: 'Buffer', data: [...] } u otros
+        return defaultVal;
+    }
+    return String(val);
+};
+
 // Componente de búsqueda desplegable estilizado para escritorio
 const SearchableSelect = ({ options, value, onChange, placeholder }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -10,22 +23,24 @@ const SearchableSelect = ({ options, value, onChange, placeholder }) => {
 
     const formatOptionLabel = (item) => {
         if (!item) return '';
-        const extra = item.boleta
-            ? ` (Boleta: ${item.boleta})`
-            : item.num_empleado
-                ? ` (Núm. Empleado: ${item.num_empleado})`
+        const boleta = toSafeString(item.boleta);
+        const numEmp = toSafeString(item.num_empleado);
+        const extra = boleta
+            ? ` (Boleta: ${boleta})`
+            : numEmp
+                ? ` (Núm. Empleado: ${numEmp})`
                 : '';
-        return `${item.nombres || ''} ${item.apellidos || ''}${extra}`.trim();
+        return `${toSafeString(item.nombres)} ${toSafeString(item.apellidos)}${extra}`.trim();
     };
 
     useEffect(() => {
-        const selected = options.find(o => o.id == value);
+        const selected = (options || []).find(o => String(o.id) === String(value));
         if (selected) setSearchTerm(formatOptionLabel(selected));
         else if (!isOpen) setSearchTerm('');
     }, [value, options, isOpen]);
 
-    const filteredOptions = options.filter(op =>
-        `${op.nombres || ''} ${op.apellidos || ''} ${op.boleta || ''} ${op.num_empleado || ''}`
+    const filteredOptions = (options || []).filter(op =>
+        `${toSafeString(op.nombres)} ${toSafeString(op.apellidos)} ${toSafeString(op.boleta)} ${toSafeString(op.num_empleado)}`
             .toLowerCase()
             .includes(searchTerm.toLowerCase())
     );
@@ -107,8 +122,13 @@ const ClubDetailsAdminPage = () => {
     const [club, setClub] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
-    const [editData, setEditData] = useState({ nombre: '', descripcion: '', profesor_encargado_id: '', alumno_encargado_id: '' });
-    
+    const [editData, setEditData] = useState({
+        nombre: '',
+        descripcion: '',
+        profesor_encargado_id: '',
+        alumno_encargado_id: ''
+    });
+
     const [profesores, setProfesores] = useState([]);
     const [alumnos, setAlumnos] = useState([]);
     const [saving, setSaving] = useState(false);
@@ -117,72 +137,116 @@ const ClubDetailsAdminPage = () => {
     const [rejectMotivo, setRejectMotivo] = useState('');
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [actionError, setActionError] = useState('');
-    const [historialEncargados, setHistorialEncargados] = useState([]);
     const [miembros, setMiembros] = useState([]);
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
+            setActionError('');
             try {
-                // Adaptación: Carga resiliente de profesores que consulta /users/professors o recurre a /users/all-for-admin
-                const fetchProfesoresSeguro = async () => {
-                    try {
-                        const res = await Promise.race([
-                            api.get('/users/professors'),
-                            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
-                        ]);
-                        if (Array.isArray(res.data) && res.data.length > 0) return res.data;
-                    } catch (e) {
-                        // Fallback a /users/all-for-admin si /users/professors no responde
-                    }
-                    try {
-                        const allUsers = await api.get('/users/all-for-admin');
-                        return (allUsers.data || [])
-                            .filter(u => Number(u.role_id) === 3)
-                            .map(u => ({
-                                id: u.id,
-                                nombres: u.nombres,
-                                apellidos: `${u.apellido_paterno} ${u.apellido_materno || ''}`.trim()
-                            }));
-                    } catch (e) {
-                        return [];
-                    }
-                };
-
-                // Cargar datos de clubes, profesores, alumnos, historial y miembros al mismo tiempo
-                const [clubesRes, profList, alumRes, histRes, miembrosRes] = await Promise.all([
+                // Consultamos en paralelo los 3 recursos requeridos (rápido y sin endpoints bloqueantes)
+                const [clubesRes, emergenciasRes, allUsersRes] = await Promise.all([
                     api.get('/clubes'),
-                    fetchProfesoresSeguro(),
-                    api.get('/users/students-in-charge').catch(() => ({ data: [] })),
-                    api.get(`/clubes/${id}/historial-encargados`).catch(() => ({ data: [] })),
-                    api.get(`/clubes/${id}/miembros`).catch(() => ({ data: [] }))
+                    api.get(`/clubes/${id}/emergencias`).catch(() => ({ data: {} })),
+                    api.get('/users/all-for-admin').catch(() => ({ data: [] }))
                 ]);
 
-                const clubEncontrado = clubesRes.data.find((clubItem) => String(clubItem.id) === String(id));
+                const clubEncontrado = (clubesRes.data || []).find((clubItem) => String(clubItem.id) === String(id));
                 if (!clubEncontrado) {
-                    throw new Error('Club no encontrado');
+                    throw new Error('Club no encontrado en el sistema.');
                 }
 
                 setClub(clubEncontrado);
                 setEditData({
-                    nombre: clubEncontrado.nombre || '',
-                    descripcion: clubEncontrado.descripcion || '',
+                    nombre: toSafeString(clubEncontrado.nombre),
+                    descripcion: toSafeString(clubEncontrado.descripcion),
                     profesor_encargado_id: clubEncontrado.profesor_encargado_id || '',
                     alumno_encargado_id: clubEncontrado.alumno_encargado_id || ''
                 });
-                setProfesores(profList || []);
-                setAlumnos(alumRes.data || []);
-                setHistorialEncargados(histRes.data || []);
-                setMiembros(miembrosRes.data || []);
+
+                // Mapa de usuarios desencriptados con catálogo de profesores y alumnos
+                const rawUsers = Array.isArray(allUsersRes.data) ? allUsersRes.data : [];
+                const usersMap = new Map();
+                const listaProfesores = [];
+                const listaAlumnos = [];
+
+                for (const u of rawUsers) {
+                    const uId = Number(u.id);
+                    usersMap.set(uId, u);
+
+                    const itemSelect = {
+                        id: uId,
+                        nombres: toSafeString(u.nombres),
+                        apellidos: `${toSafeString(u.apellido_paterno)} ${toSafeString(u.apellido_materno)}`.trim(),
+                        boleta: toSafeString(u.boleta),
+                        num_empleado: toSafeString(u.num_empleado)
+                    };
+
+                    if (Number(u.role_id) === 3) {
+                        listaProfesores.push(itemSelect);
+                    } else if (Number(u.role_id) === 2 || Number(u.role_id) === 4) {
+                        listaAlumnos.push(itemSelect);
+                    }
+                }
+
+                setProfesores(listaProfesores);
+                setAlumnos(listaAlumnos);
+
+                // Obtención y resolución limpia de miembros del club
+                let rawMiembros = emergenciasRes.data?.miembros;
+                if (!Array.isArray(rawMiembros) || rawMiembros.length === 0) {
+                    try {
+                        const mRes = await api.get(`/clubes/${id}/miembros`);
+                        rawMiembros = mRes.data || [];
+                    } catch (e) {
+                        rawMiembros = [];
+                    }
+                }
+
+                const miembrosTratados = (rawMiembros || []).map(m => {
+                    const mId = Number(m.usuario_id || m.id);
+                    const userPerfil = usersMap.get(mId);
+
+                    let nombreCompleto = '';
+                    if (userPerfil) {
+                        nombreCompleto = `${toSafeString(userPerfil.nombres)} ${toSafeString(userPerfil.apellido_paterno)} ${toSafeString(userPerfil.apellido_materno)}`.trim();
+                    } else if (typeof m.nombre_completo === 'string' && m.nombre_completo.trim().length > 0) {
+                        nombreCompleto = m.nombre_completo.trim();
+                    } else {
+                        nombreCompleto = `Usuario ${mId}`;
+                    }
+
+                    const boleta = toSafeString(userPerfil?.boleta || m.boleta);
+                    const numEmp = toSafeString(userPerfil?.num_empleado || m.num_empleado);
+                    const identificador = boleta || numEmp || '—';
+
+                    return {
+                        id: mId,
+                        nombre_completo: nombreCompleto,
+                        boleta: boleta,
+                        num_empleado: numEmp,
+                        identificador: identificador,
+                        correo: toSafeString(userPerfil?.correo || m.correo),
+                        rol_en_club: toSafeString(m.rol_en_club, 'miembro'),
+                        estatus: toSafeString(m.estatus_inscripcion || m.estatus, 'activo')
+                    };
+                });
+
+                setMiembros(miembrosTratados);
             } catch (error) {
-                console.error('Error al cargar datos:', error);
-                setActionError(error.response?.data?.message || error.message || 'No se pudo conectar con el servidor. ¿Reiniciaste el backend?');
+                console.error('Error al cargar datos del club:', error);
+                setActionError(error.response?.data?.message || error.message || 'No se pudo conectar con el servidor.');
             } finally {
                 setLoading(false);
             }
         };
+
         fetchData();
     }, [id]);
+
+    const handleIniciarEdicion = () => {
+        setIsEditing(true);
+    };
 
     const handleSaveChanges = async () => {
         setSaving(true);
@@ -276,8 +340,36 @@ const ClubDetailsAdminPage = () => {
         }
     };
 
-    if (loading) return <div style={{ textAlign: 'center', padding: '50px', fontSize: '1.2rem' }}>Cargando información del club...</div>;
-    if (!club) return <div style={{ textAlign: 'center', padding: '50px', color: 'red' }}>{actionError}</div>;
+    if (loading) {
+        return (
+            <div style={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f2f5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                <div style={{ textAlign: 'center', background: '#fff', padding: '30px 50px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>⏳</div>
+                    <div style={{ fontSize: '1.2rem', color: '#003366', fontWeight: '700' }}>Cargando información del club...</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!club) {
+        return (
+            <div style={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f2f5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                <div style={{ textAlign: 'center', background: '#fff', padding: '35px 45px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', maxWidth: '520px' }}>
+                    <div style={{ fontSize: '2.8rem', marginBottom: '10px' }}>⚠️</div>
+                    <h2 style={{ margin: '0 0 10px 0', color: '#dc3545', fontSize: '1.4rem' }}>No se pudo cargar el club</h2>
+                    <p style={{ color: '#555', margin: '0 0 24px 0', fontSize: '0.98rem' }}>
+                        {actionError || 'El club especificado no fue encontrado o ocurrió un error al consultar el servidor.'}
+                    </p>
+                    <button
+                        onClick={() => navigate('/admin')}
+                        style={{ padding: '10px 22px', background: '#003366', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '0.95rem' }}
+                    >
+                        ← Volver al Panel de Administración
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div style={{ minHeight: '100vh', width: '100vw', position: 'absolute', top: 0, left: 0, backgroundColor: '#f0f2f5', fontFamily: 'system-ui, -apple-system, sans-serif', overflowX: 'hidden' }}>
@@ -511,7 +603,7 @@ const ClubDetailsAdminPage = () => {
                                             {actionLoading === 'reactivar' ? 'Reactivando...' : '▶️ Reactivar Club'}
                                         </button>
                                     )}
-                                    <button onClick={() => setIsEditing(true)} style={{ padding: '10px 18px', background: '#e4e6eb', color: '#1c1e21', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', transition: 'background 0.2s' }}>
+                                    <button onClick={handleIniciarEdicion} style={{ padding: '10px 18px', background: '#e4e6eb', color: '#1c1e21', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', transition: 'background 0.2s' }}>
                                         ✏️ Editar Encargados
                                     </button>
                                     <button onClick={handleDeleteClub} style={{ padding: '10px 18px', background: '#fce8e6', color: '#e53935', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', transition: 'background 0.2s' }}>
@@ -605,36 +697,34 @@ const ClubDetailsAdminPage = () => {
                                     {/* Profesor */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '20px', border: '1px solid #e4e6eb', borderRadius: '8px', backgroundColor: '#fafafa' }}>
                                         <img 
-                                            src={`https://ui-avatars.com/api/?name=${club.profesor_nombres}+${club.profesor_apellidos}&background=003366&color=fff&size=120`} 
+                                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(toSafeString(club.profesor_nombres, 'Profesor'))}&background=003366&color=fff&size=120`} 
                                             alt="Profesor" 
                                             style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }}
                                         />
                                         <div>
-                                            <h4 style={{ margin: '0 0 5px 0', color: '#050505', fontSize: '1.2rem', fontWeight: '700' }}>{club.profesor_nombres} {club.profesor_apellidos}</h4>
+                                            <h4 style={{ margin: '0 0 5px 0', color: '#050505', fontSize: '1.2rem', fontWeight: '700' }}>{toSafeString(club.profesor_nombres, 'Profesor no asignado')}</h4>
                                             <p style={{ margin: '0 0 8px 0', color: '#003366', fontSize: '0.95rem', fontWeight: '600' }}>👨‍🏫 Profesor Encargado</p>
-                                            <p style={{ margin: '0 0 4px 0', color: '#444', fontSize: '0.9rem' }}>✉️ <strong>Correo:</strong> {club.profesor_correo || 'No registrado'}</p>
-                                            <p style={{ margin: 0, color: '#444', fontSize: '0.9rem' }}>💼 <strong>Núm. Empleado:</strong> {club.profesor_num_empleado || 'No registrado'}</p>
+                                            <p style={{ margin: '0 0 4px 0', color: '#444', fontSize: '0.9rem' }}>✉️ <strong>Correo:</strong> {toSafeString(club.profesor_correo, 'No registrado')}</p>
+                                            <p style={{ margin: 0, color: '#444', fontSize: '0.9rem' }}>💼 <strong>Núm. Empleado:</strong> {toSafeString(club.profesor_num_empleado, 'No registrado')}</p>
                                         </div>
                                     </div>
 
                                     {/* Alumno */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '20px', border: '1px solid #e4e6eb', borderRadius: '8px', backgroundColor: '#fafafa' }}>
                                         <img 
-                                            src={`https://ui-avatars.com/api/?name=${club.alumno_nombres}+${club.alumno_apellidos}&background=1E8449&color=fff&size=120`} 
+                                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(toSafeString(club.alumno_nombres, 'Alumno'))}&background=1E8449&color=fff&size=120`} 
                                             alt="Alumno" 
                                             style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }}
                                         />
                                         <div>
-                                            <h4 style={{ margin: '0 0 5px 0', color: '#050505', fontSize: '1.2rem', fontWeight: '700' }}>{club.alumno_nombres} {club.alumno_apellidos}</h4>
+                                            <h4 style={{ margin: '0 0 5px 0', color: '#050505', fontSize: '1.2rem', fontWeight: '700' }}>{toSafeString(club.alumno_nombres, 'Alumno no asignado')}</h4>
                                             <p style={{ margin: '0 0 8px 0', color: '#1E8449', fontSize: '0.95rem', fontWeight: '600' }}>🎓 Alumno Encargado</p>
-                                            <p style={{ margin: '0 0 4px 0', color: '#444', fontSize: '0.9rem' }}>✉️ <strong>Correo:</strong> {club.alumno_correo || 'No registrado'}</p>
-                                            <p style={{ margin: 0, color: '#444', fontSize: '0.9rem' }}>🆔 <strong>Boleta:</strong> {club.alumno_boleta || 'No registrada'}</p>
+                                            <p style={{ margin: '0 0 4px 0', color: '#444', fontSize: '0.9rem' }}>✉️ <strong>Correo:</strong> {toSafeString(club.alumno_correo, 'No registrado')}</p>
+                                            <p style={{ margin: 0, color: '#444', fontSize: '0.9rem' }}>🆔 <strong>Boleta:</strong> {toSafeString(club.alumno_boleta, 'No registrada')}</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
-                            
 
                             {/* Tarjeta Auditoría Miembros del Club */}
                             <div style={{ background: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
@@ -642,9 +732,31 @@ const ClubDetailsAdminPage = () => {
                                     <h3 style={{ margin: 0, fontSize: '1.3rem', color: '#1c1e21', fontWeight: '700' }}>
                                         👥 Miembros Inscritos en el Club
                                     </h3>
-                                    <span style={{ fontSize: '0.85rem', background: '#e7f3ff', color: '#003366', padding: '4px 12px', borderRadius: '15px', fontWeight: 'bold' }}>
-                                        Total: {miembros.length}
-                                    </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{ fontSize: '0.85rem', background: '#e7f3ff', color: '#003366', padding: '4px 12px', borderRadius: '15px', fontWeight: 'bold' }}>
+                                            Total: {miembros.length}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate(`/admin/club/${id}/emergencias`)}
+                                            style={{
+                                                fontSize: '0.82rem',
+                                                background: '#f0fdf4',
+                                                color: '#166534',
+                                                border: '1px solid #bbf7d0',
+                                                padding: '4px 12px',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                fontWeight: '600',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '5px'
+                                            }}
+                                            title="Ver fichas médicas y contactos de emergencia"
+                                        >
+                                            🩺 Fichas de Emergencia
+                                        </button>
+                                    </div>
                                 </div>
                                 {miembros.length === 0 ? (
                                     <p style={{ color: '#666', margin: 0 }}>No hay miembros inscritos actualmente en este club.</p>
@@ -654,7 +766,7 @@ const ClubDetailsAdminPage = () => {
                                             <thead>
                                                 <tr style={{ backgroundColor: '#003366', color: '#fff' }}>
                                                     <th style={{ padding: '10px', textAlign: 'left' }}>Nombre</th>
-                                                    <th style={{ padding: '10px', textAlign: 'left' }}>Boleta</th>
+                                                    <th style={{ padding: '10px', textAlign: 'left' }}>Boleta / Identificador</th>
                                                     <th style={{ padding: '10px', textAlign: 'left' }}>Rol en Club</th>
                                                     <th style={{ padding: '10px', textAlign: 'center' }}>Estatus</th>
                                                 </tr>
@@ -663,10 +775,10 @@ const ClubDetailsAdminPage = () => {
                                                 {miembros.map((m, idx) => (
                                                     <tr key={m.id || idx} style={{ borderBottom: '1px solid #eee', backgroundColor: idx % 2 === 0 ? '#fff' : '#f9f9f9' }}>
                                                         <td style={{ padding: '10px', fontWeight: '600', color: '#333' }}>
-                                                            {m.nombres} {m.apellidos}
+                                                            {toSafeString(m.nombre_completo, 'Usuario')}
                                                         </td>
                                                         <td style={{ padding: '10px', color: '#666', fontFamily: 'monospace' }}>
-                                                            {m.boleta || '—'}
+                                                            {toSafeString(m.identificador, '—')}
                                                         </td>
                                                         <td style={{ padding: '10px' }}>
                                                             <span style={{
