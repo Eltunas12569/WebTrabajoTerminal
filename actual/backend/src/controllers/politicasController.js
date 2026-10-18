@@ -241,11 +241,11 @@ const actualizarVersionPolitica = async (req, res) => {
 const obtenerHistorialYEstadisticas = async (req, res) => {
     try {
         const [versiones] = await db.query(`
-            SELECT pv.*, CONCAT(u.nombres, ' ', u.apellido_paterno) AS autor
+            SELECT pv.*, CONCAT(CAST(AES_DECRYPT(u.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR)) AS autor
             FROM politicas_versiones pv
             LEFT JOIN usuarios u ON pv.creado_por = u.id
             ORDER BY pv.id DESC
-        `);
+        `, [AES_KEY, AES_KEY]);
 
         const [politicaActiva] = await db.query(`
             SELECT version FROM politicas_versiones WHERE activo = 1 ORDER BY id DESC LIMIT 1

@@ -56,12 +56,26 @@ router.get('/:id/chat', verificarToken, requireVerificado, async (req, res) => {
     try {
         const [mensajes] = await db.query(`
             SELECT c.id, c.club_id, c.usuario_id, c.mensaje, c.fecha_envio, 
-                   CONCAT(CAST(AES_DECRYPT(u.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR)) AS autor_nombre
-            FROM chat_mensajes c JOIN usuarios u ON c.usuario_id = u.id
-            WHERE c.club_id = ? AND c.tipo_sala = 'club' ORDER BY c.fecha_envio ASC
+                   CONCAT(CAST(AES_DECRYPT(u.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(u.apellido_paterno, ?) AS CHAR)) AS autor_nombre,
+                   u.role_id AS autor_rol,
+                   (
+                       SELECT IF(i.rol_en_club = 'encargado_profesor', 'Profe Titular', 
+                              IF(i.rol_en_club = 'encargado_alumno', 'Alumno Rep.', 'Miembro'))
+                       FROM inscripciones i 
+                       WHERE i.usuario_id = c.usuario_id AND i.club_id = c.club_id 
+                       LIMIT 1
+                   ) AS etiqueta_encargado
+            FROM chat_mensajes c 
+            JOIN usuarios u ON c.usuario_id = u.id
+            WHERE c.club_id = ? AND c.tipo_sala = 'club' 
+            ORDER BY c.fecha_envio ASC
         `, [AES_KEY, AES_KEY, req.params.id]);
+
         res.status(200).json(mensajes);
-    } catch (error) { res.status(500).json({ message: "Error al cargar chat" }); }
+    } catch (error) {
+        console.error("Error al cargar chat del club:", error);
+        res.status(500).json({ message: "Error al cargar chat" });
+    }
 });
 
 router.get('/:id/avisos', verificarToken, requireVerificado, async (req, res) => {
@@ -275,8 +289,14 @@ router.get('/:id/eventos/:idEvento/asistentes', verificarToken, requireVerificad
              JOIN usuarios u ON ae.usuario_id = u.id
              LEFT JOIN inscripciones i ON i.usuario_id = u.id AND i.club_id = ?
              WHERE ae.evento_id = ? AND ae.asistira = 1
-             ORDER BY u.apellido_paterno ASC, u.nombres ASC`,
-            [AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, clubId, clubId, idEvento]
+             ORDER BY apellido_paterno ASC, nombres ASC`,
+            [
+                AES_KEY, AES_KEY, AES_KEY, // nombres, paterno, materno
+                AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, // nombre_completo (CONCAT + IF)
+                AES_KEY, // boleta
+                AES_KEY, // num_empleado
+                clubId, clubId, idEvento // IDs de los JOINs y WHERE
+            ]
         );
 
         res.status(200).json({ asistentes });
@@ -362,13 +382,11 @@ router.get('/', verificarToken, requireVerificado, async (req, res) => {
         const [filas] = await db.query(`
             SELECT c.*,
                 p.id AS profesor_encargado_id, 
-                CAST(AES_DECRYPT(p.nombres, ?) AS CHAR) AS profesor_nombres, 
-                CONCAT(CAST(AES_DECRYPT(p.apellido_paterno, ?) AS CHAR), ' ', IFNULL(CAST(AES_DECRYPT(p.apellido_materno, ?) AS CHAR), '')) AS profesor_apellidos,
+                CONCAT(CAST(AES_DECRYPT(p.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(p.apellido_paterno, ?) AS CHAR), IF(CAST(AES_DECRYPT(p.apellido_materno, ?) AS CHAR) IS NOT NULL AND CAST(AES_DECRYPT(p.apellido_materno, ?) AS CHAR) != '', CONCAT(' ', CAST(AES_DECRYPT(p.apellido_materno, ?) AS CHAR)), '')) AS profesor_nombres,
                 p.correo AS profesor_correo, 
                 CAST(AES_DECRYPT(p.num_empleado, ?) AS CHAR) AS profesor_num_empleado,
                 a.id AS alumno_encargado_id, 
-                CAST(AES_DECRYPT(a.nombres, ?) AS CHAR) AS alumno_nombres, 
-                CONCAT(CAST(AES_DECRYPT(a.apellido_paterno, ?) AS CHAR), ' ', IFNULL(CAST(AES_DECRYPT(a.apellido_materno, ?) AS CHAR), '')) AS alumno_apellidos,
+                CONCAT(CAST(AES_DECRYPT(a.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(a.apellido_paterno, ?) AS CHAR), IF(CAST(AES_DECRYPT(a.apellido_materno, ?) AS CHAR) IS NOT NULL AND CAST(AES_DECRYPT(a.apellido_materno, ?) AS CHAR) != '', CONCAT(' ', CAST(AES_DECRYPT(a.apellido_materno, ?) AS CHAR)), '')) AS alumno_nombres,
                 a.correo AS alumno_correo, 
                 CAST(AES_DECRYPT(a.boleta, ?) AS CHAR) AS alumno_boleta
             FROM clubes c
@@ -376,15 +394,23 @@ router.get('/', verificarToken, requireVerificado, async (req, res) => {
             LEFT JOIN usuarios p ON ip.usuario_id = p.id
             LEFT JOIN inscripciones ia ON c.id = ia.club_id AND ia.rol_en_club = 'encargado_alumno' AND ia.estatus = 'activo'
             LEFT JOIN usuarios a ON ia.usuario_id = a.id
-        `, [AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY]);
-        const clubesTratados = filas.map(club => ({
-            ...club,
-            cronograma: club.cronograma
-                ? (typeof club.cronograma === 'string' ? club.cronograma : JSON.stringify(club.cronograma))
-                : null
-        }));
+        `, [AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY]);
+
+        const clubesTratados = filas.map(club => {
+            return {
+                ...club,
+                profesor_nombres: club.profesor_nombres || 'Profesor',
+                profesor_apellidos: '',
+                alumno_nombres: club.alumno_nombres || 'Alumno',
+                alumno_apellidos: '',
+                cronograma: club.cronograma
+                    ? (typeof club.cronograma === 'string' ? club.cronograma : JSON.stringify(club.cronograma))
+                    : null
+            }
+        });
         res.status(200).json(clubesTratados);
     } catch (error) {
+        console.error("Error al obtener lista de clubes (GET /):", error);
         res.status(500).json({ message: "Error interno" });
     }
 });
@@ -395,15 +421,13 @@ router.get('/user/:idUsuario', verificarToken, requireVerificado, async (req, re
         const [filas] = await db.query(`
             SELECT c.*,
                 p.id AS profesor_encargado_id, 
-                CAST(AES_DECRYPT(p.nombres, ?) AS CHAR) AS profesor_nombres, 
-                CONCAT(CAST(AES_DECRYPT(p.apellido_paterno, ?) AS CHAR), ' ', IFNULL(CAST(AES_DECRYPT(p.apellido_materno, ?) AS CHAR), '')) AS profesor_apellidos,
+                CONCAT(CAST(AES_DECRYPT(p.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(p.apellido_paterno, ?) AS CHAR), IF(CAST(AES_DECRYPT(p.apellido_materno, ?) AS CHAR) IS NOT NULL AND CAST(AES_DECRYPT(p.apellido_materno, ?) AS CHAR) != '', CONCAT(' ', CAST(AES_DECRYPT(p.apellido_materno, ?) AS CHAR)), '')) AS profesor_nombres,
                 p.correo AS profesor_correo, 
                 CAST(AES_DECRYPT(p.num_empleado, ?) AS CHAR) AS profesor_num_empleado,
                 a.id AS alumno_encargado_id, 
-                CAST(AES_DECRYPT(a.nombres, ?) AS CHAR) AS alumno_nombres, 
-                CONCAT(CAST(AES_DECRYPT(a.apellido_paterno, ?) AS CHAR), ' ', IFNULL(CAST(AES_DECRYPT(a.apellido_materno, ?) AS CHAR), '')) AS alumno_apellidos,
+                CONCAT(CAST(AES_DECRYPT(a.nombres, ?) AS CHAR), ' ', CAST(AES_DECRYPT(a.apellido_paterno, ?) AS CHAR), IF(CAST(AES_DECRYPT(a.apellido_materno, ?) AS CHAR) IS NOT NULL AND CAST(AES_DECRYPT(a.apellido_materno, ?) AS CHAR) != '', CONCAT(' ', CAST(AES_DECRYPT(a.apellido_materno, ?) AS CHAR)), '')) AS alumno_nombres,
                 a.correo AS alumno_correo, 
-                CAST(AES_DECRYPT(a.boleta, ?) AS CHAR) AS alumno_boleta
+                CAST(AES_DECRYPT(a.boleta, ?) AS CHAR) AS alumno_boleta,
                 i.estatus AS inscripcion_estatus, i.fecha_inscripcion, i.rol_en_club AS mi_rol_interno,
                 (SELECT COUNT(*) FROM inscripciones WHERE club_id = c.id AND estatus = 'activo' AND rol_en_club != 'encargado_profesor') AS aceptados_count
             FROM clubes c
@@ -412,16 +436,32 @@ router.get('/user/:idUsuario', verificarToken, requireVerificado, async (req, re
             LEFT JOIN usuarios p ON ip.usuario_id = p.id
             LEFT JOIN inscripciones ia ON c.id = ia.club_id AND ia.rol_en_club = 'encargado_alumno' AND ia.estatus = 'activo'
             LEFT JOIN usuarios a ON ia.usuario_id = a.id
-        `, [AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, idUsuario]);
+        `, [
+            AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, // Profe nombres
+            AES_KEY, // Profe empleado
+            AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, // Alumno nombres
+            AES_KEY, // Alumno boleta
+            idUsuario // Parámetro WHERE
+        ]);
 
-        const clubesTratados = filas.map(club => ({
-            ...club,
-            cronograma: club.cronograma
-                ? (typeof club.cronograma === 'string' ? club.cronograma : JSON.stringify(club.cronograma))
-                : null
-        }));
+        const clubesTratados = filas.map(club => {
+            return {
+                ...club,
+                profesor_nombres: club.profesor_nombres || 'Profesor',
+                profesor_apellidos: '',
+                alumno_nombres: club.alumno_nombres || 'Alumno',
+                alumno_apellidos: '',
+                cronograma: club.cronograma
+                    ? (typeof club.cronograma === 'string' ? club.cronograma : JSON.stringify(club.cronograma))
+                    : null
+            }
+        });
+
         res.status(200).json(clubesTratados);
-    } catch (error) { res.status(500).json({ message: "Error" }); }
+    } catch (error) {
+        console.error("Error en mis clubes:", error);
+        res.status(500).json({ message: "Error al obtener mis clubes" });
+    }
 });
 
 router.get('/:id/historial-encargados', verificarToken, requireVerificado, async (req, res) => {
@@ -438,7 +478,7 @@ router.get('/:id/historial-encargados', verificarToken, requireVerificado, async
             JOIN usuarios u ON h.usuario_id = u.id
             WHERE h.club_id = ?
             ORDER BY h.fecha_fin DESC
-        `, [AES_KEY, AES_KEY, AES_KEY, req.params.id]);
+        `, [AES_KEY, AES_KEY, AES_KEY, AES_KEY, req.params.id]);
 
         res.status(200).json(historial);
     } catch (error) {
