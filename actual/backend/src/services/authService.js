@@ -2,9 +2,18 @@ const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { enviarCodigoVerificacion, enviarCorreoRecuperacion } = require('./emailService');
+const AES_KEY = process.env.AES_KEY;
 
 const iniciarSesion = async (correo, contrasena) => {
-    const [usuarios] = await db.query(`SELECT * FROM usuarios WHERE correo = ?`, [correo]);
+    const [usuarios] = await db.query(`
+        SELECT id, correo, password, role_id, verificado, bloqueado_hasta, intentos_fallidos,
+               CAST(AES_DECRYPT(nombres, ?) AS CHAR) AS nombres,
+               CAST(AES_DECRYPT(apellido_paterno, ?) AS CHAR) AS apellido_paterno,
+               CAST(AES_DECRYPT(apellido_materno, ?) AS CHAR) AS apellido_materno,
+               CAST(AES_DECRYPT(boleta, ?) AS CHAR) AS boleta,
+               CAST(AES_DECRYPT(num_empleado, ?) AS CHAR) AS num_empleado
+        FROM usuarios WHERE correo = ?
+    `, [AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, correo]);
     const usuario = usuarios[0];
 
     if (!usuario) throw new Error('El correo electrónico no está registrado');
@@ -44,7 +53,7 @@ const iniciarSesion = async (correo, contrasena) => {
             role_id: usuario.role_id,
             boleta: usuario.boleta,
             num_empleado: usuario.num_empleado,
-            verificado: usuario.verificado === 1 || usuario.verificado === true 
+            verificado: usuario.verificado === 1 || usuario.verificado === true
         }
     };
 };
@@ -96,11 +105,13 @@ const registrar = async (datosRegistro) => {
         const [resultadoUsuario] = await conexion.query(
             `INSERT INTO usuarios 
             (nombres, apellido_paterno, apellido_materno, correo, password, role_id, codigo_otp, expiracion_otp, acepta_privacidad, version_aviso_privacidad, fecha_aceptacion_privacidad, nss, boleta, carrera, num_empleado, tipo_sangre, condiciones_preexistentes) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)`, 
+            VALUES (AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), ?, ?, ?, ?, ?, ?, ?, NOW(), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), ?, AES_ENCRYPT(?, ?), ?, AES_ENCRYPT(?, ?))`,
             [
-                nombres, apellidoPaterno, apellidoMaterno, correo, hashContrasena, idRol, codigoOTP, expiracionOTP, true, versionAvisoPrivacidad, 
-                nss || null, boleta || null, carrera || null, numEmpleado || null, 
-                tipoSangre || null, condicionesPreexistentes || null 
+                nombres, AES_KEY, apellidoPaterno, AES_KEY, apellidoMaterno || null, AES_KEY,
+                correo, hashContrasena, idRol, codigoOTP, expiracionOTP, true, versionAvisoPrivacidad,
+                nss || null, AES_KEY, boleta || null, AES_KEY, carrera || null,
+                numEmpleado || null, AES_KEY, tipoSangre || null,
+                condicionesPreexistentes || null, AES_KEY
             ]
         );
         const idUsuarioNuevo = resultadoUsuario.insertId;
@@ -206,10 +217,10 @@ const restablecerPassword = async (correo, codigoIngresado, nuevaContrasena) => 
     return { mensaje: 'Contraseña actualizada exitosamente. Ya puedes iniciar sesión.' };
 };
 
-module.exports = { 
-    iniciarSesion, 
-    registrar, 
-    verificarCuentaConOTP, 
+module.exports = {
+    iniciarSesion,
+    registrar,
+    verificarCuentaConOTP,
     reenviarCodigoOTP,
     solicitarRecuperacion,
     restablecerPassword

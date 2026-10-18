@@ -1,6 +1,7 @@
 const servicioAutenticacion = require('../services/authService');
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
+const AES_KEY = process.env.AES_KEY;
 
 const iniciarSesion = async (req, res) => {
     try {
@@ -24,7 +25,7 @@ const registrar = async (req, res) => {
         const {
             nombres, apellido_paterno, apellido_materno,
             nss, boleta, correo, password: contrasena, rol_id: idRol,
-            carrera, num_empleado, 
+            carrera, num_empleado,
             tipo_sangre, condiciones_preexistentes, // <--- EXTRACCIÓN NUEVA
             acepta_privacidad: aceptaPrivacidad,
             version_aviso_privacidad: versionAvisoPrivacidad
@@ -60,8 +61,8 @@ const registrar = async (req, res) => {
             boleta: idRol === 2 && boleta ? boleta.trim() : null,
             carrera: idRol === 2 && carrera ? carrera.trim() : null,
             numEmpleado: idRol === 3 && num_empleado ? num_empleado.trim() : null,
-            tipoSangre: tipo_sangre,                         
-            condicionesPreexistentes: condiciones_preexistentes, 
+            tipoSangre: tipo_sangre,
+            condicionesPreexistentes: condiciones_preexistentes,
             aceptaPrivacidad,
             versionAvisoPrivacidad
         });
@@ -76,19 +77,37 @@ const registrar = async (req, res) => {
 const obtenerPerfil = async (req, res) => {
     try {
         const queryUsuario = `
-            SELECT id, nombres, apellido_paterno, apellido_materno, correo, verificado, role_id,
-                   boleta, carrera, nss, num_empleado, tipo_sangre, condiciones_preexistentes
+            SELECT id, 
+                   CAST(AES_DECRYPT(nombres, ?) AS CHAR) AS nombres, 
+                   CAST(AES_DECRYPT(apellido_paterno, ?) AS CHAR) AS apellido_paterno, 
+                   CAST(AES_DECRYPT(apellido_materno, ?) AS CHAR) AS apellido_materno, 
+                   correo, verificado, role_id,
+                   CAST(AES_DECRYPT(boleta, ?) AS CHAR) AS boleta, 
+                   carrera, 
+                   CAST(AES_DECRYPT(nss, ?) AS CHAR) AS nss, 
+                   CAST(AES_DECRYPT(num_empleado, ?) AS CHAR) AS num_empleado, 
+                   tipo_sangre, 
+                   CAST(AES_DECRYPT(condiciones_preexistentes, ?) AS CHAR) AS condiciones_preexistentes
             FROM usuarios
             WHERE id = ?
         `;
-        const [filasUsuario] = await db.query(queryUsuario, [req.user.id]);
-        
+        const [filasUsuario] = await db.query(queryUsuario, [
+            AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, AES_KEY, req.user.id
+        ]);
+
         if (filasUsuario.length === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
 
         const usuarioInfo = filasUsuario[0];
 
-        const [contactos] = await db.query('SELECT nombre, telefono, parentesco FROM contactos_emergencia WHERE usuario_id = ? ORDER BY id ASC', [req.user.id]);
-        
+        const [contactos] = await db.query(`
+            SELECT CAST(AES_DECRYPT(nombre, ?) AS CHAR) AS nombre, 
+                   CAST(AES_DECRYPT(telefono, ?) AS CHAR) AS telefono, 
+                   CAST(AES_DECRYPT(parentesco, ?) AS CHAR) AS parentesco 
+            FROM contactos_emergencia 
+            WHERE usuario_id = ? 
+            ORDER BY id ASC
+        `, [AES_KEY, AES_KEY, AES_KEY, req.user.id]);
+
         let ficha_medica = null;
         if (usuarioInfo.tipo_sangre || usuarioInfo.condiciones_preexistentes || contactos.length > 0) {
             ficha_medica = {
@@ -102,7 +121,7 @@ const obtenerPerfil = async (req, res) => {
             };
         }
 
-        res.status(200).json({ 
+        res.status(200).json({
             nombres: usuarioInfo.nombres,
             apellido_paterno: usuarioInfo.apellido_paterno,
             apellido_materno: usuarioInfo.apellido_materno,
@@ -113,7 +132,7 @@ const obtenerPerfil = async (req, res) => {
             carrera: usuarioInfo.carrera,
             nss: usuarioInfo.nss,
             num_empleado: usuarioInfo.num_empleado,
-            ficha_medica 
+            ficha_medica
         });
     } catch (error) {
         console.error("Error en obtenerPerfil:", error);
@@ -149,10 +168,10 @@ const actualizarPerfil = async (req, res) => {
         }
 
         if (nombres !== undefined && apellido_paterno !== undefined) {
-             await db.query(
-                'UPDATE usuarios SET nombres = ?, apellido_paterno = ?, apellido_materno = ? WHERE id = ?',
-                [nombres, apellido_paterno, apellido_materno, req.user.id]
-             );
+            await db.query(
+                'UPDATE usuarios SET nombres = AES_ENCRYPT(?, ?), apellido_paterno = AES_ENCRYPT(?, ?), apellido_materno = AES_ENCRYPT(?, ?) WHERE id = ?',
+                [nombres, AES_KEY, apellido_paterno, AES_KEY, apellido_materno, AES_KEY, req.user.id]
+            );
         }
 
         if (contrasenaActual && contrasenaNueva) {
@@ -168,13 +187,16 @@ const actualizarPerfil = async (req, res) => {
         }
 
         await db.query(
-            'UPDATE usuarios SET tipo_sangre = ?, condiciones_preexistentes = ? WHERE id = ?', 
-            [tipo_sangre || null, alergias || null, req.user.id]
+            'UPDATE usuarios SET tipo_sangre = ?, condiciones_preexistentes = AES_ENCRYPT(?, ?) WHERE id = ?',
+            [tipo_sangre || null, alergias || null, AES_KEY, req.user.id]
         );
 
         await db.query('DELETE FROM contactos_emergencia WHERE usuario_id = ?', [req.user.id]);
         for (const contacto of contactos) {
-            await db.query('INSERT INTO contactos_emergencia (usuario_id, nombre, telefono, parentesco) VALUES (?, ?, ?, ?)', [req.user.id, contacto.nombre.trim(), contacto.telefono.trim(), contacto.parentesco || null]);
+            await db.query(
+                'INSERT INTO contactos_emergencia (usuario_id, nombre, telefono, parentesco) VALUES (?, AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?))',
+                [req.user.id, contacto.nombre.trim(), AES_KEY, contacto.telefono.trim(), AES_KEY, contacto.parentesco || null, AES_KEY]
+            );
         }
 
         res.status(200).json({ message: 'Perfil actualizado exitosamente' });
@@ -212,7 +234,7 @@ const solicitarRecuperacion = async (req, res) => {
     try {
         const { correo } = req.body;
         if (!correo || !correo.trim()) return res.status(400).json({ message: 'El correo es requerido' });
-        
+
         const resultado = await servicioAutenticacion.solicitarRecuperacion(correo.trim().toLowerCase());
         res.status(200).json(resultado);
     } catch (error) {
@@ -223,15 +245,15 @@ const solicitarRecuperacion = async (req, res) => {
 const restablecerPassword = async (req, res) => {
     try {
         const { correo, codigo, nuevaPassword, confirmarPassword } = req.body;
-        
+
         if (!correo || !codigo || !nuevaPassword || !confirmarPassword) {
             return res.status(400).json({ message: 'Todos los campos son requeridos' });
         }
-        
+
         if (nuevaPassword !== confirmarPassword) {
             return res.status(400).json({ message: 'Las contraseñas no coinciden' });
         }
-        
+
         const resultado = await servicioAutenticacion.restablecerPassword(correo.trim().toLowerCase(), codigo, nuevaPassword);
         res.status(200).json(resultado);
     } catch (error) {
@@ -239,13 +261,13 @@ const restablecerPassword = async (req, res) => {
     }
 };
 
-module.exports = { 
-    iniciarSesion, 
-    registrar, 
-    obtenerPerfil, 
-    actualizarPerfil, 
-    verificarCuenta, 
-    reenviarCodigo, 
-    solicitarRecuperacion, 
-    restablecerPassword 
+module.exports = {
+    iniciarSesion,
+    registrar,
+    obtenerPerfil,
+    actualizarPerfil,
+    verificarCuenta,
+    reenviarCodigo,
+    solicitarRecuperacion,
+    restablecerPassword
 };

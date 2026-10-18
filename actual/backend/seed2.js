@@ -56,7 +56,7 @@ const seedMasivo = async () => {
         console.log("⏳ 3. Generando usuarios unificados y contactos ENCRIPTADOS...");
         const hash = await bcrypt.hash("qwerty", 10);
         // Define tu llave AES. Lo ideal es que venga de process.env.AES_KEY
-        const AES_KEY = process.env.AES_KEY || 'MiLlaveSecretaSuperSeguraTT2026!';
+        const AES_KEY = process.env.AES_KEY || 'PassKeyLlaveSecretaSeguraTTB0512026!';
 
         const carreras = ['Ing. en Sistemas Computacionales', 'Ing. en Inteligencia Artificial', 'Lic. en Ciencia de Datos', 'Ing. Mecatrónica'];
         const parentescos = ['Madre', 'Padre', 'Tutor', 'Hermano/a', 'Tío/a'];
