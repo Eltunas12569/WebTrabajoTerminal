@@ -14,10 +14,44 @@ const SearchIcon = () => (
     </svg>
 );
 
+// Validación estricta para garantizar que solo se listen y seleccionen alumnos (nunca profesores ni personal docente)
+const esAlumnoValido = (u) => {
+    if (!u) return false;
+    const rol = Number(u.role_id || u.rol || 0);
+
+    // 1. Excluir explícitamente rol de profesor (3) y administrador (1)
+    if (rol === 3 || rol === 1) return false;
+
+    // 2. Excluir si tiene número de empleado registrado (incluso si rol fuese 4 o 2 en DB)
+    if (u.num_empleado && String(u.num_empleado).trim() !== '' && String(u.num_empleado).trim().toLowerCase() !== 'null') {
+        return false;
+    }
+
+    // 3. Excluir si el nombre o apellido contiene la palabra "Profesor", "Profesora", "Docente" o "Prof."
+    const nombreCompleto = `${u.nombres || ''} ${u.apellidos || ''}`.toLowerCase();
+    if (nombreCompleto.includes('profesor') || nombreCompleto.includes('docente') || /\bprof\b/i.test(nombreCompleto)) {
+        return false;
+    }
+
+    // 4. Obligatorio: debe contar con una boleta de estudiante válida
+    const boleta = String(u.boleta || '').trim();
+    if (!boleta || boleta.toLowerCase() === 'null' || boleta.toLowerCase() === 'undefined' || boleta === '0') {
+        return false;
+    }
+
+    return true;
+};
+
 // Componente interno para selector con búsqueda (Autocomplete para Alumno Encargado)
-const SearchableSelect = ({ options, value, onChange, placeholder }) => {
+const SearchableSelect = ({ options, value, onChange, placeholder, onRemoteSearch }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        if (onRemoteSearch && searchTerm.trim().length >= 2) {
+            onRemoteSearch(searchTerm.trim());
+        }
+    }, [searchTerm, onRemoteSearch]);
 
     useEffect(() => {
         const selected = options.find(o => o.id == value);
@@ -28,9 +62,11 @@ const SearchableSelect = ({ options, value, onChange, placeholder }) => {
         }
     }, [value, options, isOpen]);
 
-    const filteredOptions = options.filter(op =>
-        `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredOptions = options
+        .filter(esAlumnoValido)
+        .filter(op =>
+            `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())
+        );
 
     return (
         <div className="searchable-select-wrapper">
@@ -81,6 +117,21 @@ const SearchableSelect = ({ options, value, onChange, placeholder }) => {
 
 const MIN_ESTUDIANTES = 20;
 
+const MESES_DEL_ANO = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre'
+];
+
 // Componente interno para selector múltiple (Autocomplete para plantilla de miembros)
 const MultiSearchableSelect = ({ options, selectedIds, leaderId, onChange, placeholder, onRemoteSearch }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -104,11 +155,13 @@ const MultiSearchableSelect = ({ options, selectedIds, leaderId, onChange, place
         onChange(selectedIds.filter(selectedId => selectedId !== id));
     };
 
-    const availableOptions = options.filter(op =>
-        !selectedIds.includes(op.id) &&
-        Number(op.id) !== Number(leaderId) &&
-        `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const availableOptions = options
+        .filter(esAlumnoValido)
+        .filter(op =>
+            !selectedIds.includes(op.id) &&
+            Number(op.id) !== Number(leaderId) &&
+            `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())
+        );
 
     const leaderObj = options.find(o => Number(o.id) === Number(leaderId));
 
@@ -219,7 +272,8 @@ const CrearClubPage = () => {
             try {
                 setLoadingAlumnos(true);
                 const response = await api.get('/users/students-in-charge');
-                setAlumnosDisponibles(response.data);
+                const soloAlumnos = (response.data || []).filter(esAlumnoValido);
+                setAlumnosDisponibles(soloAlumnos);
             } catch (err) {
                 console.error("Error al cargar alumnos encargados:", err);
                 setError('No se pudieron cargar los alumnos disponibles.');
@@ -231,17 +285,25 @@ const CrearClubPage = () => {
     }, []);
 
     const handleBuscarAlumnos = async (termino) => {
+        if (!termino || termino.trim().length < 2) return;
         try {
             const response = await api.get('/users', { params: { busqueda: termino } });
-            const alumnos = response.data
-                .filter((u) => [2, 4].includes(Number(u.role_id)))
+            const alumnos = (response.data || [])
+                .filter(esAlumnoValido)
                 .map((u) => ({
                     id: u.id,
                     nombres: u.nombres,
                     apellidos: u.apellidos,
-                    boleta: u.boleta
+                    boleta: u.boleta,
+                    role_id: u.role_id,
+                    num_empleado: u.num_empleado
                 }));
-            setAlumnosBuscados(alumnos);
+            setAlumnosBuscados(prev => {
+                const map = new Map();
+                prev.filter(esAlumnoValido).forEach(p => map.set(p.id, p));
+                alumnos.forEach(a => map.set(a.id, a));
+                return Array.from(map.values());
+            });
         } catch (err) {
             console.error('Error al buscar alumnos:', err);
         }
@@ -249,7 +311,9 @@ const CrearClubPage = () => {
 
     const opcionesAlumnos = React.useMemo(() => {
         const mapa = new Map();
-        [...alumnosDisponibles, ...alumnosBuscados].forEach((alumno) => mapa.set(alumno.id, alumno));
+        [...alumnosDisponibles, ...alumnosBuscados]
+            .filter(esAlumnoValido)
+            .forEach((alumno) => mapa.set(alumno.id, alumno));
         return Array.from(mapa.values());
     }, [alumnosDisponibles, alumnosBuscados]);
 
@@ -310,7 +374,20 @@ const CrearClubPage = () => {
             return;
         }
 
-        const alumnosArray = Array.from(new Set([Number(alumnoEncargadoId), ...miembrosIds.map(Number)])).filter(id => id > 0);
+        const alumnoEncargadoObj = opcionesAlumnos.find(o => Number(o.id) === Number(alumnoEncargadoId));
+        if (alumnoEncargadoObj && !esAlumnoValido(alumnoEncargadoObj)) {
+            setError('Error: El encargado del club debe ser un alumno registrado con boleta válida.');
+            setLoading(false);
+            return;
+        }
+
+        const alumnosArray = Array.from(new Set([Number(alumnoEncargadoId), ...miembrosIds.map(Number)]))
+            .filter(id => id > 0)
+            .filter(id => {
+                const u = opcionesAlumnos.find(o => Number(o.id) === Number(id));
+                return !u || esAlumnoValido(u);
+            });
+
         if (alumnosArray.length < MIN_ESTUDIANTES) {
             setError(`Debes registrar al menos ${MIN_ESTUDIANTES} alumnos en total (incluyendo al encargado). Actualmente tienes ${alumnosArray.length}.`);
             setLoading(false);
@@ -543,33 +620,59 @@ const CrearClubPage = () => {
                                             </div>
                                         </div>
 
+                                        <div className="cronograma-header-row">
+                                            <span>#</span>
+                                            <span>Mes</span>
+                                            <span>Actividad u Objetivo Programado</span>
+                                            <span></span>
+                                        </div>
+
                                         <div className="cronograma-list">
                                             {cronograma.map((item, index) => (
                                                 <div key={index} className="cronograma-row">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Mes (ej. Septiembre)"
-                                                        value={item.mes}
-                                                        onChange={(e) => handleCronogramaChange(index, 'mes', e.target.value)}
-                                                        required
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Actividad programada (ej. Convocatoria y reclutamiento)"
-                                                        value={item.actividad}
-                                                        onChange={(e) => handleCronogramaChange(index, 'actividad', e.target.value)}
-                                                        required
-                                                    />
-                                                    {cronograma.length > 1 && (
-                                                        <button
-                                                            type="button"
-                                                            className="btn-remove-cronograma"
-                                                            onClick={() => handleRemoveCronogramaItem(index)}
-                                                            title="Eliminar fila del cronograma"
+                                                    <div className="cronograma-num-badge" title={`Actividad #${index + 1}`}>
+                                                        {index + 1}
+                                                    </div>
+                                                    <div className="cronograma-field-mes">
+                                                        <select
+                                                            className="cronograma-select-mes"
+                                                            value={item.mes}
+                                                            onChange={(e) => handleCronogramaChange(index, 'mes', e.target.value)}
+                                                            required
                                                         >
-                                                            ✕
-                                                        </button>
-                                                    )}
+                                                            <option value="" disabled>Selecciona mes...</option>
+                                                            {MESES_DEL_ANO.map((mes) => (
+                                                                <option key={mes} value={mes}>
+                                                                    {mes}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="cronograma-field-actividad">
+                                                        <input
+                                                            type="text"
+                                                            className="cronograma-input-actividad"
+                                                            placeholder="Ej. Convocatoria y reclutamiento, taller, torneo..."
+                                                            value={item.actividad}
+                                                            onChange={(e) => handleCronogramaChange(index, 'actividad', e.target.value)}
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div className="cronograma-field-action">
+                                                        {cronograma.length > 1 ? (
+                                                            <button
+                                                                type="button"
+                                                                className="btn-remove-cronograma"
+                                                                onClick={() => handleRemoveCronogramaItem(index)}
+                                                                title="Eliminar fila del cronograma"
+                                                                aria-label="Eliminar fila"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        ) : (
+                                                            <div className="cronograma-action-placeholder" />
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -579,7 +682,8 @@ const CrearClubPage = () => {
                                             className="btn-add-cronograma"
                                             onClick={handleAddCronogramaItem}
                                         >
-                                            ➕ Agregar otra actividad al cronograma
+                                            <span style={{ fontSize: '1rem', lineHeight: 1 }}>➕</span>
+                                            <span>Agregar otra actividad al cronograma</span>
                                         </button>
                                     </section>
                                 </div>
@@ -615,6 +719,7 @@ const CrearClubPage = () => {
                                                 options={opcionesAlumnos}
                                                 value={alumnoEncargadoId}
                                                 onChange={(id) => setAlumnoEncargadoId(id)}
+                                                onRemoteSearch={handleBuscarAlumnos}
                                                 placeholder={loadingAlumnos ? "Cargando padrón de alumnos..." : "Buscar por nombre, apellido o boleta..."}
                                             />
                                         </div>

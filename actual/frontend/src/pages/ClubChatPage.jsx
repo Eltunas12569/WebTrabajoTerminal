@@ -222,7 +222,6 @@ const ClubChatPage = () => {
         <div className="web-dashboard">
             <header className="admin-navbar-fixed" style={{ backgroundColor: '#003366', color: '#fff', padding: '0 20px', minHeight: '65px' }}>
                 <div className="nav-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '1.6rem' }}>🏆</span>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span className="nav-title" style={{ fontSize: '1.15rem', fontWeight: 'bold', lineHeight: '1.2', color: '#fff' }}>
                             {club.nombre}
@@ -311,17 +310,6 @@ const ClubChatPage = () => {
 
             <div style={{ marginTop: '65px', height: 'calc(100vh - 65px)', display: 'flex', flexDirection: 'column' }}>
                 <div className="chat-page-wrapper">
-                    {/* Subcabecera del club */}
-                    <div className="chat-room-header">
-                        <div className="chat-room-info">
-                            <div className="chat-room-title-row">
-                                <h2 className="chat-room-title">
-                                     {club.nombre}
-                                </h2>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Área de mensajes con scroll */}
                     <div className="chat-messages-area">
                         {mensajes.length === 0 ? (
