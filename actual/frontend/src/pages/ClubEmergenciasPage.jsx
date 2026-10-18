@@ -116,7 +116,10 @@ const ClubEmergenciasPage = () => {
 
     // Listas específicas para modales de KPIs
     const miembrosConAlergias = useMemo(() => {
-        return miembros.filter(m => m.alergias && m.alergias.trim() && m.alergias.trim().toLowerCase() !== 'ninguna');
+        return miembros.filter(m => {
+            const al = typeof m.alergias === 'string' ? m.alergias.trim() : (m.alergias ? String(m.alergias).trim() : '');
+            return al.length > 0 && al.toLowerCase() !== 'ninguna';
+        });
     }, [miembros]);
 
     // Métricas para los KPIs
@@ -132,11 +135,12 @@ const ClubEmergenciasPage = () => {
             // Filtro por texto de búsqueda
             if (busqueda.trim()) {
                 const query = busqueda.toLowerCase().trim();
+                const alStr = typeof m.alergias === 'string' ? m.alergias : (m.alergias ? String(m.alergias) : '');
                 const coincideNombre = (m.nombre_completo || '').toLowerCase().includes(query);
                 const coincideBoleta = (m.boleta || '').toLowerCase().includes(query);
                 const coincideEmpleado = (m.num_empleado || '').toLowerCase().includes(query);
                 const coincideTelefono = (m.telefono || '').toLowerCase().includes(query);
-                const coincideAlergias = (m.alergias || '').toLowerCase().includes(query);
+                const coincideAlergias = alStr.toLowerCase().includes(query);
                 const coincideContacto = m.contactos?.some(c => 
                     (c.nombre || '').toLowerCase().includes(query) || 
                     (c.telefono || '').toLowerCase().includes(query) ||

@@ -81,8 +81,19 @@ const EditarClubEncargadoPage = () => {
 
             try {
                 // Paso 1: Verificar en el servidor que el usuario sea encargado activo de este club
-                const userClubsRes = await api.get(`/clubes/user/${user.id}`);
-                const miRegistro = (userClubsRes.data || []).find(c => String(c.id) === String(id));
+                let miRegistro = null;
+                try {
+                    const userClubsRes = await api.get(`/clubes/user/${user.id}`);
+                    miRegistro = (userClubsRes.data || []).find(c => String(c.id) === String(id));
+                } catch (err) {
+                    const allClubsRes = await api.get('/clubes');
+                    const c = (allClubsRes.data || []).find(c => String(c.id) === String(id));
+                    if (c && Number(c.profesor_encargado_id) === Number(user.id)) {
+                        miRegistro = { ...c, mi_rol_interno: 'encargado_profesor', inscripcion_estatus: 'activo' };
+                    } else if (c && Number(c.alumno_encargado_id) === Number(user.id)) {
+                        miRegistro = { ...c, mi_rol_interno: 'encargado_alumno', inscripcion_estatus: 'activo' };
+                    }
+                }
                 const rolInterno = miRegistro?.mi_rol_interno || miRegistro?.rol_en_club;
                 const esEncargadoActivo = Boolean(
                     miRegistro &&

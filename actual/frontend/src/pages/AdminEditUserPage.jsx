@@ -30,7 +30,8 @@ const AdminEditUserPage = () => {
                     role_id: Number(response.data.role_id),
                     boleta: response.data.boleta || '',
                     carrera: response.data.carrera || '',
-                    num_empleado: response.data.num_empleado || ''
+                    num_empleado: response.data.num_empleado || '',
+                    nss: response.data.nss || ''
                 });
             } catch (requestError) {
                 setError(requestError.response?.data?.message || 'No se pudo cargar el usuario.');
@@ -131,6 +132,7 @@ const AdminEditUserPage = () => {
                                     <>
                                         <label>Boleta<input name="boleta" value={formData.boleta} onChange={handleChange} required maxLength={10} /></label>
                                         <label>Carrera<input name="carrera" value={formData.carrera} onChange={handleChange} required maxLength={150} /></label>
+                                        <label>NSS (Número de Seguridad Social)<input name="nss" value={formData.nss} onChange={handleChange} maxLength={11} /></label>
                                     </>
                                 )}
                             </div>

@@ -124,11 +124,36 @@ const ClubDetailsAdminPage = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
+                // Adaptación: Carga resiliente de profesores que consulta /users/professors o recurre a /users/all-for-admin
+                const fetchProfesoresSeguro = async () => {
+                    try {
+                        const res = await Promise.race([
+                            api.get('/users/professors'),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
+                        ]);
+                        if (Array.isArray(res.data) && res.data.length > 0) return res.data;
+                    } catch (e) {
+                        // Fallback a /users/all-for-admin si /users/professors no responde
+                    }
+                    try {
+                        const allUsers = await api.get('/users/all-for-admin');
+                        return (allUsers.data || [])
+                            .filter(u => Number(u.role_id) === 3)
+                            .map(u => ({
+                                id: u.id,
+                                nombres: u.nombres,
+                                apellidos: `${u.apellido_paterno} ${u.apellido_materno || ''}`.trim()
+                            }));
+                    } catch (e) {
+                        return [];
+                    }
+                };
+
                 // Cargar datos de clubes, profesores, alumnos, historial y miembros al mismo tiempo
-                const [clubesRes, profRes, alumRes, histRes, miembrosRes] = await Promise.all([
+                const [clubesRes, profList, alumRes, histRes, miembrosRes] = await Promise.all([
                     api.get('/clubes'),
-                    api.get('/users/professors'),
-                    api.get('/users/students-in-charge'),
+                    fetchProfesoresSeguro(),
+                    api.get('/users/students-in-charge').catch(() => ({ data: [] })),
                     api.get(`/clubes/${id}/historial-encargados`).catch(() => ({ data: [] })),
                     api.get(`/clubes/${id}/miembros`).catch(() => ({ data: [] }))
                 ]);
@@ -145,8 +170,8 @@ const ClubDetailsAdminPage = () => {
                     profesor_encargado_id: clubEncontrado.profesor_encargado_id || '',
                     alumno_encargado_id: clubEncontrado.alumno_encargado_id || ''
                 });
-                setProfesores(profRes.data);
-                setAlumnos(alumRes.data);
+                setProfesores(profList || []);
+                setAlumnos(alumRes.data || []);
                 setHistorialEncargados(histRes.data || []);
                 setMiembros(miembrosRes.data || []);
             } catch (error) {

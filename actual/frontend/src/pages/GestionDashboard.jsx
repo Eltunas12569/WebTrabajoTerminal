@@ -48,9 +48,26 @@ const GestionDashboard = () => {
             setLoadingClubs(true);
             try {
                 const response = await api.get(`/clubes/user/${user.id}`);
-                setUserClubs(response.data);
+                setUserClubs(response.data || []);
             } catch (error) {
                 console.error("Error al obtener los clubes del usuario:", error);
+                // Adaptación fallback: Si el endpoint específico falla en el servidor, consultar /clubes y filtrar
+                try {
+                    const fallbackRes = await api.get('/clubes');
+                    const misClubes = (fallbackRes.data || []).filter(c =>
+                        Number(c.profesor_encargado_id) === Number(user.id) ||
+                        Number(c.alumno_encargado_id) === Number(user.id)
+                    ).map(c => ({
+                        ...c,
+                        mi_rol_interno: Number(c.profesor_encargado_id) === Number(user.id) ? 'encargado_profesor' : 'encargado_alumno',
+                        inscripcion_estatus: 'activo'
+                    }));
+                    if (misClubes.length > 0) {
+                        setUserClubs(misClubes);
+                    }
+                } catch (fallbackErr) {
+                    console.error("Fallback de clubes falló:", fallbackErr);
+                }
             } finally {
                 setLoadingClubs(false);
             }
@@ -157,8 +174,21 @@ const GestionDashboard = () => {
         if (!user || !user.id) return;
         setLoadingEventosCalendario(true);
         try {
-            const resClubs = await api.get(`/clubes/user/${user.id}`);
-            const misClubes = resClubs.data || [];
+            let misClubes = [];
+            try {
+                const resClubs = await api.get(`/clubes/user/${user.id}`);
+                misClubes = resClubs.data || [];
+            } catch (err) {
+                try {
+                    const fallbackRes = await api.get('/clubes');
+                    misClubes = (fallbackRes.data || []).filter(c =>
+                        Number(c.profesor_encargado_id) === Number(user.id) ||
+                        Number(c.alumno_encargado_id) === Number(user.id)
+                    );
+                } catch (e) {
+                    misClubes = [];
+                }
+            }
 
             let invitaciones = [];
             try {

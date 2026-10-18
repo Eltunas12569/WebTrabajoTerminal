@@ -128,15 +128,13 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         const fetchClubData = async () => {
             setLoading(true);
             try {
+                let miRegistro = null;
                 if (user?.id) {
-                    const userClubsRes = await api.get(`/clubes/user/${user.id}`);
-                    const miRegistro = userClubsRes.data.find(uc => String(uc.id) === String(id));
-                    if (miRegistro) {
-                        setMiRolInterno(miRegistro.mi_rol_interno || miRegistro.rol_en_club);
-                        setInscripcionEstatus(miRegistro.inscripcion_estatus);
-                        setIsMember(miRegistro.inscripcion_estatus === 'activo');
-                    } else if (esAdmin) {
-                        setIsMember(true);
+                    try {
+                        const userClubsRes = await api.get(`/clubes/user/${user.id}`);
+                        miRegistro = (userClubsRes.data || []).find(uc => String(uc.id) === String(id));
+                    } catch (e) {
+                        // Silencioso: Se calculará con clubEncontrado abajo si es encargado
                     }
                 }
 
@@ -144,6 +142,26 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                 const clubEncontrado = response.data.find(c => String(c.id) === String(id));
                 if (!clubEncontrado) throw new Error('Club no encontrado');
                 setClub(clubEncontrado);
+
+                if (miRegistro) {
+                    setMiRolInterno(miRegistro.mi_rol_interno || miRegistro.rol_en_club);
+                    setInscripcionEstatus(miRegistro.inscripcion_estatus);
+                    setIsMember(miRegistro.inscripcion_estatus === 'activo');
+                } else if (user?.id) {
+                    if (Number(clubEncontrado.profesor_encargado_id) === Number(user.id)) {
+                        setMiRolInterno('encargado_profesor');
+                        setInscripcionEstatus('activo');
+                        setIsMember(true);
+                    } else if (Number(clubEncontrado.alumno_encargado_id) === Number(user.id)) {
+                        setMiRolInterno('encargado_alumno');
+                        setInscripcionEstatus('activo');
+                        setIsMember(true);
+                    } else if (esAdmin) {
+                        setIsMember(true);
+                    }
+                } else if (esAdmin) {
+                    setIsMember(true);
+                }
             } catch (err) {
                 if (!club) setError('Error al cargar la información del club.');
             } finally {

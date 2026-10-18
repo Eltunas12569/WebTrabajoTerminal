@@ -61,19 +61,32 @@ const CanalesChatPage = ({ canalInicial }) => {
             const esAdmin = Number(user.role_id) === 1 || user.rol === 1;
 
             try {
-                // Consultamos los clubes del usuario para verificar si es encargado de alguno
-                const res = await api.get(`/clubes/user/${user.id}`);
-                const clubs = res.data || [];
-                const esEncargado = clubs.some(c => 
-                    ['encargado_profesor', 'encargado_alumno'].includes(c.mi_rol_interno) 
-                    && c.inscripcion_estatus === 'activo'
-                );
+                let esEncargado = false;
+                try {
+                    // Consultamos los clubes del usuario para verificar si es encargado de alguno
+                    const res = await api.get(`/clubes/user/${user.id}`);
+                    const clubs = res.data || [];
+                    esEncargado = clubs.some(c => 
+                        ['encargado_profesor', 'encargado_alumno'].includes(c.mi_rol_interno) 
+                        && c.inscripcion_estatus === 'activo'
+                    );
+                } catch (err) {
+                    try {
+                        const fallbackRes = await api.get('/clubes');
+                        esEncargado = (fallbackRes.data || []).some(c =>
+                            Number(c.profesor_encargado_id) === Number(user.id) ||
+                            Number(c.alumno_encargado_id) === Number(user.id)
+                        );
+                    } catch (fallbackErr) {
+                        console.error("Fallback canales chat:", fallbackErr);
+                    }
+                }
 
-                setPermisos({
-                    esAdmin,
-                    esEncargado,
-                    cargado: true
-                });
+            setPermisos({
+                esAdmin,
+                esEncargado,
+                cargado: true
+            });
 
                 // Si el canal activo es 'encargados' y es admin puro (no encargado), cambiar a directivos
                 if (canalActivo === 'encargados' && esAdmin && !esEncargado) {
