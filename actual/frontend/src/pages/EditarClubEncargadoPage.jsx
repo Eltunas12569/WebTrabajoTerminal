@@ -375,6 +375,39 @@ const EditarClubEncargadoPage = () => {
                                         </div>
                                     )}
 
+                                    {/* AVISO DE MOTIVO DE RECHAZO A SUBSANAR */}
+                                    {club?.estatus === 'rechazado' && club?.motivo_rechazo && (
+                                        <div style={{
+                                            backgroundColor: '#fef2f2',
+                                            border: '1px solid #fecaca',
+                                            borderLeft: '5px solid #dc2626',
+                                            borderRadius: '8px',
+                                            padding: '16px 20px',
+                                            color: '#1f2937'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+                                                <strong style={{ color: '#991b1b', fontSize: '1rem' }}>
+                                                    Observaciones del Administrador (Motivo de Rechazo)
+                                                </strong>
+                                            </div>
+                                            <div style={{
+                                                backgroundColor: '#ffffff',
+                                                border: '1px solid #fca5a5',
+                                                borderRadius: '6px',
+                                                padding: '12px 16px',
+                                                marginBottom: '10px'
+                                            }}>
+                                                <p style={{ margin: 0, fontSize: '0.98rem', lineHeight: '1.6', color: '#1f2937', whiteSpace: 'pre-wrap' }}>
+                                                    {club.motivo_rechazo}
+                                                </p>
+                                            </div>
+                                            <span style={{ fontSize: '0.85rem', color: '#b91c1c', fontStyle: 'italic', display: 'block' }}>
+                                                ℹ️ Corrige los campos indicados y haz clic en "Guardar Cambios". La propuesta pasará automáticamente a estado "En Revisión".
+                                            </span>
+                                        </div>
+                                    )}
+
                                     {/* Fila 1: Descripción y Objetivo */}
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '18px' }}>
                                         <div>

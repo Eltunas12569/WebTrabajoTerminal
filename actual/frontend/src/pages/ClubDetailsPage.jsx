@@ -131,6 +131,10 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     );
     // Encargados (profesor o alumno), administradores y profesores miembros pueden consultar el padrón de miembros.
     const canViewMiembros = esAdmin || canManage || (esProfesor && isMember);
+    const esEncargado = Boolean(
+        canManage ||
+        (club && ['encargado_profesor', 'encargado_alumno'].includes(miRolInterno))
+    );
 
     // Cargar avisos descartados por el usuario
     useEffect(() => {
@@ -1157,6 +1161,79 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* AVISO DE RECHAZO (EXCLUSIVO PARA ENCARGADOS Y ADMINISTRACIÓN) */}
+                        {club?.estatus === 'rechazado' && club?.motivo_rechazo && esEncargado && (
+                            <div style={{
+                                backgroundColor: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                borderLeft: '6px solid #dc2626',
+                                borderRadius: '12px',
+                                padding: '22px 26px',
+                                boxShadow: '0 4px 14px rgba(220, 38, 38, 0.08)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '14px'
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <span style={{ fontSize: '1.8rem', lineHeight: 1 }}>⚠️</span>
+                                        <div>
+                                            <h3 style={{ margin: 0, color: '#991b1b', fontSize: '1.25rem', fontWeight: '800' }}>
+                                                Propuesta de Club Rechazada
+                                            </h3>
+                                            <span style={{ fontSize: '0.82rem', color: '#b91c1c', fontWeight: '600' }}>
+                                                Observaciones institucionales de la administración (Visible solo para encargados)
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {esEncargado && (
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate(`/club/${id}/editar`)}
+                                            style={{
+                                                backgroundColor: '#dc2626',
+                                                color: '#ffffff',
+                                                border: 'none',
+                                                padding: '10px 18px',
+                                                borderRadius: '8px',
+                                                fontWeight: '700',
+                                                fontSize: '0.9rem',
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
+                                            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                                        >
+                                            ✏️ Corregir Propuesta
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div style={{
+                                    backgroundColor: '#ffffff',
+                                    border: '1px solid #fca5a5',
+                                    borderRadius: '8px',
+                                    padding: '16px 20px'
+                                }}>
+                                    <strong style={{ display: 'block', color: '#7f1d1d', fontSize: '0.88rem', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        Motivo u Observaciones del Administrador:
+                                    </strong>
+                                    <p style={{ margin: 0, color: '#1f2937', fontSize: '1.02rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                                        {club.motivo_rechazo}
+                                    </p>
+                                </div>
+
+                                <p style={{ margin: 0, color: '#7f1d1d', fontSize: '0.88rem', lineHeight: '1.5' }}>
+                                    💡 <strong>¿Qué debes hacer?</strong> Revisa los puntos anteriores y realiza las modificaciones solicitadas usando el botón <em>"Corregir y Subsanar Propuesta"</em>. Al guardar tus cambios, la propuesta pasará automáticamente al estado <strong>"En Revisión"</strong> para que el administrador la evalúe nuevamente.
+                                </p>
+                            </div>
+                        )}
 
                         {/* BARRA DE PESTAÑAS DE ESCRITORIO (DESKTOP TABS) */}
                         <div style={{

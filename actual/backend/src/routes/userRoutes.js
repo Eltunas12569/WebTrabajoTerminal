@@ -191,7 +191,7 @@ router.delete('/:id/admin-delete', verificarToken, requireVerificado, checkRole(
     }
 });
 
-router.get('/', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR]), async (req, res) => {
+router.get('/', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR, ROLES.ALUMNO_REPRESENTANTE, ROLES.ALUMNO]), async (req, res) => {
     const { busqueda } = req.query;
     if (!busqueda || busqueda.trim().length < 2) return res.status(400).json({ message: "Escribe al menos 2 caracteres para buscar." });
     const terminoBusqueda = `%${busqueda.trim()}%`;

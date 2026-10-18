@@ -35,7 +35,7 @@ router.put('/invitaciones/:idClub/responder', verificarToken, requireVerificado,
             await db.query(`UPDATE inscripciones SET estatus = 'activo' WHERE club_id = ? AND usuario_id = ?`, [idClub, idUsuario]);
             res.status(200).json({ message: "¡Bienvenido al club!" });
         } else {
-            await db.query(`DELETE FROM inscripciones WHERE club_id = ? AND usuario_id = ? AND estatus = 'pendiente'`, [idClub, idUsuario]);
+            await db.query(`UPDATE inscripciones SET estatus = 'rechazado' WHERE club_id = ? AND usuario_id = ? AND estatus = 'pendiente'`, [idClub, idUsuario]);
             res.status(200).json({ message: "Invitación rechazada" });
         }
     } catch (error) { res.status(500).json({ message: "Error interno" }); }
@@ -44,12 +44,32 @@ router.put('/invitaciones/:idClub/responder', verificarToken, requireVerificado,
 router.put('/:id/enviar-revision', verificarToken, requireVerificado, async (req, res) => {
     const { id } = req.params;
     try {
-        const [resultadoConteo] = await db.query(`SELECT COUNT(*) as total FROM inscripciones WHERE club_id = ? AND estatus = 'activo' AND rol_en_club != 'encargado_profesor'`, [id]);
-        if (resultadoConteo[0].total < 20) return res.status(400).json({ message: `Aún faltan confirmaciones. Han aceptado ${resultadoConteo[0].total} de 20.` });
+        // 1. Validar que el club cuente con un Alumno Representante activo (que haya firmado)
+        const [rep] = await db.query(
+            `SELECT usuario_id FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_alumno' AND estatus = 'activo'`,
+            [id]
+        );
+        if (rep.length === 0) {
+            return res.status(400).json({ 
+                message: "No se puede enviar a revisión: El club requiere obligatoriamente que el Alumno Representante haya aceptado y firmado su participación. Si declinó o aún está pendiente, debes esperar su firma o asignar a otro representante." 
+            });
+        }
+
+        // 2. Validar que se alcancen al menos 20 firmas de estudiantes en total
+        const [resultadoConteo] = await db.query(
+            `SELECT COUNT(*) as total FROM inscripciones WHERE club_id = ? AND estatus = 'activo' AND rol_en_club != 'encargado_profesor'`, 
+            [id]
+        );
+        if (resultadoConteo[0].total < 20) {
+            return res.status(400).json({ message: `Aún faltan confirmaciones. Han firmado ${resultadoConteo[0].total} de 20 estudiantes requeridos.` });
+        }
 
         await db.query(`UPDATE clubes SET estatus = 'en_revision' WHERE id = ?`, [id]);
         res.status(200).json({ message: "Club enviado a revisión exitosamente" });
-    } catch (error) { res.status(500).json({ message: "Error interno" }); }
+    } catch (error) { 
+        console.error("Error al enviar club a revisión:", error);
+        res.status(500).json({ message: "Error interno al enviar club a revisión" }); 
+    }
 });
 
 router.get('/:id/chat', verificarToken, requireVerificado, async (req, res) => {
@@ -431,7 +451,7 @@ router.get('/user/:idUsuario', verificarToken, requireVerificado, async (req, re
                 i.estatus AS inscripcion_estatus, i.fecha_inscripcion, i.rol_en_club AS mi_rol_interno,
                 (SELECT COUNT(*) FROM inscripciones WHERE club_id = c.id AND estatus = 'activo' AND rol_en_club != 'encargado_profesor') AS aceptados_count
             FROM clubes c
-            JOIN inscripciones i ON c.id = i.club_id AND i.usuario_id = ?
+            JOIN inscripciones i ON c.id = i.club_id AND i.usuario_id = ? AND i.estatus != 'rechazado'
             LEFT JOIN inscripciones ip ON c.id = ip.club_id AND ip.rol_en_club = 'encargado_profesor' AND ip.estatus = 'activo'
             LEFT JOIN usuarios p ON ip.usuario_id = p.id
             LEFT JOIN inscripciones ia ON c.id = ia.club_id AND ia.rol_en_club = 'encargado_alumno' AND ia.estatus = 'activo'
@@ -689,6 +709,181 @@ router.get('/:id/miembros', verificarToken, requireVerificado, checkRole([ROLES.
     } catch (error) {
         console.error("Error al obtener firmas:", error);
         res.status(500).json({ message: "Error al cargar la lista de firmas" });
+    }
+});
+
+router.post('/:id/invitar', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR, ROLES.ALUMNO_REPRESENTANTE, ROLES.ALUMNO]), async (req, res) => {
+    const clubId = req.params.id;
+    const { usuario_id } = req.body;
+    const solicitanteId = req.user.id;
+    const solicitanteRol = Number(req.user.rol || req.user.role_id);
+
+    if (!usuario_id) {
+        return res.status(400).json({ message: "Debes seleccionar un alumno para invitar." });
+    }
+
+    try {
+        // 1. Verificar permisos: El usuario debe ser Administrador o Encargado (profesor o alumno) de este club
+        if (solicitanteRol !== 1) {
+            const [esEncargado] = await db.query(
+                `SELECT id FROM inscripciones 
+                 WHERE club_id = ? AND usuario_id = ? AND rol_en_club IN ('encargado_profesor', 'encargado_alumno')
+                 LIMIT 1`,
+                [clubId, solicitanteId]
+            );
+            if (esEncargado.length === 0) {
+                return res.status(403).json({ message: "Acceso denegado. Solo los encargados de este club o administradores pueden invitar nuevos miembros." });
+            }
+        }
+
+        // 2. Verificar que el usuario a invitar sea un alumno registrado
+        const [alumno] = await db.query(
+            `SELECT id, role_id, 
+                    CAST(AES_DECRYPT(boleta, ?) AS CHAR CHARACTER SET utf8mb4) AS boleta,
+                    CAST(AES_DECRYPT(nombres, ?) AS CHAR CHARACTER SET utf8mb4) AS nombres
+             FROM usuarios WHERE id = ?`,
+            [AES_KEY, AES_KEY, usuario_id]
+        );
+
+        if (alumno.length === 0 || ![ROLES.ALUMNO, ROLES.ALUMNO_REPRESENTANTE].includes(Number(alumno[0].role_id))) {
+            return res.status(400).json({ message: "El usuario seleccionado debe ser un estudiante activo con boleta registrada." });
+        }
+
+        // 3. Verificar si ya está en inscripciones
+        const [inscripcionExistente] = await db.query(
+            `SELECT id, estatus, rol_en_club FROM inscripciones WHERE club_id = ? AND usuario_id = ?`,
+            [clubId, usuario_id]
+        );
+
+        if (inscripcionExistente.length > 0) {
+            const actual = inscripcionExistente[0];
+            if (actual.estatus === 'activo') {
+                return res.status(400).json({ message: "Este alumno ya firmó y es miembro activo del club." });
+            }
+            if (actual.estatus === 'pendiente') {
+                return res.status(400).json({ message: "Este alumno ya tiene una invitación pendiente de responder." });
+            }
+            // Si estaba en 'rechazado' o 'inactivo', se reactiva como invitación pendiente
+            await db.query(
+                `UPDATE inscripciones SET estatus = 'pendiente', fecha_inscripcion = NOW() WHERE id = ?`,
+                [actual.id]
+            );
+        } else {
+            // Nueva invitación
+            await db.query(
+                `INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus, fecha_inscripcion) VALUES (?, ?, 'miembro', 'pendiente', NOW())`,
+                [usuario_id, clubId]
+            );
+        }
+
+        res.status(200).json({ message: `Invitación enviada exitosamente a ${alumno[0].nombres || 'el alumno'}.` });
+    } catch (error) {
+        console.error("Error al invitar alumno al club:", error);
+        res.status(500).json({ message: "Error interno al enviar la invitación." });
+    }
+});
+
+router.put('/:id/asignar-representante', verificarToken, requireVerificado, checkRole([ROLES.ADMINISTRADOR, ROLES.PROFESOR]), async (req, res) => {
+    const clubId = req.params.id;
+    const { nuevo_usuario_id } = req.body;
+    const solicitanteId = req.user.id;
+    const solicitanteRol = Number(req.user.rol || req.user.role_id);
+
+    if (!nuevo_usuario_id) {
+        return res.status(400).json({ message: "Debes especificar al alumno que asumirá como representante." });
+    }
+
+    try {
+        // 1. Permisos: Administrador o Profesor Encargado del club
+        if (solicitanteRol !== ROLES.ADMINISTRADOR) {
+            const [esProfe] = await db.query(
+                `SELECT id FROM inscripciones 
+                 WHERE club_id = ? AND usuario_id = ? AND rol_en_club = 'encargado_profesor' AND estatus = 'activo'
+                 LIMIT 1`,
+                [clubId, solicitanteId]
+            );
+            if (esProfe.length === 0) {
+                return res.status(403).json({ message: "Solo el Profesor Titular de este club o un Administrador pueden asignar o cambiar al Alumno Representante." });
+            }
+
+            // Validar que el Alumno Representante principal haya rechazado la invitación
+            const [repActual] = await db.query(
+                `SELECT usuario_id, estatus FROM inscripciones WHERE club_id = ? AND rol_en_club = 'encargado_alumno'`,
+                [clubId]
+            );
+            if (repActual.length > 0 && repActual[0].estatus !== 'rechazado') {
+                return res.status(400).json({ 
+                    message: "El Alumno Representante actual aún no ha declinado la invitación. Solo se puede asignar a otro si el principal rechazó." 
+                });
+            }
+        }
+
+        // 2. Verificar que nuevo_usuario_id sea un alumno válido con boleta
+        const [alumno] = await db.query(
+            `SELECT id, role_id, 
+                    CAST(AES_DECRYPT(boleta, ?) AS CHAR CHARACTER SET utf8mb4) AS boleta,
+                    CAST(AES_DECRYPT(nombres, ?) AS CHAR CHARACTER SET utf8mb4) AS nombres,
+                    CONCAT(IFNULL(CAST(AES_DECRYPT(apellido_paterno, ?) AS CHAR CHARACTER SET utf8mb4), ''), ' ', IFNULL(CAST(AES_DECRYPT(apellido_materno, ?) AS CHAR CHARACTER SET utf8mb4), '')) AS apellidos
+             FROM usuarios WHERE id = ?`,
+            [AES_KEY, AES_KEY, AES_KEY, AES_KEY, nuevo_usuario_id]
+        );
+
+        if (alumno.length === 0 || ![ROLES.ALUMNO, ROLES.ALUMNO_REPRESENTANTE].includes(Number(alumno[0].role_id))) {
+            return res.status(400).json({ message: "El usuario seleccionado debe ser un estudiante activo con boleta registrada." });
+        }
+
+        const nombreAlumno = `${alumno[0].nombres || ''} ${alumno[0].apellidos || ''}`.trim() || 'el estudiante';
+
+        // 3. Degradación / reasignación del representante anterior de este club a miembro
+        await db.query(
+            `UPDATE inscripciones 
+             SET rol_en_club = 'miembro' 
+             WHERE club_id = ? AND rol_en_club = 'encargado_alumno' AND usuario_id != ?`,
+            [clubId, nuevo_usuario_id]
+        );
+
+        // 4. Asignar al nuevo alumno como encargado_alumno
+        const [existente] = await db.query(
+            `SELECT id, estatus, rol_en_club FROM inscripciones WHERE club_id = ? AND usuario_id = ?`,
+            [clubId, nuevo_usuario_id]
+        );
+
+        let mensajeAccion = '';
+        if (existente.length > 0) {
+            const actual = existente[0];
+            if (actual.estatus === 'activo') {
+                // Ya había firmado como miembro, se promueve a Alumno Representante activo inmediatamente
+                await db.query(
+                    `UPDATE inscripciones SET rol_en_club = 'encargado_alumno' WHERE id = ?`,
+                    [actual.id]
+                );
+                mensajeAccion = `¡${nombreAlumno} ha sido promovido exitosamente a Alumno Representante! Como ya había firmado previamente, el club cuenta ahora con su representante confirmado.`;
+            } else {
+                // Estaba pendiente o rechazado, se reactiva/actualiza como encargado_alumno pendiente de firma
+                await db.query(
+                    `UPDATE inscripciones SET rol_en_club = 'encargado_alumno', estatus = 'pendiente', fecha_inscripcion = NOW() WHERE id = ?`,
+                    [actual.id]
+                );
+                mensajeAccion = `Se ha designado a ${nombreAlumno} como Alumno Representante. Se ha enviado su invitación para que acepte y firme su participación.`;
+            }
+        } else {
+            // No estaba en el club, se inserta directamente como encargado_alumno pendiente
+            await db.query(
+                `INSERT INTO inscripciones (usuario_id, club_id, rol_en_club, estatus, fecha_inscripcion) 
+                 VALUES (?, ?, 'encargado_alumno', 'pendiente', NOW())`,
+                [nuevo_usuario_id, clubId]
+            );
+            mensajeAccion = `Se ha invitado a ${nombreAlumno} como nuevo Alumno Representante. Queda pendiente de confirmar su firma.`;
+        }
+
+        res.status(200).json({ 
+            message: mensajeAccion,
+            alumno_id: nuevo_usuario_id,
+            nombre_completo: nombreAlumno
+        });
+    } catch (error) {
+        console.error("Error al asignar nuevo alumno representante:", error);
+        res.status(500).json({ message: "Error interno al asignar el alumno representante." });
     }
 });
 
