@@ -44,7 +44,7 @@ const AdminDashboard = () => {
         }
     };
 
-    // Navegación hacia la nueva página de detalles
+    // Navegación hacia la página de detalles del club
     const goToClubDetails = (clubId) => {
         navigate(`/admin/club/${clubId}`);
     };

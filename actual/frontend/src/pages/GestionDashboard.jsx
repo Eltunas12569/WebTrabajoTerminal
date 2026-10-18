@@ -8,6 +8,16 @@ import AccionesAlumno from '../components/AccionesAlumno';
 import CalendarioEventos from '../components/CalendarioEventos';
 import Sidebar from '../components/Sidebar';
 
+const getAvatarColor = (name) => {
+    const colors = [
+        '#800020', '#003366', '#1E8449', '#D4AC0D',
+        '#7D3C98', '#A04000', '#2E4053', '#117864'
+    ];
+    const text = name || "U";
+    const index = text.charCodeAt(0) % colors.length;
+    return colors[index];
+};
+
 const GestionDashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -32,6 +42,19 @@ const GestionDashboard = () => {
     const [selectedClubName, setSelectedClubName] = useState('');
     const [selectedClub, setSelectedClub] = useState(null);
     const [sendingReview, setSendingReview] = useState(false);
+    const [memberSearchTerm, setMemberSearchTerm] = useState('');
+    const [memberFilterStatus, setMemberFilterStatus] = useState('todos');
+
+    // Estados para invitar a otro alumno en el modal de firmas
+    const [showInvitePanel, setShowInvitePanel] = useState(false);
+    const [inviteSearchTerm, setInviteSearchTerm] = useState('');
+    const [inviteResults, setInviteResults] = useState([]);
+    const [searchingInvite, setSearchingInvite] = useState(false);
+    const [selectedInviteStudent, setSelectedInviteStudent] = useState(null);
+    const [sendingInvite, setSendingInvite] = useState(false);
+    const [inviteFeedback, setInviteFeedback] = useState(null);
+    const [inviteAsRepresentante, setInviteAsRepresentante] = useState(false);
+    const [promotingStudentId, setPromotingStudentId] = useState(null);
     
     const [allActiveClubs, setAllActiveClubs] = useState([]);
     const [loadingAllClubs, setLoadingAllClubs] = useState(false);
@@ -316,27 +339,268 @@ const GestionDashboard = () => {
         fetchEventosUsuario();
     };
 
+    const fetchClubMembers = async (clubId) => {
+        const response = await api.get(`/clubes/${clubId}/miembros`);
+        const rawList = Array.isArray(response.data) ? response.data : [];
+        return rawList.map(m => {
+            const parseVal = (v) => {
+                if (!v) return '';
+                if (typeof v === 'string') return v;
+                if (v.type === 'Buffer' && Array.isArray(v.data)) {
+                    return String.fromCharCode.apply(null, v.data);
+                }
+                return String(v);
+            };
+            const nombres = parseVal(m.nombres);
+            const apellidos = parseVal(m.apellidos).trim();
+            const nombreCompleto = `${nombres} ${apellidos}`.trim() || 'Sin nombre registrado';
+            const boleta = parseVal(m.boleta) || '—';
+            const estatusNormalizado = String(m.estatus || '').trim().toLowerCase();
+            return {
+                id: m.id,
+                nombres,
+                apellidos,
+                nombre_completo: nombreCompleto,
+                boleta,
+                correo: m.correo ? String(m.correo) : '',
+                rol_en_club: m.rol_en_club || 'miembro',
+                estatus: estatusNormalizado === 'activo' 
+                    ? 'activo' 
+                    : (estatusNormalizado === 'rechazado' ? 'rechazado' : 'pendiente')
+            };
+        });
+    };
+
     const openMembersModal = async (club) => {
         setShowMembersModal(true);
         setLoadingMembers(true);
         setSelectedClubName(club.nombre);
         setSelectedClub(club);
+        setMemberSearchTerm('');
+        setMemberFilterStatus('todos');
+        setShowInvitePanel(false);
+        setInviteSearchTerm('');
+        setInviteResults([]);
+        setSelectedInviteStudent(null);
+        setInviteFeedback(null);
+        setInviteAsRepresentante(false);
+        setPromotingStudentId(null);
         try {
-            const response = await api.get(`/clubes/${club.id}/miembros`);
-            setClubMembers(response.data);
+            const members = await fetchClubMembers(club.id);
+            setClubMembers(members);
         } catch (error) {
             console.error("Error al cargar firmas:", error);
+            alert("No se pudo cargar la lista de firmas de este club.");
         } finally {
             setLoadingMembers(false);
         }
     };
 
+    const handleCloseMembersModal = () => {
+        setShowMembersModal(false);
+        setSelectedClub(null);
+        setClubMembers([]);
+        setMemberSearchTerm('');
+        setMemberFilterStatus('todos');
+        setShowInvitePanel(false);
+        setInviteSearchTerm('');
+        setInviteResults([]);
+        setSelectedInviteStudent(null);
+        setInviteFeedback(null);
+        setInviteAsRepresentante(false);
+        setPromotingStudentId(null);
+        if (location.state?.openSignaturesClubId) {
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    };
+
+    // Abrir panel enfocado en asignar al Alumno Representante
+    const handleAbrirAsignarRepresentante = () => {
+        setInviteAsRepresentante(true);
+        setShowInvitePanel(true);
+        setInviteFeedback(null);
+        setSelectedInviteStudent(null);
+        setInviteSearchTerm('');
+        setInviteResults([]);
+    };
+
+    // Promover a un miembro existente de la lista para que sea el nuevo Alumno Representante
+    const handlePromoverMiembro = async (miembro) => {
+        if (!selectedClub || !miembro) return;
+        const confirmMsg = miembro.estatus === 'activo'
+            ? `¿Deseas nombrar a "${miembro.nombre_completo}" como el nuevo Alumno Representante del club?\n\nComo este alumno ya confirmó y firmó, el club contará de inmediato con su Alumno Representante validado.`
+            : `¿Deseas nombrar a "${miembro.nombre_completo}" como el nuevo Alumno Representante del club?\n\nSe le actualizará su estatus para que firme como representante.`;
+
+        if (!window.confirm(confirmMsg)) return;
+
+        setPromotingStudentId(miembro.id);
+        setInviteFeedback(null);
+        try {
+            const res = await api.put(`/clubes/${selectedClub.id}/asignar-representante`, {
+                nuevo_usuario_id: miembro.id
+            });
+            alert(res.data.message || "¡Alumno representante asignado correctamente!");
+            const updatedMembers = await fetchClubMembers(selectedClub.id);
+            setClubMembers(updatedMembers);
+            fetchUserClubs();
+        } catch (err) {
+            console.error("Error al promover alumno:", err);
+            alert(err.response?.data?.message || "No se pudo asignar al alumno como representante.");
+        } finally {
+            setPromotingStudentId(null);
+        }
+    };
+
+    // Búsqueda de estudiantes para invitar a otro alumno al club
+    const handleSearchInviteStudents = async (query) => {
+        setInviteSearchTerm(query);
+        setSelectedInviteStudent(null);
+        setInviteFeedback(null);
+        const term = query.trim();
+        if (term.length < 2) {
+            setInviteResults([]);
+            return;
+        }
+        setSearchingInvite(true);
+        try {
+            const res = await api.get('/users', { params: { busqueda: term } });
+            const list = Array.isArray(res.data) ? res.data : [];
+            // Alumnos con invitación vigente (activos o pendientes)
+            const activeOrPendingIds = new Set(
+                clubMembers
+                    .filter(m => m.estatus === 'activo' || m.estatus === 'pendiente')
+                    .map(m => Number(m.id))
+            );
+            // Filtrar solo alumnos (rol 2 y 4 en frontend o 2/3 en backend) y excluir los ya vigentes en este club
+            const filtered = list.filter(u => {
+                const isStudent = [2, 3, 4].includes(Number(u.role_id));
+                const notAlreadyVigente = !activeOrPendingIds.has(Number(u.id));
+                return isStudent && notAlreadyVigente;
+            });
+            setInviteResults(filtered);
+        } catch (err) {
+            console.error("Error al buscar estudiantes para invitar:", err);
+            setInviteResults([]);
+        } finally {
+            setSearchingInvite(false);
+        }
+    };
+
+    // Enviar invitación al estudiante seleccionado (como miembro o como representante)
+    const handleSendInvite = async () => {
+        if (!selectedClub || !selectedInviteStudent) return;
+        setSendingInvite(true);
+        setInviteFeedback(null);
+        try {
+            if (inviteAsRepresentante && representanteRechazo) {
+                const res = await api.put(`/clubes/${selectedClub.id}/asignar-representante`, {
+                    nuevo_usuario_id: selectedInviteStudent.id
+                });
+                setInviteFeedback({
+                    type: 'success',
+                    text: res.data.message || `Alumno representante asignado exitosamente a ${selectedInviteStudent.nombres}.`
+                });
+            } else {
+                const res = await api.post(`/clubes/${selectedClub.id}/invitar`, {
+                    usuario_id: selectedInviteStudent.id
+                });
+                setInviteFeedback({
+                    type: 'success',
+                    text: res.data.message || `Invitación enviada exitosamente a ${selectedInviteStudent.nombres}.`
+                });
+            }
+            setSelectedInviteStudent(null);
+            setInviteSearchTerm('');
+            setInviteResults([]);
+            // Recargar lista actualizada de miembros/firmas
+            const updatedMembers = await fetchClubMembers(selectedClub.id);
+            setClubMembers(updatedMembers);
+            fetchUserClubs();
+        } catch (err) {
+            console.error("Error al procesar invitación / asignación:", err);
+            setInviteFeedback({
+                type: 'error',
+                text: err.response?.data?.message || "Ocurrió un error al procesar la solicitud."
+            });
+        } finally {
+            setSendingInvite(false);
+        }
+    };
+
+    // Efecto para abrir automáticamente el modal de firmas si se redirige desde la creación de un club
+    useEffect(() => {
+        if (location.state?.openSignaturesClubId) {
+            const targetClubId = location.state.openSignaturesClubId;
+            const clubFound = userClubs.find(c => Number(c.id) === Number(targetClubId));
+            if (clubFound) {
+                openMembersModal(clubFound);
+                navigate(location.pathname, { replace: true, state: {} });
+            } else if (!loadingClubs) {
+                api.get('/clubes').then(res => {
+                    const found = (res.data || []).find(c => Number(c.id) === Number(targetClubId));
+                    if (found) {
+                        openMembersModal(found);
+                    }
+                }).catch(err => console.error("Error al buscar club recién creado:", err))
+                  .finally(() => {
+                    navigate(location.pathname, { replace: true, state: {} });
+                  });
+            }
+        }
+    }, [location.state?.openSignaturesClubId, userClubs, loadingClubs]);
+
+    const MIN_FIRMAS = 20;
+    const firmadosCount = clubMembers.filter(m => m.estatus === 'activo').length;
+    const pendientesCount = clubMembers.filter(m => m.estatus === 'pendiente').length;
+    const rechazadosCount = clubMembers.filter(m => m.estatus === 'rechazado').length;
+    const porcentajeProgreso = Math.min(100, Math.round((firmadosCount / MIN_FIRMAS) * 100));
+
+    // Detección del estado del Alumno Representante
+    const representanteActual = clubMembers.find(m => m.rol_en_club === 'encargado_alumno');
+    const representanteActivo = Boolean(representanteActual && representanteActual.estatus === 'activo');
+    const representanteRechazo = Boolean(representanteActual && representanteActual.estatus === 'rechazado');
+    const representantePendiente = Boolean(representanteActual && representanteActual.estatus === 'pendiente');
+
+    // La meta para enviar a revisión requiere 20 firmas y obligatoriamente la firma del Alumno Representante
+    const metaCumplida = firmadosCount >= MIN_FIRMAS && representanteActivo;
+
+    // Permiso para reasignar representante (Profesor Titular o Administrador)
+    const esProfesorTitularClub = user && selectedClub && (
+        Number(user.id) === Number(selectedClub.profesor_encargado_id) ||
+        selectedClub.mi_rol_interno === 'encargado_profesor'
+    );
+    const puedeGestionarRepresentante = Boolean(
+        user && (Number(user.role_id || user.rol) === 1 || esProfesorTitularClub)
+    );
+
+    const filteredClubMembers = clubMembers.filter(m => {
+        if (memberFilterStatus === 'firmados' && m.estatus !== 'activo') return false;
+        if (memberFilterStatus === 'pendientes' && m.estatus !== 'pendiente') return false;
+        if (memberFilterStatus === 'rechazados' && m.estatus !== 'rechazado') return false;
+        if (memberSearchTerm.trim()) {
+            const term = memberSearchTerm.toLowerCase();
+            const fullName = (m.nombre_completo || '').toLowerCase();
+            const boleta = String(m.boleta || '').toLowerCase();
+            const email = (m.correo || '').toLowerCase();
+            return fullName.includes(term) || boleta.includes(term) || email.includes(term);
+        }
+        return true;
+    });
+
     const handleEnviarRevision = async () => {
         if (!selectedClub) return;
+        if (!representanteActivo) {
+            alert("No se puede enviar a revisión: El club requiere obligatoriamente que el Alumno Representante haya aceptado y firmado su participación.");
+            return;
+        }
+        if (firmadosCount < MIN_FIRMAS) {
+            alert(`Aún faltan confirmaciones. Se requieren al menos ${MIN_FIRMAS} firmas de estudiantes y actualmente hay ${firmadosCount}.`);
+            return;
+        }
         setSendingReview(true);
         try {
             const response = await api.put(`/clubes/${selectedClub.id}/enviar-revision`, {});
-            alert(response.data.message);
+            alert(response.data.message || "¡Club enviado a revisión institucional exitosamente!");
             setShowMembersModal(false);
             fetchUserClubs();
         } catch (error) {
@@ -690,9 +954,9 @@ const GestionDashboard = () => {
                                                                 📋 Panel y Detalles
                                                             </button>
 
-                                                            {club.mi_rol_interno === 'encargado_profesor' && club.estatus === 'esperando_firmas' && (
+                                                            {club.estatus === 'esperando_firmas' && (club.mi_rol_interno === 'encargado_profesor' || club.mi_rol_interno === 'encargado_alumno' || user?.role_id === 1) && (
                                                                 <button 
-                                                                    type="button"
+                                                                    type="button" 
                                                                     className="btn-club-action signatures"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
@@ -727,110 +991,507 @@ const GestionDashboard = () => {
 
             {/* Modal de Detalles y Firmas del Club */}
             {showMembersModal && (
-                <div className="club-details-overlay" onClick={() => setShowMembersModal(false)}>
+                <div 
+                    className="club-details-overlay" 
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            handleCloseMembersModal();
+                        }
+                    }}
+                >
                     <div
-                        className="club-details-modal"
+                        className="club-details-modal signatures-modal-dialog"
                         onClick={e => e.stopPropagation()}
-                        style={{ maxWidth: '820px', width: '92%', maxHeight: '90vh', overflowY: 'auto', borderRadius: '16px' }}
                     >
-                        <button className="close-modal-btn" onClick={() => setShowMembersModal(false)}>✖</button>
-                        <h2 className="modal-title" style={{ marginBottom: '4px' }}>{selectedClubName}</h2>
-                        <p style={{ textAlign: 'center', color: '#64748b', marginTop: 0, marginBottom: '22px', fontSize: '0.92rem' }}>
-                            Control de Firmas de Conformidad e Integrantes Registrados
-                        </p>
+                        <button 
+                            type="button" 
+                            className="sig-modal-close-btn" 
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleCloseMembersModal();
+                            }}
+                            title="Cerrar ventana"
+                            aria-label="Cerrar ventana"
+                        >
+                            ✕
+                        </button>
+                        
+                        <div className="sig-modal-header">
+                            <div className="sig-modal-header-top">
+                                <span className="sig-modal-badge">
+                                    {selectedClub?.estatus === 'esperando_firmas' ? '⏳ Esperando Firmas' : (selectedClub?.estatus || 'Expediente')}
+                                </span>
+                                {selectedClub?.codigo_union && (
+                                    <span className="sig-modal-code">Código: {selectedClub.codigo_union}</span>
+                                )}
+                            </div>
+                            <h2 className="sig-modal-title">{selectedClubName}</h2>
+                            <p className="sig-modal-subtitle">
+                                Control de Firmas de Conformidad e Integrantes Registrados
+                            </p>
+                        </div>
                         
                         {loadingMembers ? (
-                            <p style={{ textAlign: 'center', padding: '30px' }}>Cargando lista de alumnos...</p>
+                            <div className="sig-loading-state">
+                                <div className="sig-spinner"></div>
+                                <p>Cargando lista de firmas de los alumnos...</p>
+                            </div>
                         ) : (
-                            <div>
-                                {/* Resumen en 3 tarjetas */}
+                            <div className="sig-modal-body">
+                                {/* Banner explicativo de estado */}
+                                {selectedClub?.estatus === 'esperando_firmas' && (
+                                    <>
+                                        {representanteRechazo && (
+                                            <div className="sig-status-notice error-alert">
+                                                <div className="sig-notice-icon">⚠️</div>
+                                                <div className="sig-notice-content">
+                                                    <strong>¡Atención! El Alumno Representante declinó la invitación</strong>
+                                                    <p>
+                                                        Para que el club pueda constituirse y enviarse a revisión institucional, es indispensable contar con un Alumno Representante activo. 
+                                                        {puedeGestionarRepresentante 
+                                                            ? " Puedes promover a cualquiera de los integrantes que ya firmaron en la lista o asignar a un nuevo estudiante como representante." 
+                                                            : " El Profesor Titular o la administración deben asignar a un nuevo representante."}
+                                                    </p>
+                                                    {puedeGestionarRepresentante && (
+                                                        <button
+                                                            type="button"
+                                                            className="sig-btn-notice-action"
+                                                            onClick={handleAbrirAsignarRepresentante}
+                                                        >
+                                                            ⭐ Asignar Nuevo Representante
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {!representanteRechazo && (
+                                            <div className={`sig-status-notice ${metaCumplida ? 'ready' : (firmadosCount >= MIN_FIRMAS && !representanteActivo ? 'warning-rep' : 'waiting')}`}>
+                                                <div className="sig-notice-icon">{metaCumplida ? '🎉' : (firmadosCount >= MIN_FIRMAS && !representanteActivo ? '⏳' : 'ℹ️')}</div>
+                                                <div className="sig-notice-content">
+                                                    <strong>
+                                                        {metaCumplida 
+                                                            ? '¡Requisitos de firmas alcanzados!' 
+                                                            : firmadosCount >= MIN_FIRMAS && !representanteActivo
+                                                                ? 'Meta de firmas alcanzada (Esperando firma del Alumno Representante)'
+                                                                : 'Expediente en recopilación de firmas'}
+                                                    </strong>
+                                                    <p>
+                                                        {metaCumplida
+                                                            ? `Se han recolectado ${firmadosCount} firmas de alumnos (mínimo requerido: ${MIN_FIRMAS}) y el Alumno Representante ha firmado su conformidad. Ya puedes enviar el club a revisión del comité institucional.`
+                                                            : firmadosCount >= MIN_FIRMAS && !representanteActivo
+                                                                ? `Se cuenta con las ${firmadosCount} firmas requeridas, pero el Alumno Representante aún no confirma su participación. Una vez que firme, se habilitará el envío institucional.`
+                                                                : `Se requiere que al menos ${MIN_FIRMAS} estudiantes confirmen y firmen su participación para validar el club, incluyendo al Alumno Representante. Faltan ${Math.max(0, MIN_FIRMAS - firmadosCount)} firmas.`}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+
+                                {/* Resumen en 4 tarjetas métricas */}
                                 <div className="signatures-summary-grid">
                                     <div className="sig-metric-box">
                                         <span className="sig-metric-val">{clubMembers.length}</span>
                                         <span className="sig-metric-label">Total en Lista</span>
                                     </div>
-                                    <div className="sig-metric-box">
+                                    <div className="sig-metric-box success">
                                         <span className="sig-metric-val" style={{ color: '#16a34a' }}>
-                                            {clubMembers.filter(m => m.estatus === 'activo').length}
+                                            {firmadosCount} / {MIN_FIRMAS}
                                         </span>
                                         <span className="sig-metric-label">Firmados ✓</span>
                                     </div>
-                                    <div className="sig-metric-box">
+                                    <div className="sig-metric-box warning">
                                         <span className="sig-metric-val" style={{ color: '#d97706' }}>
-                                            {clubMembers.filter(m => m.estatus === 'pendiente').length}
+                                            {pendientesCount}
                                         </span>
                                         <span className="sig-metric-label">Pendientes ⏳</span>
                                     </div>
+                                    <div className="sig-metric-box danger">
+                                        <span className="sig-metric-val" style={{ color: '#dc2626' }}>
+                                            {rechazadosCount}
+                                        </span>
+                                        <span className="sig-metric-label">Rechazados ❌</span>
+                                    </div>
                                 </div>
 
-                                <div style={{ overflowX: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
+                                {/* Barra de progreso de firmas */}
+                                <div className="sig-progress-container">
+                                    <div className="sig-progress-header">
+                                        <span className="sig-progress-title">Avance hacia la meta de firmas requeridas</span>
+                                        <span className={`sig-progress-percent ${metaCumplida ? 'complete' : ''}`}>
+                                            {porcentajeProgreso}% ({firmadosCount} de {MIN_FIRMAS})
+                                        </span>
+                                    </div>
+                                    <div className="sig-progress-track">
+                                        <div 
+                                            className={`sig-progress-fill ${metaCumplida ? 'complete' : ''}`}
+                                            style={{ width: `${porcentajeProgreso}%` }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Barra de búsqueda, filtros rápidos y botón de invitar */}
+                                <div className="sig-toolbar">
+                                    <div className="sig-search-box">
+                                        <span className="sig-search-icon">🔍</span>
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar alumno por nombre o boleta..."
+                                            value={memberSearchTerm}
+                                            onChange={(e) => setMemberSearchTerm(e.target.value)}
+                                        />
+                                        {memberSearchTerm && (
+                                            <button 
+                                                type="button" 
+                                                className="sig-search-clear" 
+                                                onClick={() => setMemberSearchTerm('')}
+                                            >
+                                                ×
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="sig-filters">
+                                        <button
+                                            type="button"
+                                            className={`sig-filter-btn ${memberFilterStatus === 'todos' ? 'active' : ''}`}
+                                            onClick={() => setMemberFilterStatus('todos')}
+                                        >
+                                            Todos ({clubMembers.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`sig-filter-btn ${memberFilterStatus === 'firmados' ? 'active' : ''}`}
+                                            onClick={() => setMemberFilterStatus('firmados')}
+                                        >
+                                            Firmados ({firmadosCount})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`sig-filter-btn ${memberFilterStatus === 'pendientes' ? 'active' : ''}`}
+                                            onClick={() => setMemberFilterStatus('pendientes')}
+                                        >
+                                            Pendientes ({pendientesCount})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`sig-filter-btn rejected ${memberFilterStatus === 'rechazados' ? 'active' : ''}`}
+                                            onClick={() => setMemberFilterStatus('rechazados')}
+                                        >
+                                            Rechazados ({rechazadosCount})
+                                        </button>
+                                    </div>
+                                    <div className="sig-toolbar-actions">
+                                        {puedeGestionarRepresentante && selectedClub?.estatus === 'esperando_firmas' && representanteRechazo && (
+                                            <button
+                                                type="button"
+                                                className="sig-btn-asignar-rep-toolbar"
+                                                onClick={handleAbrirAsignarRepresentante}
+                                                title="Asignar o reemplazar al Alumno Representante que declinó la invitación"
+                                            >
+                                                ⭐ Asignar Representante
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            className={`sig-invite-toggle-btn ${showInvitePanel ? 'active' : ''}`}
+                                            onClick={() => {
+                                                setShowInvitePanel(prev => !prev);
+                                                setInviteFeedback(null);
+                                                setInviteAsRepresentante(false);
+                                            }}
+                                        >
+                                            {showInvitePanel ? '✕ Cerrar Panel' : '➕ Invitar a Otro Alumno'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Panel desplegable para invitar o asignar alumno */}
+                                {showInvitePanel && (
+                                    <div className={`sig-invite-panel ${inviteAsRepresentante ? 'rep-mode' : ''}`}>
+                                        <div className="sig-invite-panel-header">
+                                            <div className="sig-invite-panel-title">
+                                                <span className="sig-invite-panel-icon">{inviteAsRepresentante ? '⭐' : '✉️'}</span>
+                                                <div>
+                                                    <strong>
+                                                        {inviteAsRepresentante 
+                                                            ? 'Asignar Nuevo Alumno Representante' 
+                                                            : 'Invitar a un nuevo estudiante al club'}
+                                                    </strong>
+                                                    <p>
+                                                        {inviteAsRepresentante 
+                                                            ? 'Busca a un alumno por nombre o boleta para nombrarlo como Alumno Representante y enviarle su invitación/confirmación:' 
+                                                            : 'Busca a un alumno por nombre o boleta para enviarle una invitación y recabar su firma:'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                type="button" 
+                                                className="sig-invite-close-btn"
+                                                onClick={() => {
+                                                    setShowInvitePanel(false);
+                                                    setInviteFeedback(null);
+                                                    setInviteAsRepresentante(false);
+                                                }}
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+
+                                        {/* Selector de rol de la invitación solo si el representante declinó */}
+                                        {puedeGestionarRepresentante && representanteRechazo && (
+                                            <div className="sig-invite-role-selector">
+                                                <span className="sig-invite-role-label">Rol a asignar:</span>
+                                                <div className="sig-invite-role-buttons">
+                                                    <button
+                                                        type="button"
+                                                        className={`sig-invite-role-chip ${!inviteAsRepresentante ? 'active' : ''}`}
+                                                        onClick={() => setInviteAsRepresentante(false)}
+                                                    >
+                                                        👤 Integrante común
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`sig-invite-role-chip rep ${inviteAsRepresentante ? 'active' : ''}`}
+                                                        onClick={() => setInviteAsRepresentante(true)}
+                                                    >
+                                                        ⭐ Alumno Representante
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {inviteFeedback && (
+                                            <div className={`sig-invite-alert ${inviteFeedback.type}`}>
+                                                <span>{inviteFeedback.type === 'success' ? '✓' : '⚠️'}</span>
+                                                <span>{inviteFeedback.text}</span>
+                                            </div>
+                                        )}
+
+                                        <div className="sig-invite-form">
+                                            <div className="sig-invite-search-container">
+                                                <div className="sig-invite-input-wrap">
+                                                    <span className="sig-invite-search-icon">🔍</span>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Escribe al menos 2 letras o boleta del alumno..."
+                                                        value={inviteSearchTerm}
+                                                        onChange={(e) => handleSearchInviteStudents(e.target.value)}
+                                                        className="sig-invite-input"
+                                                    />
+                                                    {searchingInvite && <span className="sig-invite-spinner-inline" />}
+                                                </div>
+
+                                                {/* Dropdown de sugerencias de alumnos */}
+                                                {inviteResults.length > 0 && !selectedInviteStudent && (
+                                                    <div className="sig-invite-dropdown">
+                                                        {inviteResults.map((est) => (
+                                                            <div
+                                                                key={est.id}
+                                                                className="sig-invite-dropdown-item"
+                                                                onClick={() => {
+                                                                    setSelectedInviteStudent(est);
+                                                                    setInviteResults([]);
+                                                                    setInviteSearchTerm(`${est.nombres} ${est.apellidos || ''}`.trim());
+                                                                }}
+                                                            >
+                                                                <div className="sig-invite-student-info">
+                                                                    <span className="sig-invite-student-name">
+                                                                        {est.nombres} {est.apellidos}
+                                                                    </span>
+                                                                    <span className="sig-invite-student-boleta">
+                                                                        Boleta: {est.boleta || '—'}
+                                                                    </span>
+                                                                </div>
+                                                                <span className="sig-invite-select-badge">
+                                                                    {inviteAsRepresentante ? 'Elegir Representante ➜' : 'Seleccionar ➜'}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {inviteSearchTerm.trim().length >= 2 && !searchingInvite && inviteResults.length === 0 && !selectedInviteStudent && (
+                                                    <div className="sig-invite-dropdown empty">
+                                                        No se encontraron estudiantes disponibles con ese criterio.
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {selectedInviteStudent && (
+                                                <div className="sig-invite-selected-card">
+                                                    <div className="sig-invite-selected-details">
+                                                        <span className="sig-invite-selected-label">
+                                                            {inviteAsRepresentante 
+                                                                ? 'Estudiante para Alumno Representante:' 
+                                                                : 'Estudiante seleccionado:'}
+                                                        </span>
+                                                        <strong className="sig-invite-selected-name">
+                                                            {inviteAsRepresentante ? '⭐' : '🎓'} {selectedInviteStudent.nombres} {selectedInviteStudent.apellidos}
+                                                        </strong>
+                                                        <span className="sig-invite-selected-boleta">
+                                                            Boleta: {selectedInviteStudent.boleta || 'Sin boleta'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="sig-invite-selected-actions">
+                                                        <button
+                                                            type="button"
+                                                            className="sig-invite-btn-cancel-select"
+                                                            onClick={() => {
+                                                                setSelectedInviteStudent(null);
+                                                                setInviteSearchTerm('');
+                                                            }}
+                                                        >
+                                                            Cambiar
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={`sig-invite-btn-send ${inviteAsRepresentante ? 'rep-btn' : ''}`}
+                                                            onClick={handleSendInvite}
+                                                            disabled={sendingInvite}
+                                                        >
+                                                            {sendingInvite 
+                                                                ? 'Procesando...' 
+                                                                : inviteAsRepresentante
+                                                                    ? '⭐ Asignar como Representante'
+                                                                    : '📨 Enviar Invitación'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Tabla de Miembros y Firmas */}
+                                <div className="sig-table-wrapper">
+                                    <table className="sig-table">
                                         <thead>
-                                            <tr style={{ backgroundColor: '#003366', color: '#fff', textAlign: 'left' }}>
-                                                <th style={{ padding: '12px 16px', borderTopLeftRadius: '8px' }}>Integrante</th>
-                                                <th style={{ padding: '12px 16px' }}>Identificador</th>
-                                                <th style={{ padding: '12px 16px' }}>Rol</th>
-                                                <th style={{ padding: '12px 16px', borderTopRightRadius: '8px' }}>Firma</th>
+                                            <tr>
+                                                <th style={{ width: '40px' }}>#</th>
+                                                <th>Estudiante</th>
+                                                <th>Boleta</th>
+                                                <th>Rol en Club</th>
+                                                <th style={{ textAlign: 'center' }}>Estado de Firma</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {clubMembers.map((miembro, idx) => (
-                                                <tr key={miembro.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
-                                                    <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1e293b' }}>
-                                                        {miembro.nombres} {miembro.apellidos}
+                                            {filteredClubMembers.map((miembro, idx) => (
+                                                <tr key={miembro.id}>
+                                                    <td className="sig-td-idx">{idx + 1}</td>
+                                                    <td className="sig-td-student">
+                                                        <div className="sig-student-cell">
+                                                            <div 
+                                                                className="sig-avatar"
+                                                                style={{ backgroundColor: getAvatarColor(miembro.nombres) }}
+                                                            >
+                                                                {(miembro.nombres || 'A').charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div className="sig-student-names">
+                                                                <span className="sig-name">{miembro.nombre_completo}</span>
+                                                                {miembro.correo && (
+                                                                    <span className="sig-email">{miembro.correo}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </td>
-                                                    <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
-                                                        {miembro.boleta || miembro.num_empleado || '—'}
+                                                    <td className="sig-td-boleta">
+                                                        <span className="sig-boleta-chip">{miembro.boleta}</span>
                                                     </td>
-                                                    <td style={{ padding: '12px 16px' }}>
-                                                        <span className={`role-badge-chip ${miembro.rol_en_club === 'encargado_alumno' ? 'lider' : miembro.rol_en_club === 'encargado_profesor' ? 'profesor' : 'miembro'}`}>
-                                                            {miembro.rol_en_club === 'encargado_alumno' ? '🎓 Líder' : miembro.rol_en_club === 'encargado_profesor' ? '👨‍🏫 Profesor' : 'Miembro'}
-                                                        </span>
+                                                    <td className="sig-td-rol">
+                                                        <div className="sig-rol-cell-wrapper">
+                                                            <span className={`role-badge-chip ${miembro.rol_en_club === 'encargado_alumno' ? 'lider' : 'miembro'}`}>
+                                                                {miembro.rol_en_club === 'encargado_alumno' ? '⭐ Alumno Representante' : '👤 Integrante'}
+                                                            </span>
+                                                            {/* Botón para promover a representante solo si el representante principal rechazó */}
+                                                            {miembro.rol_en_club !== 'encargado_alumno' && representanteRechazo && puedeGestionarRepresentante && selectedClub?.estatus === 'esperando_firmas' && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="sig-btn-promover-rep"
+                                                                    title={miembro.estatus === 'activo'
+                                                                        ? "Nombrar a este alumno como el nuevo Alumno Representante (ya cuenta con firma confirmada)"
+                                                                        : "Nombrar a este alumno como el nuevo Alumno Representante"}
+                                                                    onClick={() => handlePromoverMiembro(miembro)}
+                                                                    disabled={promotingStudentId === miembro.id}
+                                                                >
+                                                                    {promotingStudentId === miembro.id ? 'Asignando...' : '⭐ Nombrar Representante'}
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </td>
-                                                    <td style={{ padding: '12px 16px' }}>
+                                                    <td className="sig-td-status" style={{ textAlign: 'center' }}>
                                                         {miembro.estatus === 'activo' ? (
-                                                            <span style={{ color: '#15803d', backgroundColor: '#dcfce7', padding: '4px 10px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: '700' }}>
+                                                            <span className="sig-status-badge signed">
                                                                 ✓ Firmado
                                                             </span>
+                                                        ) : miembro.estatus === 'rechazado' ? (
+                                                            <div className="sig-status-rejected-wrap">
+                                                                <span className="sig-status-badge rejected" title="El estudiante no aceptó la invitación">
+                                                                    ❌ Rechazó invitación
+                                                                </span>
+                                                                {miembro.rol_en_club === 'encargado_alumno' && puedeGestionarRepresentante && selectedClub?.estatus === 'esperando_firmas' && (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="sig-btn-reemplazar-rep-mini"
+                                                                        title="Buscar a otro estudiante para asignarlo como Alumno Representante"
+                                                                        onClick={handleAbrirAsignarRepresentante}
+                                                                    >
+                                                                        ⭐ Reemplazar Representante
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         ) : (
-                                                            <span style={{ color: '#b45309', backgroundColor: '#fef3c7', padding: '4px 10px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: '700' }}>
-                                                                ⏳ Pendiente
+                                                            <span className="sig-status-badge pending">
+                                                                ⏳ Pendiente de firma
                                                             </span>
                                                         )}
                                                     </td>
                                                 </tr>
                                             ))}
-                                            {clubMembers.length === 0 && (
+                                            {filteredClubMembers.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="4" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
-                                                        No hay miembros inscritos.
+                                                    <td colSpan="5" className="sig-empty-row">
+                                                        No se encontraron integrantes con el criterio seleccionado.
                                                     </td>
                                                 </tr>
                                             )}
                                         </tbody>
                                     </table>
+                                </div>
+
+                                {/* Pie del Modal con Acciones */}
+                                <div className="sig-modal-footer">
+                                    <button
+                                        type="button"
+                                        className="btn-cancelar-club"
+                                        onClick={handleCloseMembersModal}
+                                    >
+                                        Cerrar
+                                    </button>
 
                                     {selectedClub?.estatus === 'esperando_firmas' && (
-                                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
-                                            <button 
-                                                onClick={handleEnviarRevision}
-                                                disabled={sendingReview}
-                                                style={{ 
-                                                    padding: '12px 28px',
-                                                    backgroundColor: '#16a34a',
-                                                    color: 'white', 
-                                                    border: 'none',
-                                                    borderRadius: '10px',
-                                                    fontWeight: '700', 
-                                                    cursor: sendingReview ? 'not-allowed' : 'pointer',
-                                                    fontSize: '0.96rem',
-                                                    boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
-                                                    transition: 'all 0.2s ease'
-                                                }}
-                                            >
-                                                {sendingReview ? 'Enviando...' : '🚀 Enviar Club a Revisión Institucional'}
-                                            </button>
-                                        </div>
+                                        <button 
+                                            type="button"
+                                            onClick={handleEnviarRevision}
+                                            disabled={sendingReview || !metaCumplida}
+                                            className={`btn-enviar-revision ${metaCumplida ? 'ready' : 'locked'}`}
+                                            title={
+                                                !representanteActivo
+                                                    ? 'Se requiere obligatoriamente que el Alumno Representante acepte y firme su participación'
+                                                    : firmadosCount < MIN_FIRMAS
+                                                        ? `Faltan ${MIN_FIRMAS - firmadosCount} firmas de alumnos para habilitar el envío`
+                                                        : 'Enviar club para validación de la administración'
+                                            }
+                                        >
+                                            {sendingReview 
+                                                ? 'Enviando...' 
+                                                : metaCumplida
+                                                    ? '🚀 Enviar Club a Revisión Institucional' 
+                                                    : !representanteActivo
+                                                        ? '🔒 Enviar a Revisión (Falta firma del Representante)'
+                                                        : `🔒 Enviar a Revisión (Faltan ${MIN_FIRMAS - firmadosCount} firmas)`}
+                                        </button>
                                     )}
                                 </div>
                             </div>

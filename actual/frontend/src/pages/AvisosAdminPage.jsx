@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -12,7 +12,28 @@ const AvisosAdminPage = () => {
     const [error, setError] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [eliminando, setEliminando] = useState('');
+    const [ordenFecha, setOrdenFecha] = useState('desc'); // 'desc': más recientes primero, 'asc': más antiguos primero
     const navigate = useNavigate();
+
+    // Extraer timestamp seguro para ordenar por fecha de publicación
+    const obtenerTimestampPublicacion = (aviso) => {
+        const fechaRaw = aviso.fecha_envio || aviso.fecha_creacion;
+        if (!fechaRaw) return 0;
+        const d = new Date(fechaRaw);
+        return isNaN(d.getTime()) ? 0 : d.getTime();
+    };
+
+    // Ordenamiento por fecha de publicación en el frontend
+    const avisosOrdenados = useMemo(() => {
+        return [...avisos].sort((a, b) => {
+            const tiempoA = obtenerTimestampPublicacion(a);
+            const tiempoB = obtenerTimestampPublicacion(b);
+            if (ordenFecha === 'asc') {
+                return tiempoA - tiempoB;
+            }
+            return tiempoB - tiempoA;
+        });
+    }, [avisos, ordenFecha]);
 
     useEffect(() => {
         const fetchAllAvisos = async () => {
@@ -116,12 +137,35 @@ const AvisosAdminPage = () => {
                 />
 
                 <main className="admin-main-scroll" style={{ backgroundColor: '#f4f6f8' }}>
-                    <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                         <div>
                             <h2 style={{ margin: 0 }}>Gestión de Avisos</h2>
                             <p style={{ margin: '4px 0 0 0', color: '#666' }}>Visualiza todos los avisos globales y de clubes.</p>
                         </div>
-                        <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', padding: '6px 12px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                <label htmlFor="orden-fecha" style={{ fontSize: '0.88rem', fontWeight: '600', color: '#333' }}>
+                                    📅 Ordenar por fecha:
+                                </label>
+                                <select
+                                    id="orden-fecha"
+                                    value={ordenFecha}
+                                    onChange={(e) => setOrdenFecha(e.target.value)}
+                                    style={{
+                                        padding: '6px 10px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #ccc',
+                                        backgroundColor: '#fff',
+                                        fontSize: '0.88rem',
+                                        cursor: 'pointer',
+                                        color: '#333',
+                                        fontWeight: '500'
+                                    }}
+                                >
+                                    <option value="desc">Más recientes primero</option>
+                                    <option value="asc">Más antiguos primero</option>
+                                </select>
+                            </div>
                             <button
                                 onClick={() => navigate('/admin/avisos/crear')}
                                 className="special-link"
@@ -146,7 +190,7 @@ const AvisosAdminPage = () => {
                     
                     {!loading && !error && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
-                            {avisos.map(aviso => (
+                            {avisosOrdenados.map(aviso => (
                                 <div key={`${aviso.tipo}-${aviso.id}`} style={{
                                     background: '#fff',
                                     borderRadius: '8px',
@@ -193,7 +237,7 @@ const AvisosAdminPage = () => {
                                     </div>
                                 </div>
                             ))}
-                             {avisos.length === 0 && (
+                             {avisosOrdenados.length === 0 && (
                                 <div className="loading-state">No se encontraron avisos.</div>
                             )}
                         </div>

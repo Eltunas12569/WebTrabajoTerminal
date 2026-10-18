@@ -14,10 +14,44 @@ const SearchIcon = () => (
     </svg>
 );
 
+// Validación estricta para garantizar que solo se listen y seleccionen alumnos (nunca profesores ni personal docente)
+const esAlumnoValido = (u) => {
+    if (!u) return false;
+    const rol = Number(u.role_id || u.rol || 0);
+
+    // 1. Excluir explícitamente rol de profesor (3) y administrador (1)
+    if (rol === 3 || rol === 1) return false;
+
+    // 2. Excluir si tiene número de empleado registrado (incluso si rol fuese 4 o 2 en DB)
+    if (u.num_empleado && String(u.num_empleado).trim() !== '' && String(u.num_empleado).trim().toLowerCase() !== 'null') {
+        return false;
+    }
+
+    // 3. Excluir si el nombre o apellido contiene la palabra "Profesor", "Profesora", "Docente" o "Prof."
+    const nombreCompleto = `${u.nombres || ''} ${u.apellidos || ''}`.toLowerCase();
+    if (nombreCompleto.includes('profesor') || nombreCompleto.includes('docente') || /\bprof\b/i.test(nombreCompleto)) {
+        return false;
+    }
+
+    // 4. Obligatorio: debe contar con una boleta de estudiante válida
+    const boleta = String(u.boleta || '').trim();
+    if (!boleta || boleta.toLowerCase() === 'null' || boleta.toLowerCase() === 'undefined' || boleta === '0') {
+        return false;
+    }
+
+    return true;
+};
+
 // Componente interno para selector con búsqueda (Autocomplete para Alumno Encargado)
-const SearchableSelect = ({ options, value, onChange, placeholder }) => {
+const SearchableSelect = ({ options, value, onChange, placeholder, onRemoteSearch }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        if (onRemoteSearch && searchTerm.trim().length >= 2) {
+            onRemoteSearch(searchTerm.trim());
+        }
+    }, [searchTerm, onRemoteSearch]);
 
     useEffect(() => {
         const selected = options.find(o => o.id == value);
@@ -28,9 +62,11 @@ const SearchableSelect = ({ options, value, onChange, placeholder }) => {
         }
     }, [value, options, isOpen]);
 
-    const filteredOptions = options.filter(op =>
-        `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredOptions = options
+        .filter(esAlumnoValido)
+        .filter(op =>
+            `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())
+        );
 
     return (
         <div className="searchable-select-wrapper">
@@ -81,6 +117,21 @@ const SearchableSelect = ({ options, value, onChange, placeholder }) => {
 
 const MIN_ESTUDIANTES = 20;
 
+const MESES_DEL_ANO = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre'
+];
+
 // Componente interno para selector múltiple (Autocomplete para plantilla de miembros)
 const MultiSearchableSelect = ({ options, selectedIds, leaderId, onChange, placeholder, onRemoteSearch }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -104,11 +155,13 @@ const MultiSearchableSelect = ({ options, selectedIds, leaderId, onChange, place
         onChange(selectedIds.filter(selectedId => selectedId !== id));
     };
 
-    const availableOptions = options.filter(op =>
-        !selectedIds.includes(op.id) &&
-        Number(op.id) !== Number(leaderId) &&
-        `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const availableOptions = options
+        .filter(esAlumnoValido)
+        .filter(op =>
+            !selectedIds.includes(op.id) &&
+            Number(op.id) !== Number(leaderId) &&
+            `${op.nombres} ${op.apellidos} ${op.boleta}`.toLowerCase().includes(searchTerm.toLowerCase())
+        );
 
     const leaderObj = options.find(o => Number(o.id) === Number(leaderId));
 
@@ -202,6 +255,7 @@ const CrearClubPage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [createdClubSuccess, setCreatedClubSuccess] = useState(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const navigate = useNavigate();
@@ -219,7 +273,8 @@ const CrearClubPage = () => {
             try {
                 setLoadingAlumnos(true);
                 const response = await api.get('/users/students-in-charge');
-                setAlumnosDisponibles(response.data);
+                const soloAlumnos = (response.data || []).filter(esAlumnoValido);
+                setAlumnosDisponibles(soloAlumnos);
             } catch (err) {
                 console.error("Error al cargar alumnos encargados:", err);
                 setError('No se pudieron cargar los alumnos disponibles.');
@@ -231,17 +286,25 @@ const CrearClubPage = () => {
     }, []);
 
     const handleBuscarAlumnos = async (termino) => {
+        if (!termino || termino.trim().length < 2) return;
         try {
             const response = await api.get('/users', { params: { busqueda: termino } });
-            const alumnos = response.data
-                .filter((u) => [2, 4].includes(Number(u.role_id)))
+            const alumnos = (response.data || [])
+                .filter(esAlumnoValido)
                 .map((u) => ({
                     id: u.id,
                     nombres: u.nombres,
                     apellidos: u.apellidos,
-                    boleta: u.boleta
+                    boleta: u.boleta,
+                    role_id: u.role_id,
+                    num_empleado: u.num_empleado
                 }));
-            setAlumnosBuscados(alumnos);
+            setAlumnosBuscados(prev => {
+                const map = new Map();
+                prev.filter(esAlumnoValido).forEach(p => map.set(p.id, p));
+                alumnos.forEach(a => map.set(a.id, a));
+                return Array.from(map.values());
+            });
         } catch (err) {
             console.error('Error al buscar alumnos:', err);
         }
@@ -249,7 +312,9 @@ const CrearClubPage = () => {
 
     const opcionesAlumnos = React.useMemo(() => {
         const mapa = new Map();
-        [...alumnosDisponibles, ...alumnosBuscados].forEach((alumno) => mapa.set(alumno.id, alumno));
+        [...alumnosDisponibles, ...alumnosBuscados]
+            .filter(esAlumnoValido)
+            .forEach((alumno) => mapa.set(alumno.id, alumno));
         return Array.from(mapa.values());
     }, [alumnosDisponibles, alumnosBuscados]);
 
@@ -310,7 +375,20 @@ const CrearClubPage = () => {
             return;
         }
 
-        const alumnosArray = Array.from(new Set([Number(alumnoEncargadoId), ...miembrosIds.map(Number)])).filter(id => id > 0);
+        const alumnoEncargadoObj = opcionesAlumnos.find(o => Number(o.id) === Number(alumnoEncargadoId));
+        if (alumnoEncargadoObj && !esAlumnoValido(alumnoEncargadoObj)) {
+            setError('Error: El encargado del club debe ser un alumno registrado con boleta válida.');
+            setLoading(false);
+            return;
+        }
+
+        const alumnosArray = Array.from(new Set([Number(alumnoEncargadoId), ...miembrosIds.map(Number)]))
+            .filter(id => id > 0)
+            .filter(id => {
+                const u = opcionesAlumnos.find(o => Number(o.id) === Number(id));
+                return !u || esAlumnoValido(u);
+            });
+
         if (alumnosArray.length < MIN_ESTUDIANTES) {
             setError(`Debes registrar al menos ${MIN_ESTUDIANTES} alumnos en total (incluyendo al encargado). Actualmente tienes ${alumnosArray.length}.`);
             setLoading(false);
@@ -340,6 +418,12 @@ const CrearClubPage = () => {
                 lista_estudiantes: alumnosArray,
                 estatus: 'esperando_firmas',
                 archivo_lista_estudiantes: 'pendiente.pdf'
+            });
+            const newClubId = response.data?.clubId;
+            setCreatedClubSuccess({
+                id: newClubId,
+                nombre: nombre,
+                totalMiembros: alumnosArray.length
             });
             setSuccess('Club creado exitosamente: ' + response.data.message);
             setNombre('');
@@ -423,9 +507,29 @@ const CrearClubPage = () => {
                             </div>
                         )}
                         {success && (
-                            <div className="message-banner success">
-                                <span>✅</span>
-                                <span>{success}</span>
+                            <div className="message-banner success" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>✅</span>
+                                    <span>{success}</span>
+                                </div>
+                                {createdClubSuccess && (
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate('/gestion', { state: { openSignaturesClubId: createdClubSuccess.id } })}
+                                        style={{
+                                            padding: '6px 14px',
+                                            backgroundColor: '#15803d',
+                                            color: '#fff',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            fontWeight: '700',
+                                            cursor: 'pointer',
+                                            fontSize: '0.85rem'
+                                        }}
+                                    >
+                                        ✍️ Ver Firmas del Club
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -543,33 +647,59 @@ const CrearClubPage = () => {
                                             </div>
                                         </div>
 
+                                        <div className="cronograma-header-row">
+                                            <span>#</span>
+                                            <span>Mes</span>
+                                            <span>Actividad u Objetivo Programado</span>
+                                            <span></span>
+                                        </div>
+
                                         <div className="cronograma-list">
                                             {cronograma.map((item, index) => (
                                                 <div key={index} className="cronograma-row">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Mes (ej. Septiembre)"
-                                                        value={item.mes}
-                                                        onChange={(e) => handleCronogramaChange(index, 'mes', e.target.value)}
-                                                        required
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Actividad programada (ej. Convocatoria y reclutamiento)"
-                                                        value={item.actividad}
-                                                        onChange={(e) => handleCronogramaChange(index, 'actividad', e.target.value)}
-                                                        required
-                                                    />
-                                                    {cronograma.length > 1 && (
-                                                        <button
-                                                            type="button"
-                                                            className="btn-remove-cronograma"
-                                                            onClick={() => handleRemoveCronogramaItem(index)}
-                                                            title="Eliminar fila del cronograma"
+                                                    <div className="cronograma-num-badge" title={`Actividad #${index + 1}`}>
+                                                        {index + 1}
+                                                    </div>
+                                                    <div className="cronograma-field-mes">
+                                                        <select
+                                                            className="cronograma-select-mes"
+                                                            value={item.mes}
+                                                            onChange={(e) => handleCronogramaChange(index, 'mes', e.target.value)}
+                                                            required
                                                         >
-                                                            ✕
-                                                        </button>
-                                                    )}
+                                                            <option value="" disabled>Selecciona mes...</option>
+                                                            {MESES_DEL_ANO.map((mes) => (
+                                                                <option key={mes} value={mes}>
+                                                                    {mes}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="cronograma-field-actividad">
+                                                        <input
+                                                            type="text"
+                                                            className="cronograma-input-actividad"
+                                                            placeholder="Ej. Convocatoria y reclutamiento, taller, torneo..."
+                                                            value={item.actividad}
+                                                            onChange={(e) => handleCronogramaChange(index, 'actividad', e.target.value)}
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div className="cronograma-field-action">
+                                                        {cronograma.length > 1 ? (
+                                                            <button
+                                                                type="button"
+                                                                className="btn-remove-cronograma"
+                                                                onClick={() => handleRemoveCronogramaItem(index)}
+                                                                title="Eliminar fila del cronograma"
+                                                                aria-label="Eliminar fila"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        ) : (
+                                                            <div className="cronograma-action-placeholder" />
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -579,7 +709,8 @@ const CrearClubPage = () => {
                                             className="btn-add-cronograma"
                                             onClick={handleAddCronogramaItem}
                                         >
-                                            ➕ Agregar otra actividad al cronograma
+                                            <span style={{ fontSize: '1rem', lineHeight: 1 }}>➕</span>
+                                            <span>Agregar otra actividad al cronograma</span>
                                         </button>
                                     </section>
                                 </div>
@@ -615,6 +746,7 @@ const CrearClubPage = () => {
                                                 options={opcionesAlumnos}
                                                 value={alumnoEncargadoId}
                                                 onChange={(id) => setAlumnoEncargadoId(id)}
+                                                onRemoteSearch={handleBuscarAlumnos}
                                                 placeholder={loadingAlumnos ? "Cargando padrón de alumnos..." : "Buscar por nombre, apellido o boleta..."}
                                             />
                                         </div>
@@ -691,6 +823,84 @@ const CrearClubPage = () => {
                     </div>
                 </main>
             </div>
+
+            {/* Modal de Confirmación y Acceso a Firmas tras Registro */}
+            {createdClubSuccess && (
+                <div className="club-details-overlay" onClick={() => setCreatedClubSuccess(null)}>
+                    <div 
+                        className="club-details-modal" 
+                        onClick={e => e.stopPropagation()} 
+                        style={{ maxWidth: '560px', width: '92%', textAlign: 'center', padding: '36px 28px', borderRadius: '18px' }}
+                    >
+                        <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🎉</div>
+                        <h2 style={{ color: '#003366', fontSize: '1.5rem', fontWeight: '800', marginBottom: '8px' }}>
+                            ¡Club Registrado Exitosamente!
+                        </h2>
+                        <p style={{ color: '#475569', fontSize: '0.98rem', lineHeight: '1.5', marginBottom: '20px' }}>
+                            El club <strong>"{createdClubSuccess.nombre}"</strong> ha sido creado y su estado actual es <strong>Esperando Firmas</strong> con <strong>{createdClubSuccess.totalMiembros}</strong> estudiantes integrantes registrados.
+                        </p>
+                        
+                        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px', marginBottom: '24px', textAlign: 'left', fontSize: '0.9rem', color: '#166534', lineHeight: '1.45' }}>
+                            <div style={{ fontWeight: '700', marginBottom: '4px' }}>📋 Próximo paso:</div>
+                            Los {createdClubSuccess.totalMiembros} estudiantes deben ingresar al sistema con su cuenta para firmar su conformidad. En cuanto se cuente con al menos <strong>20 firmas</strong>, el expediente se podrá enviar a revisión institucional.
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/gestion', { state: { openSignaturesClubId: createdClubSuccess.id } })}
+                                style={{
+                                    padding: '12px 20px',
+                                    backgroundColor: '#800020',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '10px',
+                                    fontWeight: '700',
+                                    fontSize: '0.98rem',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(128, 0, 32, 0.25)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px'
+                                }}
+                            >
+                                ✍️ Ver Control de Firmas de Este Club
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/gestion')}
+                                style={{
+                                    padding: '10px 20px',
+                                    backgroundColor: '#f1f5f9',
+                                    color: '#334155',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '10px',
+                                    fontWeight: '600',
+                                    fontSize: '0.92rem',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                📋 Ir a Mi Panel de Gestión
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setCreatedClubSuccess(null)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#64748b',
+                                    fontSize: '0.88rem',
+                                    cursor: 'pointer',
+                                    padding: '6px'
+                                }}
+                            >
+                                ➕ Registrar otro club
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

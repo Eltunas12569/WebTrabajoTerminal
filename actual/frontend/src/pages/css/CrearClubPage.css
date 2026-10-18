@@ -310,6 +310,19 @@
 /* ==========================================================================
    CRONOGRAMA (PLAN DE TRABAJO DINÁMICO)
    ========================================================================== */
+.cronograma-header-row {
+    display: grid;
+    grid-template-columns: 34px 165px 1fr 38px;
+    gap: 12px;
+    padding: 0 12px 6px 12px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    user-select: none;
+}
+
 .cronograma-list {
     display: flex;
     flex-direction: column;
@@ -319,55 +332,164 @@
 
 .cronograma-row {
     display: grid;
-    grid-template-columns: 140px 1fr auto;
-    gap: 10px;
+    grid-template-columns: 34px 165px 1fr 38px;
+    gap: 12px;
     align-items: center;
-    background: #f8fafc;
-    padding: 8px 10px;
-    border-radius: 10px;
+    background: #ffffff;
+    padding: 9px 12px;
+    border-radius: 12px;
+    border: 1.5px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cronograma-row:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.06);
+}
+
+.cronograma-row:focus-within {
+    border-color: #93c5fd;
+    box-shadow: 0 4px 14px rgba(0, 51, 102, 0.09);
+}
+
+.cronograma-num-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #f1f5f9;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.82rem;
+    font-weight: 800;
+    user-select: none;
+    transition: all 0.2s ease;
     border: 1px solid #e2e8f0;
 }
 
-.cronograma-row input {
-    background: #ffffff !important;
-    margin: 0;
+.cronograma-row:focus-within .cronograma-num-badge {
+    background: #eff6ff;
+    color: #003366;
+    border-color: #bfdbfe;
+}
+
+.cronograma-field-mes,
+.cronograma-field-actividad {
+    width: 100%;
+}
+
+.cronograma-select-mes {
+    width: 100% !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    padding: 10px 36px 10px 14px !important;
+    border: 1.5px solid #cbd5e1 !important;
+    border-radius: 9px !important;
+    font-size: 0.90rem !important;
+    font-weight: 600 !important;
+    font-family: inherit !important;
+    color: #0f172a !important;
+    background-color: #f8fafc !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none'%3e%3cpath d='M6 9l6 6 6-6' stroke='%23003366' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 11px center !important;
+    background-size: 18px 18px !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.cronograma-select-mes:hover {
+    background-color: #ffffff !important;
+    border-color: #94a3b8 !important;
+}
+
+.cronograma-select-mes:focus {
+    background-color: #ffffff !important;
+    border-color: #003366 !important;
+    box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.12) !important;
+    outline: none;
+}
+
+.cronograma-input-actividad {
+    width: 100% !important;
+    padding: 10px 14px !important;
+    border: 1.5px solid #cbd5e1 !important;
+    border-radius: 9px !important;
+    font-size: 0.90rem !important;
+    font-family: inherit !important;
+    color: #0f172a !important;
+    background-color: #f8fafc !important;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+    margin: 0 !important;
+}
+
+.cronograma-input-actividad:hover {
+    background-color: #ffffff !important;
+    border-color: #94a3b8 !important;
+}
+
+.cronograma-input-actividad:focus {
+    background-color: #ffffff !important;
+    border-color: #003366 !important;
+    box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.12) !important;
+    outline: none;
+}
+
+.cronograma-field-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn-remove-cronograma {
     width: 36px;
     height: 36px;
-    border-radius: 8px;
+    border-radius: 9px;
     background: #fef2f2;
     color: #dc2626;
-    border: 1px solid #fecaca;
+    border: 1.5px solid #fee2e2;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.9rem;
-    font-weight: bold;
-    transition: all 0.15s ease;
+    font-size: 0.88rem;
+    font-weight: 700;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+    padding: 0;
 }
 
 .btn-remove-cronograma:hover {
     background: #dc2626;
     color: #ffffff;
     border-color: #dc2626;
+    transform: scale(1.05);
+    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+}
+
+.cronograma-action-placeholder {
+    width: 36px;
+    height: 36px;
 }
 
 .btn-add-cronograma {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 9px 16px;
-    background: #eff6ff;
+    padding: 11px 18px;
+    background: #f0f7ff;
     color: #003366;
-    border: 1px dashed #93c5fd;
+    border: 1.5px dashed #93c5fd;
     border-radius: 10px;
     cursor: pointer;
     font-weight: 700;
-    font-size: 0.86rem;
-    transition: all 0.2s ease;
+    font-size: 0.88rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     width: 100%;
     justify-content: center;
 }
@@ -375,6 +497,9 @@
 .btn-add-cronograma:hover {
     background: #dbeafe;
     border-color: #003366;
+    color: #002244;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 51, 102, 0.08);
 }
 
 /* ==========================================================================
@@ -690,8 +815,19 @@
         grid-template-columns: 1fr;
     }
 
+    .cronograma-header-row {
+        display: none;
+    }
+
     .cronograma-row {
         grid-template-columns: 1fr;
+        gap: 8px;
+        position: relative;
+        padding-top: 12px;
+    }
+
+    .cronograma-field-action {
+        justify-content: flex-end;
     }
 
     .crear-club-footer-actions {

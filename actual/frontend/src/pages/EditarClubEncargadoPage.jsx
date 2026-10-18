@@ -24,6 +24,21 @@ const parseCronogramaSeguro = (raw) => {
     return [{ mes: '', actividad: '' }];
 };
 
+const MESES_DEL_ANO = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre'
+];
+
 const EditarClubEncargadoPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -360,6 +375,39 @@ const EditarClubEncargadoPage = () => {
                                         </div>
                                     )}
 
+                                    {/* AVISO DE MOTIVO DE RECHAZO A SUBSANAR */}
+                                    {club?.estatus === 'rechazado' && club?.motivo_rechazo && (
+                                        <div style={{
+                                            backgroundColor: '#fef2f2',
+                                            border: '1px solid #fecaca',
+                                            borderLeft: '5px solid #dc2626',
+                                            borderRadius: '8px',
+                                            padding: '16px 20px',
+                                            color: '#1f2937'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+                                                <strong style={{ color: '#991b1b', fontSize: '1rem' }}>
+                                                    Observaciones del Administrador (Motivo de Rechazo)
+                                                </strong>
+                                            </div>
+                                            <div style={{
+                                                backgroundColor: '#ffffff',
+                                                border: '1px solid #fca5a5',
+                                                borderRadius: '6px',
+                                                padding: '12px 16px',
+                                                marginBottom: '10px'
+                                            }}>
+                                                <p style={{ margin: 0, fontSize: '0.98rem', lineHeight: '1.6', color: '#1f2937', whiteSpace: 'pre-wrap' }}>
+                                                    {club.motivo_rechazo}
+                                                </p>
+                                            </div>
+                                            <span style={{ fontSize: '0.85rem', color: '#b91c1c', fontStyle: 'italic', display: 'block' }}>
+                                                ℹ️ Corrige los campos indicados y haz clic en "Guardar Cambios". La propuesta pasará automáticamente a estado "En Revisión".
+                                            </span>
+                                        </div>
+                                    )}
+
                                     {/* Fila 1: Descripción y Objetivo */}
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '18px' }}>
                                         <div>
@@ -450,22 +498,58 @@ const EditarClubEncargadoPage = () => {
                                                     key={idx}
                                                     style={{
                                                         display: 'grid',
-                                                        gridTemplateColumns: cronograma.length > 1 ? '220px 1fr 38px' : '220px 1fr',
+                                                        gridTemplateColumns: cronograma.length > 1 ? '34px 175px 1fr 38px' : '34px 175px 1fr',
                                                         gap: '10px',
-                                                        alignItems: 'center'
+                                                        alignItems: 'center',
+                                                        backgroundColor: '#ffffff',
+                                                        padding: '8px 10px',
+                                                        borderRadius: '10px',
+                                                        border: '1.5px solid #e2e8f0'
                                                     }}
                                                 >
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Mes / Período"
+                                                    <div style={{
+                                                        width: '32px',
+                                                        height: '32px',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: '#f1f5f9',
+                                                        color: '#475569',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontSize: '0.82rem',
+                                                        fontWeight: '800',
+                                                        userSelect: 'none'
+                                                    }} title={`Actividad #${idx + 1}`}>
+                                                        {idx + 1}
+                                                    </div>
+                                                    <select
                                                         value={item.mes}
                                                         onChange={(e) => handleCronogramaChange(idx, 'mes', e.target.value)}
-                                                        style={inputStyle}
+                                                        style={{
+                                                            ...inputStyle,
+                                                            appearance: 'none',
+                                                            WebkitAppearance: 'none',
+                                                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none'%3e%3cpath d='M6 9l6 6 6-6' stroke='%23003366' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e")`,
+                                                            backgroundRepeat: 'no-repeat',
+                                                            backgroundPosition: 'right 10px center',
+                                                            backgroundSize: '18px 18px',
+                                                            paddingRight: '36px',
+                                                            fontWeight: '600',
+                                                            cursor: 'pointer'
+                                                        }}
                                                         required
-                                                    />
+                                                    >
+                                                        <option value="" disabled>Selecciona mes...</option>
+                                                        {MESES_DEL_ANO.map((mes) => (
+                                                            <option key={mes} value={mes}>{mes}</option>
+                                                        ))}
+                                                        {item.mes && !MESES_DEL_ANO.includes(item.mes) && (
+                                                            <option value={item.mes}>{item.mes}</option>
+                                                        )}
+                                                    </select>
                                                     <input
                                                         type="text"
-                                                        placeholder="Actividad programada"
+                                                        placeholder="Actividad programada (ej. Taller, torneo, sesión práctica)"
                                                         value={item.actividad}
                                                         onChange={(e) => handleCronogramaChange(idx, 'actividad', e.target.value)}
                                                         style={inputStyle}
@@ -476,13 +560,19 @@ const EditarClubEncargadoPage = () => {
                                                             type="button"
                                                             onClick={() => handleRemoveCronogramaRow(idx)}
                                                             style={{
-                                                                height: '40px',
+                                                                width: '38px',
+                                                                height: '38px',
                                                                 backgroundColor: '#fef2f2',
                                                                 color: '#dc2626',
-                                                                border: '1px solid #fecaca',
+                                                                border: '1.5px solid #fee2e2',
                                                                 borderRadius: '8px',
                                                                 cursor: 'pointer',
-                                                                fontWeight: '700'
+                                                                fontWeight: '700',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                fontSize: '0.88rem',
+                                                                transition: 'all 0.2s ease'
                                                             }}
                                                             title="Eliminar fila"
                                                         >

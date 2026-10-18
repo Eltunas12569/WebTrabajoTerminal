@@ -5,6 +5,27 @@ import api from '../services/api';
 import './css/Dashboards.css';
 import Sidebar from '../components/Sidebar';
 
+const toSafeString = (val) => {
+    if (val === null || val === undefined) return '';
+    if (typeof val === 'string') return val;
+    if (typeof val === 'number') return String(val);
+    if (typeof val === 'object' && val.type === 'Buffer' && Array.isArray(val.data)) {
+        try {
+            return String.fromCharCode(...val.data).trim();
+        } catch (e) {
+            return '';
+        }
+    }
+    if (typeof val === 'object') {
+        try {
+            return JSON.stringify(val);
+        } catch (e) {
+            return '';
+        }
+    }
+    return String(val);
+};
+
 /**
  * Página unificada de Detalles y Panel del Club optimizada para Visualización Web Desktop.
  * Integra la navegación de la plataforma (Sidebar, Navbar fija, Dashboard Layout),
@@ -97,6 +118,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     const [loadingAsistentes, setLoadingAsistentes] = useState(false);
     const [errorAsistentes, setErrorAsistentes] = useState('');
     const [busquedaAsistente, setBusquedaAsistente] = useState('');
+    const [eliminandoEventoId, setEliminandoEventoId] = useState(null);
 
     // Roles y permisos
     const esAdmin = Number(user?.role_id) === 1 || Number(user?.rol) === 1;
@@ -105,11 +127,14 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     );
     const esProfesor = Number(user?.role_id) === 3 || Number(user?.rol) === 3;
     const canManage = esAdmin || esEncargadoClub || (
-        club && (club.profesor_encargado_id === user?.id || club.alumno_encargado_id === user?.id)
+        club && (Number(club.profesor_encargado_id) === Number(user?.id) || Number(club.alumno_encargado_id) === Number(user?.id))
     );
-    // Debido a que el backend restringe /clubes/:id/miembros a ADMINISTRADOR y PROFESOR,
-    // solo administradores y profesores pueden consultar el padrón de miembros.
-    const canViewMiembros = esAdmin || (esProfesor && isMember);
+    // Encargados (profesor o alumno), administradores y profesores miembros pueden consultar el padrón de miembros.
+    const canViewMiembros = esAdmin || canManage || (esProfesor && isMember);
+    const esEncargado = Boolean(
+        canManage ||
+        (club && ['encargado_profesor', 'encargado_alumno'].includes(miRolInterno))
+    );
 
     // Cargar avisos descartados por el usuario
     useEffect(() => {
@@ -129,7 +154,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             setLoading(true);
             try {
                 let miRegistro = null;
-                if (user?.id) {
+                if (user?.id && !esAdmin) {
                     try {
                         const userClubsRes = await api.get(`/clubes/user/${user.id}`);
                         miRegistro = (userClubsRes.data || []).find(uc => String(uc.id) === String(id));
@@ -211,19 +236,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         setSearchParams({ tab: tabId }, { replace: true });
     };
 
-    // Pre-cargar avisos y eventos para miembros (y miembros solo si tiene permiso)
+    // Carga de datos bajo demanda según la pestaña activa (evita peticiones innecesarias en 'detalles')
     useEffect(() => {
-        if (!club || !id || !isMember) return;
-        fetchAvisos();
-        fetchEventos();
-        if (canViewMiembros) {
-            fetchMiembros();
-        }
-    }, [club, id, isMember, canViewMiembros]);
-
-    // Recargar datos cuando se navega a pestañas específicas
-    useEffect(() => {
-        if (!club || !id || !isMember) return;
+        if (!club || !id || (!isMember && !canManage && !esAdmin)) return;
 
         if (activeTab === 'avisos') {
             fetchAvisos();
@@ -235,7 +250,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             fetchAvisos();
             fetchEventos();
         }
-    }, [activeTab]);
+    }, [activeTab, club, id, isMember, canViewMiembros, canManage, esAdmin]);
 
     const fetchAvisos = async () => {
         setLoadingAvisos(true);
@@ -263,11 +278,174 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
     const fetchMiembros = async () => {
         setLoadingMiembros(true);
+        setError('');
         try {
-            const res = await api.get(`/clubes/${id}/miembros`);
-            setMiembros(res.data || []);
+            // Consultar en paralelo las fuentes de información autorizadas
+            const [emergenciasRes, studentsRes, allUsersRes] = await Promise.all([
+                api.get(`/clubes/${id}/emergencias`).catch(() => ({ data: {} })),
+                api.get('/users/students-in-charge').catch(() => ({ data: [] })),
+                esAdmin ? api.get('/users/all-for-admin').catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
+            ]);
+
+            // Directorio base de usuarios desencriptados
+            const userDirectoryMap = new Map();
+
+            // 1. Si es admin y vino /all-for-admin
+            if (Array.isArray(allUsersRes?.data)) {
+                allUsersRes.data.forEach(u => {
+                    const uId = Number(u.id);
+                    userDirectoryMap.set(uId, {
+                        nombres: toSafeString(u.nombres),
+                        apellidos: `${toSafeString(u.apellido_paterno)} ${toSafeString(u.apellido_materno)}`.trim(),
+                        boleta: toSafeString(u.boleta),
+                        num_empleado: toSafeString(u.num_empleado),
+                        correo: toSafeString(u.correo)
+                    });
+                });
+            }
+
+            // 2. Mapear alumnos de /students-in-charge (desencriptados por AES para cualquier usuario verificado)
+            if (Array.isArray(studentsRes?.data)) {
+                studentsRes.data.forEach(s => {
+                    const sId = Number(s.id);
+                    if (!userDirectoryMap.has(sId)) {
+                        userDirectoryMap.set(sId, {
+                            nombres: toSafeString(s.nombres),
+                            apellidos: toSafeString(s.apellidos),
+                            boleta: toSafeString(s.boleta),
+                            num_empleado: '',
+                            correo: ''
+                        });
+                    }
+                });
+            }
+
+            // 3. Agregar los datos conocidos del usuario actual si está en sesión
+            if (user?.id) {
+                const myId = Number(user.id);
+                if (!userDirectoryMap.has(myId)) {
+                    userDirectoryMap.set(myId, {
+                        nombres: toSafeString(user.nombres || user.nombre),
+                        apellidos: toSafeString(`${user.apellido_paterno || ''} ${user.apellido_materno || ''}`.trim() || user.apellidos),
+                        boleta: toSafeString(user.boleta),
+                        num_empleado: toSafeString(user.num_empleado),
+                        correo: toSafeString(user.correo)
+                    });
+                }
+            }
+
+            // 4. Agregar los encargados oficiales del club si están disponibles en el objeto club
+            if (club?.profesor_encargado_id) {
+                const profId = Number(club.profesor_encargado_id);
+                const prev = userDirectoryMap.get(profId) || {};
+                userDirectoryMap.set(profId, {
+                    nombres: toSafeString(club.profesor_encargado || prev.nombres),
+                    apellidos: toSafeString(prev.apellidos),
+                    boleta: '',
+                    num_empleado: toSafeString(club.profesor_num_empleado || prev.num_empleado),
+                    correo: toSafeString(prev.correo)
+                });
+            }
+            if (club?.alumno_encargado_id) {
+                const alumId = Number(club.alumno_encargado_id);
+                const prev = userDirectoryMap.get(alumId) || {};
+                userDirectoryMap.set(alumId, {
+                    nombres: toSafeString(club.alumno_encargado || prev.nombres),
+                    apellidos: toSafeString(prev.apellidos),
+                    boleta: toSafeString(club.alumno_boleta || prev.boleta),
+                    num_empleado: '',
+                    correo: toSafeString(prev.correo)
+                });
+            }
+
+            // 5. Lista de miembros procedentes de /emergencias (único endpoint con WHERE i.club_id correcto en backend)
+            let rawMiembros = emergenciasRes.data?.miembros;
+            if (!Array.isArray(rawMiembros) || rawMiembros.length === 0) {
+                try {
+                    const fallbackRes = await api.get(`/clubes/${id}/miembros`);
+                    rawMiembros = fallbackRes.data || [];
+                } catch (e) {
+                    rawMiembros = [];
+                }
+            }
+
+            // 6. Para miembros que aún no tengan nombre en el directorio, consultar su ficha médica si se tiene permiso
+            const unmappedMembers = (rawMiembros || []).filter(m => {
+                const mId = Number(m.usuario_id || m.id);
+                return !userDirectoryMap.has(mId);
+            });
+
+            if (unmappedMembers.length > 0 && canManage) {
+                const individualFetches = await Promise.allSettled(
+                    unmappedMembers.map(m => api.get(`/clubes/${id}/miembros/${m.usuario_id || m.id}/emergencia`).catch(() => null))
+                );
+                individualFetches.forEach(res => {
+                    if (res.status === 'fulfilled' && res.value?.data) {
+                        const d = res.value.data;
+                        const dId = Number(d.usuario_id);
+                        userDirectoryMap.set(dId, {
+                            nombres: toSafeString(d.nombre_completo || d.nombres),
+                            apellidos: toSafeString(d.apellidos),
+                            boleta: toSafeString(d.boleta),
+                            num_empleado: toSafeString(d.num_empleado),
+                            correo: toSafeString(d.correo)
+                        });
+                    }
+                });
+            }
+
+            // 7. Ensamblar la lista limpia de miembros garantizando strings seguros sin objetos Buffer
+            const listaMiembros = (rawMiembros || []).map(m => {
+                const mId = Number(m.usuario_id || m.id);
+                const uInfo = userDirectoryMap.get(mId);
+
+                let nombres = '';
+                let apellidos = '';
+                let boleta = '';
+                let num_empleado = '';
+                let correo = toSafeString(m.correo || uInfo?.correo);
+
+                if (uInfo) {
+                    nombres = toSafeString(uInfo.nombres);
+                    apellidos = toSafeString(uInfo.apellidos);
+                    boleta = toSafeString(uInfo.boleta);
+                    num_empleado = toSafeString(uInfo.num_empleado);
+                    if (!correo) correo = toSafeString(uInfo.correo);
+                } else {
+                    const rawNom = toSafeString(m.nombre_completo || m.nombres);
+                    if (!rawNom || rawNom.length > 50 || /[^\x20-\x7EáéíóúÁÉÍÓÚñÑ]/.test(rawNom)) {
+                        nombres = `Usuario ${mId}`;
+                    } else {
+                        nombres = rawNom;
+                    }
+                    apellidos = toSafeString(m.apellidos);
+                    boleta = toSafeString(m.boleta);
+                    num_empleado = toSafeString(m.num_empleado);
+                }
+
+                let nombreCompleto = `${nombres} ${apellidos}`.trim();
+                if (!nombreCompleto || /[^\x20-\x7EáéíóúÁÉÍÓÚñÑ]/.test(nombreCompleto)) {
+                    nombreCompleto = `Usuario ${mId}`;
+                }
+
+                return {
+                    id: mId,
+                    usuario_id: mId,
+                    nombres: nombres || `Usuario ${mId}`,
+                    apellidos: apellidos,
+                    nombre_completo: nombreCompleto,
+                    boleta: boleta,
+                    num_empleado: num_empleado,
+                    correo: correo || '—',
+                    rol_en_club: toSafeString(m.rol_en_club || 'miembro'),
+                    estatus: toSafeString(m.estatus_inscripcion || m.estatus || 'activo')
+                };
+            });
+
+            setMiembros(listaMiembros);
         } catch (err) {
-            console.error(err);
+            console.error("Error al cargar miembros del club:", err);
+            setError("No se pudo cargar la lista de miembros.");
         } finally {
             setLoadingMiembros(false);
         }
@@ -475,6 +653,33 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
         }
     };
 
+    const handleEliminarEventoAdmin = async (evento) => {
+        if (!evento || !evento.id) return;
+        const confirmacion = window.confirm(
+            `¿Estás seguro de que deseas eliminar el evento "${evento.titulo}"? Esta acción cancelará el evento y eliminará los registros de asistencia asociados permanentemente.`
+        );
+        if (!confirmacion) return;
+
+        setEliminandoEventoId(evento.id);
+        setError('');
+        setSuccess('');
+        try {
+            await api.delete(`/avisos/gestion-admin/eventos/${evento.id}`);
+            setEventos(prev => prev.filter(e => e.id !== evento.id));
+            if (eventoAsistentesModal && eventoAsistentesModal.id === evento.id) {
+                setEventoAsistentesModal(null);
+            }
+            setSuccess(`El evento "${evento.titulo}" fue eliminado correctamente.`);
+            setTimeout(() => setSuccess(''), 4500);
+        } catch (err) {
+            console.error("Error al eliminar evento:", err);
+            const msg = err.response?.data?.message || err.response?.data?.mensaje || err.message || 'No se pudo eliminar el evento.';
+            setError(msg);
+        } finally {
+            setEliminandoEventoId(null);
+        }
+    };
+
     // Ficha Médica de Emergencia (Encargados)
     const handleVerEmergencia = async (miembro) => {
         if (!canManage) return;
@@ -486,7 +691,31 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
         try {
             const res = await api.get(`/clubes/${id}/miembros/${miembro.id}/emergencia`);
-            setSelectedEmergencia(res.data);
+            const raw = res.data || {};
+            const normalizado = {
+                usuario: {
+                    nombres: toSafeString(raw.usuario?.nombres || raw.nombre_completo || raw.nombres || miembro.nombres || miembro.nombre_completo),
+                    apellidos: toSafeString(raw.usuario?.apellidos || raw.apellidos || miembro.apellidos),
+                    correo: toSafeString(raw.usuario?.correo || raw.correo || miembro.correo),
+                    boleta: toSafeString(raw.usuario?.boleta || raw.boleta || miembro.boleta),
+                    num_empleado: toSafeString(raw.usuario?.num_empleado || raw.num_empleado || miembro.num_empleado)
+                },
+                ficha_medica: {
+                    tipo_sangre: toSafeString(raw.ficha_medica?.tipo_sangre || raw.tipo_sangre) || 'No especificado',
+                    alergias: toSafeString(raw.ficha_medica?.alergias || raw.alergias) || 'Ninguna registrada',
+                    padecimientos: toSafeString(raw.ficha_medica?.padecimientos || raw.condiciones_preexistentes) || 'Ninguno registrado',
+                    seguro_medico: toSafeString(raw.ficha_medica?.seguro_medico || (raw.nss ? 'IMSS / NSS' : 'IMSS Facultativo')),
+                    numero_poliza: toSafeString(raw.ficha_medica?.numero_poliza || raw.nss || 'N/A'),
+                    clinica: toSafeString(raw.ficha_medica?.clinica || '')
+                },
+                contactos: (Array.isArray(raw.contactos) ? raw.contactos : []).map(c => ({
+                    id: c.id,
+                    nombre: toSafeString(c.nombre),
+                    telefono: toSafeString(c.telefono),
+                    parentesco: toSafeString(c.parentesco)
+                }))
+            };
+            setSelectedEmergencia(normalizado);
         } catch (err) {
             console.error("Error al obtener datos de emergencia:", err);
             setErrorEmergencia(err.response?.data?.message || 'No fue posible cargar la información de emergencia.');
@@ -497,9 +726,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
     const handleExpulsarMiembro = async (miembro) => {
         if (!canManage || !miembro?.id) return;
-        const nombreCompleto = `${miembro.nombres || ''} ${miembro.apellidos || ''}`.trim() || 'este integrante';
+        const nombreCompleto = toSafeString(miembro.nombre_completo || `${miembro.nombres || ''} ${miembro.apellidos || ''}`.trim()) || 'este integrante';
         const confirmar = window.confirm(
-            `¿Estás seguro de que deseas expulsar a "${nombreCompleto}" del club "${club?.nombre || ''}"?\n\nPerderá su membresía y el acceso al chat y eventos internos del club.`
+            `¿Estás seguro de que deseas expulsar a "${nombreCompleto}" del club "${toSafeString(club?.nombre)}"?\n\nPerderá su membresía y el acceso al chat y eventos internos del club.`
         );
         if (!confirmar) return;
 
@@ -554,7 +783,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
             setCodigoInput('');
             fetchAvisos();
             fetchEventos();
-            if (esAdmin || esProfesor) fetchMiembros();
+            if (canViewMiembros) fetchMiembros();
         } catch (err) {
             setJoinMessage({
                 text: err.response?.data?.message || 'Código inválido o error al unirte al club con este código.',
@@ -639,9 +868,9 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
 
     // Filtrado de miembros en vivo
     const filteredMiembros = miembros.filter(m => {
-        const nombreCompleto = `${m.nombres || ''} ${m.apellidos || ''}`.toLowerCase();
-        const correo = (m.correo || '').toLowerCase();
-        const boleta = (m.boleta || '').toLowerCase();
+        const nombreCompleto = toSafeString(m.nombre_completo || `${m.nombres || ''} ${m.apellidos || ''}`).toLowerCase();
+        const correo = toSafeString(m.correo || '').toLowerCase();
+        const boleta = toSafeString(m.boleta || m.num_empleado || '').toLowerCase();
         const term = searchMember.toLowerCase().trim();
 
         const matchBusqueda = !term || nombreCompleto.includes(term) || correo.includes(term) || boleta.includes(term);
@@ -659,7 +888,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
     // - Para miembros estudiantes: Información General, Avisos Internos, Eventos del Club
     // - Para miembros profesores o administradores: se añade Padrón de Miembros
     // - Para encargados/admin: se añade Crear Avisos y Eventos
-    const tabs = isMember ? [
+    const tabs = (isMember || canManage || esAdmin) ? [
         { id: 'detalles', label: 'Información General', icon: 'ℹ️' },
         { id: 'avisos', label: 'Avisos Internos', icon: '📢', count: avisosVisibles.length },
         { id: 'eventos', label: 'Eventos del Club', icon: '📅', count: eventos.length },
@@ -932,6 +1161,79 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* AVISO DE RECHAZO (EXCLUSIVO PARA ENCARGADOS Y ADMINISTRACIÓN) */}
+                        {club?.estatus === 'rechazado' && club?.motivo_rechazo && esEncargado && (
+                            <div style={{
+                                backgroundColor: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                borderLeft: '6px solid #dc2626',
+                                borderRadius: '12px',
+                                padding: '22px 26px',
+                                boxShadow: '0 4px 14px rgba(220, 38, 38, 0.08)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '14px'
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <span style={{ fontSize: '1.8rem', lineHeight: 1 }}>⚠️</span>
+                                        <div>
+                                            <h3 style={{ margin: 0, color: '#991b1b', fontSize: '1.25rem', fontWeight: '800' }}>
+                                                Propuesta de Club Rechazada
+                                            </h3>
+                                            <span style={{ fontSize: '0.82rem', color: '#b91c1c', fontWeight: '600' }}>
+                                                Observaciones institucionales de la administración (Visible solo para encargados)
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {esEncargado && (
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate(`/club/${id}/editar`)}
+                                            style={{
+                                                backgroundColor: '#dc2626',
+                                                color: '#ffffff',
+                                                border: 'none',
+                                                padding: '10px 18px',
+                                                borderRadius: '8px',
+                                                fontWeight: '700',
+                                                fontSize: '0.9rem',
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
+                                            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                                        >
+                                            ✏️ Corregir Propuesta
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div style={{
+                                    backgroundColor: '#ffffff',
+                                    border: '1px solid #fca5a5',
+                                    borderRadius: '8px',
+                                    padding: '16px 20px'
+                                }}>
+                                    <strong style={{ display: 'block', color: '#7f1d1d', fontSize: '0.88rem', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        Motivo u Observaciones del Administrador:
+                                    </strong>
+                                    <p style={{ margin: 0, color: '#1f2937', fontSize: '1.02rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                                        {club.motivo_rechazo}
+                                    </p>
+                                </div>
+
+                                <p style={{ margin: 0, color: '#7f1d1d', fontSize: '0.88rem', lineHeight: '1.5' }}>
+                                    💡 <strong>¿Qué debes hacer?</strong> Revisa los puntos anteriores y realiza las modificaciones solicitadas usando el botón <em>"Corregir y Subsanar Propuesta"</em>. Al guardar tus cambios, la propuesta pasará automáticamente al estado <strong>"En Revisión"</strong> para que el administrador la evalúe nuevamente.
+                                </p>
+                            </div>
+                        )}
 
                         {/* BARRA DE PESTAÑAS DE ESCRITORIO (DESKTOP TABS) */}
                         <div style={{
@@ -1590,27 +1892,53 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                             👥 <strong>Confirmados:</strong> {evento.total_asistentes || 0} integrantes
                                                                         </div>
 
-                                                                        {canManage && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => handleVerAsistentesEvento(evento)}
-                                                                                style={{
-                                                                                    backgroundColor: '#eff6ff',
-                                                                                    color: '#003366',
-                                                                                    border: '1px solid #bfdbfe',
-                                                                                    borderRadius: '7px',
-                                                                                    padding: '5px 11px',
-                                                                                    fontSize: '0.8rem',
-                                                                                    fontWeight: '700',
-                                                                                    cursor: 'pointer',
-                                                                                    display: 'inline-flex',
-                                                                                    alignItems: 'center',
-                                                                                    gap: '5px'
-                                                                                }}
-                                                                            >
-                                                                                📋 Ver lista de asistentes
-                                                                            </button>
-                                                                        )}
+                                                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                                            {canManage && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleVerAsistentesEvento(evento)}
+                                                                                    style={{
+                                                                                        backgroundColor: '#eff6ff',
+                                                                                        color: '#003366',
+                                                                                        border: '1px solid #bfdbfe',
+                                                                                        borderRadius: '7px',
+                                                                                        padding: '5px 11px',
+                                                                                        fontSize: '0.8rem',
+                                                                                        fontWeight: '700',
+                                                                                        cursor: 'pointer',
+                                                                                        display: 'inline-flex',
+                                                                                        alignItems: 'center',
+                                                                                        gap: '5px'
+                                                                                    }}
+                                                                                >
+                                                                                    📋 Ver lista de asistentes
+                                                                                </button>
+                                                                            )}
+                                                                            {esAdmin && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleEliminarEventoAdmin(evento)}
+                                                                                    disabled={eliminandoEventoId === evento.id}
+                                                                                    title="Eliminar evento institucional (Administrador)"
+                                                                                    style={{
+                                                                                        backgroundColor: '#fce8e6',
+                                                                                        color: '#b42318',
+                                                                                        border: '1px solid #fecaca',
+                                                                                        borderRadius: '7px',
+                                                                                        padding: '5px 11px',
+                                                                                        fontSize: '0.8rem',
+                                                                                        fontWeight: '700',
+                                                                                        cursor: eliminandoEventoId === evento.id ? 'wait' : 'pointer',
+                                                                                        display: 'inline-flex',
+                                                                                        alignItems: 'center',
+                                                                                        gap: '4px',
+                                                                                        transition: 'all 0.15s ease'
+                                                                                    }}
+                                                                                >
+                                                                                    {eliminandoEventoId === evento.id ? '⏳ Eliminando...' : '🗑️ Eliminar'}
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
 
                                                                     {esAlumnoOProfesor && (
@@ -1806,21 +2134,21 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                 <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1c1e21', fontSize: '0.92rem' }}>
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                                         <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#003366', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                                                                            {(miembro.nombres || 'U').charAt(0).toUpperCase()}
+                                                                            {(toSafeString(miembro.nombres) || 'U').charAt(0).toUpperCase()}
                                                                         </div>
                                                                         <div>
-                                                                            <div>{miembro.nombres} {miembro.apellidos}</div>
-                                                                            {miembro.boleta && (
-                                                                                <small style={{ color: '#888', fontFamily: 'monospace' }}>Boleta: {miembro.boleta}</small>
+                                                                            <div>{toSafeString(miembro.nombre_completo || `${miembro.nombres || ''} ${miembro.apellidos || ''}`.trim())}</div>
+                                                                            {toSafeString(miembro.boleta) && (
+                                                                                <small style={{ color: '#888', fontFamily: 'monospace' }}>Boleta: {toSafeString(miembro.boleta)}</small>
                                                                             )}
-                                                                            {miembro.num_empleado && (
-                                                                                <small style={{ color: '#888', fontFamily: 'monospace' }}>No. Emp: {miembro.num_empleado}</small>
+                                                                            {toSafeString(miembro.num_empleado) && (
+                                                                                <small style={{ color: '#888', fontFamily: 'monospace' }}>No. Emp: {toSafeString(miembro.num_empleado)}</small>
                                                                             )}
                                                                         </div>
                                                                     </div>
                                                                 </td>
                                                                 <td style={{ padding: '12px 16px', color: '#555', fontSize: '0.9rem' }}>
-                                                                    {miembro.correo || '—'}
+                                                                    {toSafeString(miembro.correo) || '—'}
                                                                 </td>
                                                                 <td style={{ padding: '12px 16px' }}>
                                                                     <span style={{
@@ -1843,7 +2171,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                         color: miembro.estatus === 'activo' ? '#155724' : '#856404',
                                                                         fontWeight: 'bold'
                                                                     }}>
-                                                                        {miembro.estatus || 'activo'}
+                                                                        {toSafeString(miembro.estatus) || 'activo'}
                                                                     </span>
                                                                 </td>
                                                                 {canManage && (
@@ -1870,8 +2198,8 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                             </button>
 
                                                                             {!['encargado_profesor', 'encargado_alumno'].includes(miembro.rol_en_club) &&
-                                                                                Number(miembro.id) !== Number(club.profesor_encargado_id) &&
-                                                                                Number(miembro.id) !== Number(club.alumno_encargado_id) &&
+                                                                                Number(miembro.id) !== Number(club?.profesor_encargado_id) &&
+                                                                                Number(miembro.id) !== Number(club?.alumno_encargado_id) &&
                                                                                 Number(miembro.id) !== Number(user?.id) && (
                                                                                 <button
                                                                                     type="button"
@@ -2504,12 +2832,15 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                 {/* Encabezado del Alumno */}
                                 <div style={{ background: '#f8f9fa', padding: '16px 20px', borderRadius: '8px', borderLeft: '4px solid #003366' }}>
                                     <div style={{ fontSize: '1.15rem', fontWeight: 'bold', color: '#1c1e21' }}>
-                                        {selectedEmergencia.usuario?.nombres} {selectedEmergencia.usuario?.apellidos}
+                                        {toSafeString(selectedEmergencia.usuario?.nombres)} {toSafeString(selectedEmergencia.usuario?.apellidos)}
                                     </div>
                                     <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap', marginTop: '6px', fontSize: '0.88rem', color: '#555' }}>
-                                        <span>📧 {selectedEmergencia.usuario?.correo}</span>
-                                        {selectedEmergencia.usuario?.boleta && (
-                                            <span>🎓 Boleta: <strong>{selectedEmergencia.usuario?.boleta}</strong></span>
+                                        <span>📧 {toSafeString(selectedEmergencia.usuario?.correo)}</span>
+                                        {toSafeString(selectedEmergencia.usuario?.boleta) && (
+                                            <span>🎓 Boleta: <strong>{toSafeString(selectedEmergencia.usuario?.boleta)}</strong></span>
+                                        )}
+                                        {toSafeString(selectedEmergencia.usuario?.num_empleado) && (
+                                            <span>💼 No. Emp: <strong>{toSafeString(selectedEmergencia.usuario?.num_empleado)}</strong></span>
                                         )}
                                     </div>
                                 </div>
@@ -2536,31 +2867,31 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                     borderRadius: '12px',
                                                     fontSize: '0.95rem'
                                                 }}>
-                                                    {selectedEmergencia.ficha_medica?.tipo_sangre || 'No especificado'}
+                                                    {toSafeString(selectedEmergencia.ficha_medica?.tipo_sangre) || 'No especificado'}
                                                 </span>
                                             </div>
 
                                             <div>
                                                 <span style={{ color: '#666', display: 'block', fontSize: '0.8rem' }}>ALERGIAS</span>
-                                                <strong style={{ color: selectedEmergencia.ficha_medica?.alergias ? '#dc3545' : '#333' }}>
-                                                    {selectedEmergencia.ficha_medica?.alergias || 'Ninguna registrada'}
+                                                <strong style={{ color: selectedEmergencia.ficha_medica?.alergias && selectedEmergencia.ficha_medica?.alergias !== 'Ninguna registrada' ? '#dc3545' : '#333' }}>
+                                                    {toSafeString(selectedEmergencia.ficha_medica?.alergias) || 'Ninguna registrada'}
                                                 </strong>
                                             </div>
 
                                             <div>
                                                 <span style={{ color: '#666', display: 'block', fontSize: '0.8rem' }}>PADECIMIENTOS CRÓNICOS</span>
-                                                <strong>{selectedEmergencia.ficha_medica?.padecimientos || 'Ninguno registrado'}</strong>
+                                                <strong>{toSafeString(selectedEmergencia.ficha_medica?.padecimientos) || 'Ninguno registrado'}</strong>
                                             </div>
 
                                             <div>
                                                 <span style={{ color: '#666', display: 'block', fontSize: '0.8rem' }}>SEGURO MÉDICO / NSS</span>
-                                                <strong>{selectedEmergencia.ficha_medica?.seguro_medico || 'IMSS Facultativo'} ({selectedEmergencia.ficha_medica?.numero_poliza || 'N/A'})</strong>
+                                                <strong>{toSafeString(selectedEmergencia.ficha_medica?.seguro_medico) || 'IMSS Facultativo'} ({toSafeString(selectedEmergencia.ficha_medica?.numero_poliza) || 'N/A'})</strong>
                                             </div>
 
-                                            {selectedEmergencia.ficha_medica?.clinica && (
+                                            {toSafeString(selectedEmergencia.ficha_medica?.clinica) && (
                                                 <div>
                                                     <span style={{ color: '#666', display: 'block', fontSize: '0.8rem' }}>CLÍNICA / UMF</span>
-                                                    <strong>{selectedEmergencia.ficha_medica.clinica}</strong>
+                                                    <strong>{toSafeString(selectedEmergencia.ficha_medica.clinica)}</strong>
                                                 </div>
                                             )}
                                         </div>
@@ -2592,7 +2923,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                     <div key={idx} style={{ background: '#f8f9fa', padding: '12px', borderRadius: '8px', border: '1px solid #e9ecef' }}>
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                             <div style={{ fontWeight: 'bold', color: '#003366', fontSize: '0.95rem' }}>
-                                                                {c.nombre}
+                                                                {toSafeString(c.nombre)}
                                                             </div>
                                                             {idx >= 2 && (
                                                                 <span style={{ fontSize: '0.7rem', color: '#0369a1', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
@@ -2601,17 +2932,17 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                             )}
                                                         </div>
                                                         <div style={{ fontSize: '0.82rem', color: '#666', marginBottom: '8px' }}>
-                                                            Parentesco: {c.parentesco || 'Familiar'}
+                                                            Parentesco: {toSafeString(c.parentesco) || 'Familiar'}
                                                         </div>
 
-                                                        {c.telefono && (
+                                                        {toSafeString(c.telefono) && (
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                 <button
                                                                     type="button"
-                                                                    onClick={() => handleCopiarTelefono(c.telefono)}
+                                                                    onClick={() => handleCopiarTelefono(toSafeString(c.telefono))}
                                                                     style={{
                                                                         padding: '8px 14px',
-                                                                        background: telefonoCopiado === c.telefono ? '#28a745' : '#003366',
+                                                                        background: telefonoCopiado === toSafeString(c.telefono) ? '#28a745' : '#003366',
                                                                         color: '#fff',
                                                                         border: 'none',
                                                                         borderRadius: '6px',
@@ -2623,7 +2954,7 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                                                                         gap: '6px'
                                                                     }}
                                                                 >
-                                                                    📋 {telefonoCopiado === c.telefono ? '✓ ¡Número Copiado!' : `Copiar: ${c.telefono}`}
+                                                                    📋 {telefonoCopiado === toSafeString(c.telefono) ? '✓ ¡Número Copiado!' : `Copiar: ${toSafeString(c.telefono)}`}
                                                                 </button>
                                                             </div>
                                                         )}
@@ -3170,8 +3501,36 @@ const ClubDetailsPage = ({ defaultTab = 'detalles' }) => {
                             borderTop: '1px solid #e2e8f0',
                             backgroundColor: '#f8fafc',
                             display: 'flex',
-                            justifyContent: 'flex-end'
+                            justifyContent: esAdmin ? 'space-between' : 'flex-end',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '8px'
                         }}>
+                            {esAdmin && (
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        await handleEliminarEventoAdmin(eventoAsistentesModal);
+                                    }}
+                                    disabled={eliminandoEventoId === eventoAsistentesModal.id}
+                                    style={{
+                                        padding: '8px 16px',
+                                        backgroundColor: '#fce8e6',
+                                        color: '#b42318',
+                                        border: '1px solid #fecaca',
+                                        borderRadius: '8px',
+                                        fontWeight: '700',
+                                        fontSize: '0.88rem',
+                                        cursor: eliminandoEventoId === eventoAsistentesModal.id ? 'wait' : 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    {eliminandoEventoId === eventoAsistentesModal.id ? '⏳ Eliminando...' : '🗑️ Eliminar Evento'}
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={() => setEventoAsistentesModal(null)}

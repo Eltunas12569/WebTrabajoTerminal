@@ -81,6 +81,79 @@ const Login = () => {
         fetchAvisos();
     }, []);
 
+    // Avisos borrados/descartados solo para el usuario en este login (almacenamiento local)
+    const [descartados, setDescartados] = useState(() => {
+        try {
+            const savedCorreo = sessionStorage.getItem('login_correo');
+            const general = JSON.parse(localStorage.getItem('avisos_descartados_login') || '[]');
+            if (savedCorreo && savedCorreo.trim()) {
+                const porCorreo = JSON.parse(localStorage.getItem(`avisos_descartados_login_${savedCorreo.trim().toLowerCase()}`) || '[]');
+                return Array.from(new Set([...general, ...porCorreo]));
+            }
+            return general;
+        } catch {
+            return [];
+        }
+    });
+
+    // Sincronizar descartados cuando el usuario ingresa su correo
+    useEffect(() => {
+        if (correo && correo.trim()) {
+            try {
+                const general = JSON.parse(localStorage.getItem('avisos_descartados_login') || '[]');
+                const porCorreo = JSON.parse(localStorage.getItem(`avisos_descartados_login_${correo.trim().toLowerCase()}`) || '[]');
+                setDescartados(Array.from(new Set([...general, ...porCorreo])));
+            } catch (err) {
+                console.error("Error al sincronizar avisos descartados:", err);
+            }
+        }
+    }, [correo]);
+
+    // Borrar aviso solo para el usuario actual (sin alterar la BD ni a otros usuarios)
+    const handleBorrarAvisoParaMi = (e, avisoId) => {
+        if (e) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+        const idStr = String(avisoId);
+        const nuevos = Array.from(new Set([...descartados, idStr]));
+        setDescartados(nuevos);
+
+        try {
+            localStorage.setItem('avisos_descartados_login', JSON.stringify(nuevos));
+            if (correo && correo.trim()) {
+                const keyCorreo = `avisos_descartados_login_${correo.trim().toLowerCase()}`;
+                const prev = JSON.parse(localStorage.getItem(keyCorreo) || '[]');
+                localStorage.setItem(keyCorreo, JSON.stringify(Array.from(new Set([...prev, idStr]))));
+            }
+        } catch (err) {
+            console.error("Error al guardar aviso descartado:", err);
+        }
+
+        if (avisoSeleccionado && String(avisoSeleccionado.id) === idStr) {
+            setAvisoSeleccionado(null);
+        }
+    };
+
+    // Restaurar los avisos que este usuario haya borrado para sí mismo
+    const handleRestaurarAvisos = (e) => {
+        if (e) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+        setDescartados([]);
+        try {
+            localStorage.removeItem('avisos_descartados_login');
+            if (correo && correo.trim()) {
+                localStorage.removeItem(`avisos_descartados_login_${correo.trim().toLowerCase()}`);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const avisosVisibles = avisos.filter(a => !descartados.includes(String(a.id)));
+
     // Efecto para recuperar el error y el correo si la página se recarga inesperadamente
     useEffect(() => {
         const savedError = sessionStorage.getItem('login_error');
@@ -250,7 +323,7 @@ const Login = () => {
                 <div style={{ padding: '24px 20px', width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '15px' }}>
                         <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span>📢</span> Tablero de Avisos
+                            <span>📢</span> Tablero de Avisos {avisosVisibles.length > 0 && <span style={{ fontSize: '0.9rem', opacity: 0.85 }}>({avisosVisibles.length})</span>}
                         </h2>
                         <button
                             onClick={() => setIsAvisosOpen(false)}
@@ -273,8 +346,8 @@ const Login = () => {
                     </div>
 
                     <div className="hide-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '5px' }}>
-                        {avisos.length > 0 ? (
-                            avisos.map(aviso => (
+                        {avisosVisibles.length > 0 ? (
+                            avisosVisibles.map(aviso => (
                                 <div 
                                     key={aviso.id} 
                                     onClick={() => setAvisoSeleccionado(aviso)}
@@ -326,9 +399,42 @@ const Login = () => {
                                                 flexShrink: 0
                                             }}
                                         />
-                                        <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#fff', fontWeight: '600', lineHeight: '1.3' }}>
+                                        <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#fff', fontWeight: '600', lineHeight: '1.3', flex: 1, paddingRight: '4px' }}>
                                             {aviso.titulo}
                                         </h3>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleBorrarAvisoParaMi(e, aviso.id)}
+                                            title="Borrar este aviso solo para mí"
+                                            style={{
+                                                background: 'rgba(255, 255, 255, 0.12)',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                color: 'rgba(255, 255, 255, 0.75)',
+                                                width: '28px',
+                                                height: '28px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer',
+                                                fontSize: '0.85rem',
+                                                flexShrink: 0,
+                                                transition: 'all 0.2s ease',
+                                                marginLeft: 'auto'
+                                            }}
+                                            onMouseOver={(e) => {
+                                                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.4)';
+                                                e.currentTarget.style.color = '#ff8080';
+                                                e.currentTarget.style.transform = 'scale(1.1)';
+                                            }}
+                                            onMouseOut={(e) => {
+                                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                                                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.75)';
+                                                e.currentTarget.style.transform = 'scale(1)';
+                                            }}
+                                        >
+                                            🗑️
+                                        </button>
                                     </div>
                                     <p style={{ 
                                         margin: '0 0 10px 0', 
@@ -365,6 +471,30 @@ const Login = () => {
                                     </div>
                                 </div>
                             ))
+                        ) : descartados.length > 0 ? (
+                            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', marginTop: '40px', padding: '0 10px' }}>
+                                <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '12px' }}>✨</span>
+                                <p style={{ margin: '0 0 14px 0', fontSize: '0.95rem', color: '#fff' }}>Has borrado u ocultado todos los avisos.</p>
+                                <button
+                                    type="button"
+                                    onClick={handleRestaurarAvisos}
+                                    style={{
+                                        padding: '8px 16px',
+                                        backgroundColor: 'rgba(255,255,255,0.15)',
+                                        color: '#fff',
+                                        border: '1px solid rgba(255,255,255,0.35)',
+                                        borderRadius: '8px',
+                                        fontSize: '0.86rem',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                    onMouseOver={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'; }}
+                                    onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)'; }}
+                                >
+                                    ↺ Restaurar avisos ({descartados.length})
+                                </button>
+                            </div>
                         ) : (
                             <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', marginTop: '40px' }}>
                                 <span style={{ fontSize: '3rem', display: 'block', marginBottom: '15px' }}>📭</span>
@@ -372,6 +502,31 @@ const Login = () => {
                             </div>
                         )}
                     </div>
+
+                    {descartados.length > 0 && avisosVisibles.length > 0 && (
+                        <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.15)', textAlign: 'center' }}>
+                            <button
+                                type="button"
+                                onClick={handleRestaurarAvisos}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'rgba(255, 255, 255, 0.75)',
+                                    fontSize: '0.8rem',
+                                    cursor: 'pointer',
+                                    textDecoration: 'underline',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px'
+                                }}
+                                onMouseOver={(e) => { e.currentTarget.style.color = '#ffffff'; }}
+                                onMouseOut={(e) => { e.currentTarget.style.color = 'rgba(255, 255, 255, 0.75)'; }}
+                                title="Volver a mostrar los avisos que borraste solo para ti"
+                            >
+                                ↺ Restaurar avisos que borraste ({descartados.length})
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -406,7 +561,7 @@ const Login = () => {
                         onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,51,102,0.4)' }}
                         onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,51,102,0.3)' }}
                     >
-                        <span>🔔</span> Ver Avisos ({avisos.length})
+                        <span>🔔</span> Ver Avisos ({avisosVisibles.length})
                     </button>
                 )}
 
@@ -732,8 +887,34 @@ const Login = () => {
                             borderTop: '1px solid #e2e8f0',
                             backgroundColor: '#f8fafc',
                             display: 'flex',
-                            justifyContent: 'flex-end'
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '12px'
                         }}>
+                            <button
+                                type="button"
+                                onClick={(e) => handleBorrarAvisoParaMi(e, avisoSeleccionado.id)}
+                                style={{
+                                    padding: '8px 16px',
+                                    backgroundColor: 'transparent',
+                                    color: '#dc2626',
+                                    border: '1px solid #fca5a5',
+                                    borderRadius: '8px',
+                                    fontWeight: '600',
+                                    fontSize: '0.88rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.2s ease'
+                                }}
+                                onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; }}
+                                onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                                title="Borrar este aviso solo para mí (otros usuarios aún podrán verlo)"
+                            >
+                                🗑️ Borrar aviso para mí
+                            </button>
+
                             <button
                                 onClick={() => setAvisoSeleccionado(null)}
                                 style={{

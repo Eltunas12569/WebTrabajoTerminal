@@ -602,33 +602,1024 @@
 /* ==========================================================================
    7. MODAL DE FIRMAS MODERNIZADO
    ========================================================================== */
+.signatures-modal-dialog {
+    max-width: 860px !important;
+    width: 94% !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    border-radius: 18px !important;
+    padding: 28px !important;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.22) !important;
+    position: relative !important;
+}
+
+.sig-modal-close-btn {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    z-index: 1000;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.sig-modal-close-btn:hover {
+    background: #fee2e2;
+    color: #dc2626;
+    border-color: #fca5a5;
+    transform: scale(1.08);
+}
+
+.sig-modal-header {
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 16px;
+    position: relative;
+}
+
+.sig-modal-header-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.sig-modal-badge {
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.sig-modal-code {
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+.sig-modal-title {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #003366;
+    margin: 0 0 4px 0;
+}
+
+.sig-modal-subtitle {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.92rem;
+}
+
+.sig-status-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.sig-status-notice.waiting {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+}
+
+.sig-status-notice.ready {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+
+.sig-status-notice.error-alert {
+    background: #fef2f2;
+    border: 1.5px solid #fecaca;
+    color: #991b1b;
+}
+
+.sig-status-notice.warning-rep {
+    background: #fffbeb;
+    border: 1.5px solid #fde68a;
+    color: #92400e;
+}
+
+.sig-btn-notice-action {
+    margin-top: 10px;
+    padding: 7px 15px;
+    background: #b91c1c;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.18s ease;
+    box-shadow: 0 2px 6px rgba(185, 28, 28, 0.25);
+}
+
+.sig-btn-notice-action:hover {
+    background: #991b1b;
+    transform: translateY(-1px);
+}
+
+.sig-notice-icon {
+    font-size: 1.4rem;
+    line-height: 1;
+}
+
+.sig-notice-content strong {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 0.95rem;
+}
+
+.sig-notice-content p {
+    margin: 0;
+}
+
 .signatures-summary-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
     margin-bottom: 20px;
 }
 
 .sig-metric-box {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 12px 16px;
+    border-radius: 12px;
+    padding: 14px 18px;
     text-align: center;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sig-metric-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.sig-metric-box.success {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+.sig-metric-box.warning {
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
+.sig-metric-box.danger {
+    background: #fef2f2;
+    border-color: #fecaca;
 }
 
 .sig-metric-val {
     display: block;
-    font-size: 1.5rem;
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: #003366;
+    line-height: 1.2;
+}
+
+.sig-metric-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Barra de progreso de firmas */
+.sig-progress-container {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+}
+
+.sig-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.88rem;
+}
+
+.sig-progress-title {
+    font-weight: 700;
+    color: #334155;
+}
+
+.sig-progress-percent {
     font-weight: 800;
     color: #003366;
 }
 
-.sig-metric-label {
+.sig-progress-percent.complete {
+    color: #16a34a;
+}
+
+.sig-progress-track {
+    height: 10px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.sig-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #003366, #2563eb);
+    border-radius: 999px;
+    transition: width 0.4s ease;
+}
+
+.sig-progress-fill.complete {
+    background: linear-gradient(90deg, #16a34a, #22c55e);
+}
+
+/* Barra de herramientas / buscador / filtros */
+.sig-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.sig-search-box {
+    position: relative;
+    flex: 1;
+    min-width: 240px;
+}
+
+.sig-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.85rem;
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+.sig-search-box input {
+    width: 100%;
+    padding: 9px 34px 9px 36px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    color: #1e293b;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.sig-search-box input:focus {
+    border-color: #003366;
+    box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1);
+}
+
+.sig-search-clear {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.1rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.sig-filters {
+    display: flex;
+    gap: 6px;
+}
+
+.sig-filter-btn {
+    padding: 8px 14px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #475569;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.sig-filter-btn:hover {
+    background: #f1f5f9;
+}
+
+.sig-filter-btn.active {
+    background: #003366;
+    color: #fff;
+    border-color: #003366;
+}
+
+.sig-filter-btn.rejected.active {
+    background: #dc2626;
+    color: #fff;
+    border-color: #dc2626;
+}
+
+.sig-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sig-btn-asignar-rep-toolbar {
+    padding: 8px 16px;
+    background: #d97706;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.18s ease;
+    box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
+}
+
+.sig-btn-asignar-rep-toolbar:hover {
+    background: #b45309;
+    transform: translateY(-1px);
+}
+
+.sig-invite-toggle-btn {
+    padding: 8px 16px;
+    background: #003366;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 6px rgba(0, 51, 102, 0.2);
+}
+
+.sig-invite-toggle-btn:hover {
+    background: #002244;
+    transform: translateY(-1px);
+}
+
+.sig-invite-toggle-btn.active {
+    background: #475569;
+}
+
+/* Panel Desplegable para Invitar Alumnos */
+.sig-invite-panel {
+    background: #f8fafc;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+    animation: fadeInSlide 0.2s ease;
+}
+
+.sig-invite-panel.rep-mode {
+    border-color: #f59e0b;
+    background: #fffdf5;
+}
+
+.sig-invite-role-selector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.sig-invite-role-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #475569;
+}
+
+.sig-invite-role-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.sig-invite-role-chip {
+    padding: 6px 12px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.sig-invite-role-chip:hover {
+    background: #e2e8f0;
+}
+
+.sig-invite-role-chip.active {
+    background: #003366;
+    color: #ffffff;
+    border-color: #003366;
+}
+
+.sig-invite-role-chip.rep.active {
+    background: #d97706;
+    color: #ffffff;
+    border-color: #d97706;
+    box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
+}
+
+@keyframes fadeInSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.sig-invite-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+
+.sig-invite-panel-title {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.sig-invite-panel-icon {
+    font-size: 1.4rem;
+    line-height: 1;
+}
+
+.sig-invite-panel-title strong {
+    font-size: 1rem;
+    color: #003366;
+    display: block;
+    margin-bottom: 3px;
+}
+
+.sig-invite-panel-title p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.sig-invite-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.3rem;
+    color: #94a3b8;
+    cursor: pointer;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+}
+
+.sig-invite-close-btn:hover {
+    color: #1e293b;
+    background: #e2e8f0;
+}
+
+.sig-invite-alert {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.86rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+}
+
+.sig-invite-alert.success {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.sig-invite-alert.error {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+
+.sig-invite-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sig-invite-search-container {
+    position: relative;
+    width: 100%;
+}
+
+.sig-invite-input-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.sig-invite-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.9rem;
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+.sig-invite-input {
+    width: 100%;
+    padding: 10px 40px 10px 38px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: #1e293b;
+    background: #ffffff;
+    outline: none;
+    transition: all 0.18s ease;
+}
+
+.sig-invite-input:focus {
+    border-color: #003366;
+    box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1);
+}
+
+.sig-invite-spinner-inline {
+    position: absolute;
+    right: 12px;
+    top: calc(50% - 9px);
+    width: 18px;
+    height: 18px;
+    border: 2px solid #cbd5e1;
+    border-top-color: #003366;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+.sig-invite-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 10;
+}
+
+.sig-invite-dropdown.empty {
+    padding: 14px 16px;
+    color: #64748b;
+    font-size: 0.85rem;
+    font-style: italic;
+    text-align: center;
+}
+
+.sig-invite-dropdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.sig-invite-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.sig-invite-dropdown-item:hover {
+    background: #eff6ff;
+}
+
+.sig-invite-student-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.sig-invite-student-name {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.sig-invite-student-boleta {
     font-size: 0.78rem;
     color: #64748b;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+.sig-invite-select-badge {
+    font-size: 0.78rem;
     font-weight: 700;
+    color: #003366;
+    background: #e0f2fe;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.sig-invite-selected-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    border: 1.5px solid #bfdbfe;
+    border-radius: 8px;
+    padding: 12px 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.sig-invite-selected-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sig-invite-selected-label {
+    font-size: 0.76rem;
     text-transform: uppercase;
+    color: #64748b;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+}
+
+.sig-invite-selected-name {
+    font-size: 0.96rem;
+    color: #003366;
+}
+
+.sig-invite-selected-boleta {
+    font-size: 0.82rem;
+    color: #475569;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+.sig-invite-selected-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.sig-invite-btn-cancel-select {
+    padding: 8px 14px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.sig-invite-btn-cancel-select:hover {
+    background: #e2e8f0;
+}
+
+.sig-invite-btn-send {
+    padding: 8px 18px;
+    background: #16a34a;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    box-shadow: 0 2px 6px rgba(22, 163, 74, 0.25);
+}
+
+.sig-invite-btn-send:hover {
+    background: #15803d;
+    transform: translateY(-1px);
+}
+
+.sig-invite-btn-send.rep-btn {
+    background: #d97706;
+    box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
+}
+
+.sig-invite-btn-send.rep-btn:hover {
+    background: #b45309;
+}
+
+.sig-invite-btn-send:disabled {
+    background: #cbd5e1;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Tabla de Firmas */
+.sig-table-wrapper {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow-x: auto;
+    background: #fff;
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.sig-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.sig-table thead th {
+    position: sticky;
+    top: 0;
+    background: #003366;
+    color: #fff;
+    font-weight: 700;
+    padding: 12px 14px;
+    text-align: left;
+    font-size: 0.82rem;
+    letter-spacing: 0.3px;
+    z-index: 2;
+}
+
+.sig-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.15s ease;
+}
+
+.sig-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.sig-table tbody td {
+    padding: 12px 14px;
+    vertical-align: middle;
+}
+
+.sig-td-idx {
+    font-weight: 700;
+    color: #94a3b8;
+    font-size: 0.82rem;
+    text-align: center;
+}
+
+.sig-student-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sig-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    color: #fff;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.sig-student-names {
+    display: flex;
+    flex-direction: column;
+}
+
+.sig-name {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 0.92rem;
+}
+
+.sig-email {
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.sig-boleta-chip {
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #334155;
+    background: #f1f5f9;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+
+.sig-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.sig-status-badge.signed {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.sig-status-badge.pending {
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fde68a;
+}
+
+.sig-status-badge.rejected {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+.sig-status-rejected-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.sig-rol-cell-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sig-btn-promover-rep {
+    padding: 3px 8px;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    border-radius: 6px;
+    font-size: 0.73rem;
+    font-weight: 700;
+    color: #b45309;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.sig-btn-promover-rep:hover {
+    background: #fde68a;
+    color: #78350f;
+    transform: translateY(-1px);
+}
+
+.sig-btn-promover-rep:disabled {
+    background: #e2e8f0;
+    color: #94a3b8;
+    cursor: not-allowed;
+    border-color: #cbd5e1;
+    transform: none;
+}
+
+.sig-btn-reemplazar-rep-mini {
+    padding: 3px 8px;
+    background: #fff;
+    border: 1px solid #fca5a5;
+    border-radius: 6px;
+    font-size: 0.73rem;
+    font-weight: 700;
+    color: #dc2626;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.sig-btn-reemplazar-rep-mini:hover {
+    background: #fee2e2;
+    color: #991b1b;
+    transform: translateY(-1px);
+}
+
+.sig-empty-row {
+    text-align: center;
+    padding: 32px 16px;
+    color: #64748b;
+    font-style: italic;
+}
+
+/* Pie del modal */
+.sig-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    margin-top: 22px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+    flex-wrap: wrap;
+}
+
+.btn-enviar-revision {
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.94rem;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.btn-enviar-revision.ready {
+    background: #16a34a;
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.28);
+}
+
+.btn-enviar-revision.ready:hover {
+    background: #15803d;
+    transform: translateY(-1px);
+}
+
+.btn-enviar-revision.locked {
+    background: #e2e8f0;
+    color: #64748b;
+    cursor: not-allowed;
+    border: 1px dashed #cbd5e1;
+}
+
+.sig-loading-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: #64748b;
+}
+
+.sig-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid #e2e8f0;
+    border-top-color: #003366;
+    border-radius: 50%;
+    margin: 0 auto 14px auto;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 /* ==========================================================================
@@ -647,6 +1638,12 @@
         padding: 20px;
     }
 
+    .signatures-summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 550px) {
     .signatures-summary-grid {
         grid-template-columns: 1fr;
     }

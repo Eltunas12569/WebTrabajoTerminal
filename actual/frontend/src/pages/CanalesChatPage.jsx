@@ -223,9 +223,6 @@ const CanalesChatPage = ({ canalInicial }) => {
             <header className="admin-navbar-fixed" style={{ backgroundColor: '#003366', color: '#fff' }}>
                 <div className="nav-left">
                     <button className="menu-toggle" onClick={toggleSidebar}>☰</button>
-                    <span className="nav-title">
-                        {canalActivo === 'directivos' ? 'Sala de Directivos' : '🤝 Sala de Encargados'}
-                    </span>
                 </div>
                 <div className="nav-right" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                     <button
@@ -319,7 +316,7 @@ const CanalesChatPage = ({ canalInicial }) => {
                                     <div className="chat-empty-state">
                                         <div className="chat-empty-icon">💬</div>
                                         <h3 className="chat-empty-title">
-                                            {canalActivo === 'directivos' ? 'Sala General de Directivos' : 'Sala Exclusiva de Encargados'}
+                                            Sin mensajes aún
                                         </h3>
                                         <p className="chat-empty-subtitle">
                                             No hay mensajes previos en esta sala institucional. ¡Sé el primero en iniciar la conversación en tiempo real!
