@@ -13,4 +13,8 @@ const pool = mysql.createPool({
     keepAliveInitialDelay: 0
 });
 
+pool.on('connection', (connection) => {
+    connection.query("SET block_encryption_mode = 'aes-256-ecb';");
+});
+
 module.exports = pool.promise();

@@ -109,15 +109,17 @@ io.on('connection', (socket) => {
     socket.on('enviar_mensaje', async (data) => {
         const { club_id: idClub, mensaje } = data;
         try {
-            const [resultado] = await db.query(
-                `INSERT INTO chat_mensajes (club_id, usuario_id, tipo_sala, mensaje) VALUES (?, ?, 'club', ?)`,
-                [idClub, socket.datosUsuario.id, mensaje]
+            const [etiquetas] = await db.query(
+                `SELECT IF(rol_en_club = 'encargado_profesor', 'Profe Titular', IF(rol_en_club = 'encargado_alumno', 'Alumno Rep.', 'Miembro')) AS etiqueta 
+             FROM inscripciones WHERE usuario_id = ? AND club_id = ? LIMIT 1`,
+                [socket.datosUsuario.id, idClub]
             );
             const nuevoMensaje = {
                 id: resultado.insertId,
                 club_id: idClub,
                 usuario_id: socket.datosUsuario.id,
                 autor_nombre: socket.datosUsuario.nombreCompleto,
+                etiqueta_encargado: etiquetas[0]?.etiqueta || 'Miembro',
                 mensaje,
                 fecha_envio: new Date().toISOString()
             };
