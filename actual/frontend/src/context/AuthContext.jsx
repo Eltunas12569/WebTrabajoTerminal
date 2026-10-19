@@ -12,22 +12,81 @@ export const AuthProvider = ({ children }) => {
 
     const socketRef = useRef(null);
 
-    // 1. Cargar usuario desde localStorage al iniciar
+    // 1. Cargar y validar rol/sesión directamente con el servidor al iniciar o recargar
     useEffect(() => {
-        const storedUser = localStorage.getItem('user_data');
-        if (storedUser) {
-            try {
-                const parsed = JSON.parse(storedUser);
-                setUser(parsed);
-                if (parsed?.requiere_aceptar_politicas) {
-                    setPoliticaPendiente(parsed?.politica_actual || null);
-                    setMostrarModalPoliticas(true);
+        let isMounted = true;
+
+        const sincronizarSesionConServidor = async () => {
+            const token = localStorage.getItem('token');
+            const storedUser = localStorage.getItem('user_data');
+
+            if (!token) {
+                if (isMounted) {
+                    localStorage.removeItem('user_data');
+                    setUser(null);
+                    setLoading(false);
                 }
-            } catch (e) {
-                localStorage.clear();
+                return;
             }
-        }
-        setLoading(false);
+
+            // Carga preliminar del caché local para estado inicial
+            let usuarioTemporal = null;
+            if (storedUser) {
+                try {
+                    usuarioTemporal = JSON.parse(storedUser);
+                    if (isMounted) {
+                        setUser(usuarioTemporal);
+                        if (usuarioTemporal?.requiere_aceptar_politicas) {
+                            setPoliticaPendiente(usuarioTemporal?.politica_actual || null);
+                            setMostrarModalPoliticas(true);
+                        }
+                    }
+                } catch (e) {
+                    localStorage.removeItem('user_data');
+                }
+            }
+
+            // Verificación autoritativa con el servidor (obtiene el role_id real de la BD)
+            try {
+                const res = await api.get('/auth/perfil');
+                if (res.data && isMounted) {
+                    const perfilServidor = res.data;
+                    const usuarioVerificado = {
+                        ...(usuarioTemporal || {}),
+                        id: perfilServidor.id,
+                        role_id: Number(perfilServidor.role_id),
+                        rol: Number(perfilServidor.role_id),
+                        correo: perfilServidor.correo,
+                        nombres: perfilServidor.nombres,
+                        apellido_paterno: perfilServidor.apellido_paterno,
+                        apellido_materno: perfilServidor.apellido_materno,
+                        apellidos: `${perfilServidor.apellido_paterno || ''} ${perfilServidor.apellido_materno || ''}`.trim(),
+                        boleta: perfilServidor.boleta,
+                        num_empleado: perfilServidor.num_empleado,
+                        verificado: Boolean(perfilServidor.verificado)
+                    };
+                    setUser(usuarioVerificado);
+                    localStorage.setItem('user_data', JSON.stringify(usuarioVerificado));
+                }
+            } catch (err) {
+                // Si el token es inválido o expiró en el servidor (401 o 403), purgar sesión
+                if (err.response?.status === 401 || err.response?.status === 403) {
+                    if (isMounted) {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user_data');
+                        setUser(null);
+                    }
+                }
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        sincronizarSesionConServidor();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     // 2. Verificar estado de políticas con el servidor
