@@ -50,14 +50,14 @@ router.put('/:id/enviar-revision', verificarToken, requireVerificado, async (req
             [id]
         );
         if (rep.length === 0) {
-            return res.status(400).json({ 
-                message: "No se puede enviar a revisión: El club requiere obligatoriamente que el Alumno Representante haya aceptado y firmado su participación. Si declinó o aún está pendiente, debes esperar su firma o asignar a otro representante." 
+            return res.status(400).json({
+                message: "No se puede enviar a revisión: El club requiere obligatoriamente que el Alumno Representante haya aceptado y firmado su participación. Si declinó o aún está pendiente, debes esperar su firma o asignar a otro representante."
             });
         }
 
         // 2. Validar que se alcancen al menos 20 firmas de estudiantes en total
         const [resultadoConteo] = await db.query(
-            `SELECT COUNT(*) as total FROM inscripciones WHERE club_id = ? AND estatus = 'activo' AND rol_en_club != 'encargado_profesor'`, 
+            `SELECT COUNT(*) as total FROM inscripciones WHERE club_id = ? AND estatus = 'activo' AND rol_en_club != 'encargado_profesor'`,
             [id]
         );
         if (resultadoConteo[0].total < 20) {
@@ -66,9 +66,9 @@ router.put('/:id/enviar-revision', verificarToken, requireVerificado, async (req
 
         await db.query(`UPDATE clubes SET estatus = 'en_revision' WHERE id = ?`, [id]);
         res.status(200).json({ message: "Club enviado a revisión exitosamente" });
-    } catch (error) { 
+    } catch (error) {
         console.error("Error al enviar club a revisión:", error);
-        res.status(500).json({ message: "Error interno al enviar club a revisión" }); 
+        res.status(500).json({ message: "Error interno al enviar club a revisión" });
     }
 });
 
@@ -812,8 +812,8 @@ router.put('/:id/asignar-representante', verificarToken, requireVerificado, chec
                 [clubId]
             );
             if (repActual.length > 0 && repActual[0].estatus !== 'rechazado') {
-                return res.status(400).json({ 
-                    message: "El Alumno Representante actual aún no ha declinado la invitación. Solo se puede asignar a otro si el principal rechazó." 
+                return res.status(400).json({
+                    message: "El Alumno Representante actual aún no ha declinado la invitación. Solo se puede asignar a otro si el principal rechazó."
                 });
             }
         }
@@ -876,7 +876,7 @@ router.put('/:id/asignar-representante', verificarToken, requireVerificado, chec
             mensajeAccion = `Se ha invitado a ${nombreAlumno} como nuevo Alumno Representante. Queda pendiente de confirmar su firma.`;
         }
 
-        res.status(200).json({ 
+        res.status(200).json({
             message: mensajeAccion,
             alumno_id: nuevo_usuario_id,
             nombre_completo: nombreAlumno
