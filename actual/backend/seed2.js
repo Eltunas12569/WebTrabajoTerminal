@@ -365,7 +365,6 @@ const seedMasivo = async () => {
         console.log("⏳ 12. Inyectando Avisos Globales e Internos de Clubes...");
 
         // --- 1. AVISOS GLOBALES ---
-        // --- 1. AVISOS GLOBALES ---
         const avisosGlobales = [
             { titulo: 'Apertura de Convocatoria de Clubes', contenido: 'Se abre el registro formal para los talleres del semestre.', prioridad: 'alta' },
             { titulo: 'Mantenimiento en Instalaciones Deportivas', contenido: 'Las canchas permanecerán en mantenimiento preventivo.', prioridad: 'normal' },
