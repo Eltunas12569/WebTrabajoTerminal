@@ -81,35 +81,34 @@ const Login = () => {
         fetchAvisos();
     }, []);
 
-    // Avisos borrados/descartados solo para el usuario en este login (almacenamiento local)
+    // Purga de privacidad para computadoras compartidas (laboratorios escolares):
+    // Elimina de inmediato cualquier rastro histórico de correos guardados en llaves de localStorage
+    useEffect(() => {
+        try {
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.startsWith('avisos_descartados_login_') || key === 'avisos_descartados_login')) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+            sessionStorage.removeItem('login_correo');
+        } catch (e) {
+            // Ignorar errores de acceso al almacenamiento
+        }
+    }, []);
+
+    // Avisos borrados/descartados solo en la sesión activa del navegador (sessionStorage anónimo)
     const [descartados, setDescartados] = useState(() => {
         try {
-            const savedCorreo = sessionStorage.getItem('login_correo');
-            const general = JSON.parse(localStorage.getItem('avisos_descartados_login') || '[]');
-            if (savedCorreo && savedCorreo.trim()) {
-                const porCorreo = JSON.parse(localStorage.getItem(`avisos_descartados_login_${savedCorreo.trim().toLowerCase()}`) || '[]');
-                return Array.from(new Set([...general, ...porCorreo]));
-            }
-            return general;
+            return JSON.parse(sessionStorage.getItem('avisos_descartados_login') || '[]');
         } catch {
             return [];
         }
     });
 
-    // Sincronizar descartados cuando el usuario ingresa su correo
-    useEffect(() => {
-        if (correo && correo.trim()) {
-            try {
-                const general = JSON.parse(localStorage.getItem('avisos_descartados_login') || '[]');
-                const porCorreo = JSON.parse(localStorage.getItem(`avisos_descartados_login_${correo.trim().toLowerCase()}`) || '[]');
-                setDescartados(Array.from(new Set([...general, ...porCorreo])));
-            } catch (err) {
-                console.error("Error al sincronizar avisos descartados:", err);
-            }
-        }
-    }, [correo]);
-
-    // Borrar aviso solo para el usuario actual (sin alterar la BD ni a otros usuarios)
+    // Borrar aviso solo para esta sesión del navegador (sin persistir correos en storage)
     const handleBorrarAvisoParaMi = (e, avisoId) => {
         if (e) {
             e.stopPropagation();
@@ -120,14 +119,9 @@ const Login = () => {
         setDescartados(nuevos);
 
         try {
-            localStorage.setItem('avisos_descartados_login', JSON.stringify(nuevos));
-            if (correo && correo.trim()) {
-                const keyCorreo = `avisos_descartados_login_${correo.trim().toLowerCase()}`;
-                const prev = JSON.parse(localStorage.getItem(keyCorreo) || '[]');
-                localStorage.setItem(keyCorreo, JSON.stringify(Array.from(new Set([...prev, idStr]))));
-            }
+            sessionStorage.setItem('avisos_descartados_login', JSON.stringify(nuevos));
         } catch (err) {
-            console.error("Error al guardar aviso descartado:", err);
+            console.error("Error al guardar aviso descartado en sesión:", err);
         }
 
         if (avisoSeleccionado && String(avisoSeleccionado.id) === idStr) {
@@ -135,7 +129,7 @@ const Login = () => {
         }
     };
 
-    // Restaurar los avisos que este usuario haya borrado para sí mismo
+    // Restaurar los avisos descartados en la sesión actual
     const handleRestaurarAvisos = (e) => {
         if (e) {
             e.stopPropagation();
@@ -143,10 +137,7 @@ const Login = () => {
         }
         setDescartados([]);
         try {
-            localStorage.removeItem('avisos_descartados_login');
-            if (correo && correo.trim()) {
-                localStorage.removeItem(`avisos_descartados_login_${correo.trim().toLowerCase()}`);
-            }
+            sessionStorage.removeItem('avisos_descartados_login');
         } catch (err) {
             console.error(err);
         }
@@ -154,15 +145,12 @@ const Login = () => {
 
     const avisosVisibles = avisos.filter(a => !descartados.includes(String(a.id)));
 
-    // Efecto para recuperar el error y el correo si la página se recarga inesperadamente
+    // Efecto para recuperar el error si la página se recarga inesperadamente
     useEffect(() => {
         const savedError = sessionStorage.getItem('login_error');
-        const savedCorreo = sessionStorage.getItem('login_correo');
-        
         if (savedError) {
             setError(savedError);
-            sessionStorage.removeItem('login_error'); // Lo eliminamos para que no vuelva a salir si navega normal
-            if (savedCorreo) setCorreo(savedCorreo);
+            sessionStorage.removeItem('login_error');
         }
     }, []);
 
@@ -217,9 +205,8 @@ const Login = () => {
             
             setError(String(textoError));
             
-            // Guardamos el error y el correo en sessionStorage por si Vite recarga la página
+            // Guardamos el error en sessionStorage por si Vite recarga la página
             sessionStorage.setItem('login_error', String(textoError));
-            sessionStorage.setItem('login_correo', correo);
             
             // Limpiamos la contraseña para que el usuario la vuelva a intentar, manteniendo el correo
             setPassword(''); 

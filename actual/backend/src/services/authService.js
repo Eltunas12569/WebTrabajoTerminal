@@ -175,14 +175,20 @@ const reenviarCodigoOTP = async (usuarioId) => {
 };
 
 const solicitarRecuperacion = async (correo) => {
-    const [rows] = await db.query('SELECT id FROM usuarios WHERE correo = ?', [correo]);
+    const [rows] = await db.query('SELECT id, bloqueado_hasta FROM usuarios WHERE correo = ?', [correo]);
     if (rows.length === 0) throw new Error('El correo electrónico no está registrado');
+
+    const usuario = rows[0];
+    if (usuario.bloqueado_hasta && new Date(usuario.bloqueado_hasta) > new Date()) {
+        const tiempoRestante = Math.ceil((new Date(usuario.bloqueado_hasta) - new Date()) / 60000);
+        throw new Error(`Cuenta bloqueada temporalmente. Intenta de nuevo en ${tiempoRestante} minutos.`);
+    }
 
     const codigoOTP = Math.floor(100000 + Math.random() * 900000).toString();
     const expiracionOTP = new Date(Date.now() + 15 * 60 * 1000);
 
     await db.query(
-        'UPDATE usuarios SET codigo_otp = ?, expiracion_otp = ? WHERE correo = ?',
+        'UPDATE usuarios SET codigo_otp = ?, expiracion_otp = ?, intentos_fallidos = 0, bloqueado_hasta = NULL WHERE correo = ?',
         [codigoOTP, expiracionOTP, correo]
     );
 
@@ -191,15 +197,47 @@ const solicitarRecuperacion = async (correo) => {
 };
 
 const restablecerPassword = async (correo, codigoIngresado, nuevaContrasena) => {
-    const [rows] = await db.query('SELECT id, codigo_otp, expiracion_otp FROM usuarios WHERE correo = ?', [correo]);
+    const [rows] = await db.query(
+        'SELECT id, codigo_otp, expiracion_otp, intentos_fallidos, bloqueado_hasta FROM usuarios WHERE correo = ?',
+        [correo]
+    );
     if (rows.length === 0) throw new Error('Usuario no encontrado');
 
     const usuario = rows[0];
-    if (!usuario.codigo_otp || !usuario.expiracion_otp) throw new Error('No hay una solicitud de recuperación pendiente');
+
+    // 1. Candado de cuenta bloqueada
+    if (usuario.bloqueado_hasta && new Date(usuario.bloqueado_hasta) > new Date()) {
+        const tiempoRestante = Math.ceil((new Date(usuario.bloqueado_hasta) - new Date()) / 60000);
+        throw new Error(`Cuenta bloqueada temporalmente. Intenta de nuevo en ${tiempoRestante} minutos.`);
+    }
+
+    if (!usuario.codigo_otp || !usuario.expiracion_otp) {
+        throw new Error('No hay una solicitud de recuperación pendiente');
+    }
 
     const ahora = new Date();
-    if (ahora > new Date(usuario.expiracion_otp)) throw new Error('El código ha expirado. Solicita uno nuevo.');
-    if (usuario.codigo_otp !== codigoIngresado) throw new Error('El código de verificación es incorrecto');
+    if (ahora > new Date(usuario.expiracion_otp)) {
+        throw new Error('El código ha expirado. Solicita uno nuevo.');
+    }
+
+    // 2. Validación de código con conteo estricto de intentos fallidos
+    if (usuario.codigo_otp !== codigoIngresado) {
+        await db.query(`UPDATE usuarios SET intentos_fallidos = intentos_fallidos + 1 WHERE id = ?`, [usuario.id]);
+        const [usuarioActualizado] = await db.query(`SELECT intentos_fallidos FROM usuarios WHERE id = ?`, [usuario.id]);
+        const intentos = usuarioActualizado[0].intentos_fallidos;
+
+        if (intentos >= 5) {
+            // Invalidar código OTP actual y bloquear cuenta por 15 minutos (mismo candado de login)
+            await db.query(
+                `UPDATE usuarios SET bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 15 MINUTE), codigo_otp = NULL, expiracion_otp = NULL WHERE id = ?`,
+                [usuario.id]
+            );
+            throw new Error('Límite de intentos superado. Cuenta bloqueada por 15 minutos.');
+        }
+
+        const intentosRestantes = 5 - intentos;
+        throw new Error(`El código de verificación es incorrecto. Intentos restantes: ${intentosRestantes}`);
+    }
 
     const expresionContrasena = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
     if (!expresionContrasena.test(nuevaContrasena)) {

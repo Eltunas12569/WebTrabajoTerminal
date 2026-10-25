@@ -10,6 +10,13 @@ const AES_KEY = process.env.AES_KEY;
 
 const app = express();
 
+// Ocultar la marca del servidor en la red (OWASP ASVS V13 - Deshabilitar X-Powered-By)
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+    res.removeHeader('X-Powered-By');
+    next();
+});
+
 const origenesPermitidos = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(origen => origen.trim())
     : ['http://localhost:5173'];
