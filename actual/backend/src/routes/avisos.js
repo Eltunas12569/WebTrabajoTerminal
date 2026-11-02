@@ -134,12 +134,15 @@ router.get('/all-for-admin', verifyToken, requireVerificado, async (req, res) =>
     }
 });
 
-// Crear aviso global (Solo Administrador)
+// Crear aviso global (Administradores y Encargados)
 router.post('/', verifyToken, requireVerificado, async (req, res) => {
     try {
         const [users] = await db.query('SELECT role_id FROM usuarios WHERE id = ?', [req.user.id]);
-        if (!users.length || Number(users[0].role_id) !== 1) {
-            return res.status(403).json({ message: 'Acceso denegado. Solo administradores pueden publicar avisos globales.' });
+
+        // Modificación: Permitimos acceso si el rol es 1 (Admin), 3 (Profesor) o 4 (Alumno Representante)
+        const rolUsuario = users.length ? Number(users[0].role_id) : null;
+        if (!rolUsuario || ![1, 3, 4].includes(rolUsuario)) {
+            return res.status(403).json({ message: 'Acceso denegado. Solo administradores y encargados pueden publicar avisos globales.' });
         }
 
         const { titulo, contenido, prioridad = 'normal', fecha_vencimiento } = req.body;
