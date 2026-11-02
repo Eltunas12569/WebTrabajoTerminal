@@ -3,16 +3,18 @@ const db = require('./src/config/db');
 const limpiarBaseDeDatos = async () => {
     try {
         console.log("🧹 INICIANDO LIMPIEZA TOTAL DE LA BASE DE DATOS...");
-        
+
         await db.query('SET FOREIGN_KEY_CHECKS = 0;');
 
         const tablas = [
-            'roles', 
-            'usuarios', 
-            'contactos_emergencia', 
-            'clubes', 
-            'inscripciones', 
-            'historial_encargados', 
+            'politicas_versiones',
+            'historial_aceptacion_politicas',
+            'roles',
+            'usuarios',
+            'contactos_emergencia',
+            'clubes',
+            'inscripciones',
+            'historial_encargados',
             'avisos',
             'chat_mensajes',
             'eventos_club',
@@ -25,7 +27,7 @@ const limpiarBaseDeDatos = async () => {
         }
 
         await db.query('SET FOREIGN_KEY_CHECKS = 1;');
-        
+
         console.log("🚀 Limpieza terminada. Tu base de datos está en blanco y lista.");
         process.exit(0);
 
